@@ -1,0 +1,43 @@
+{
+  "_readme": "One venue for ./bootstrap.sh add-client <file>. Copy to venues/<name>.json (gitignored: it holds this venue's Square token and login secret) and fill in. Keys starting with _ are comments; blank values are skipped.",
+
+  "username": "",
+  "_username": "3-63 letters, numbers, dots or hyphens, starting and ending with a letter or number. Becomes the client ID, database name and S3 bucket suffix. By convention, the venue Square merchant ID (e.g. M5E5N7KAHZA7Q).",
+  "clientSecret": "",
+  "_clientSecret": "The venue-level login secret (log in with username = client ID = the value above). A long random string; effectively a root credential.",
+  "contactName": "",
+  "clientEmail": "",
+  "theater_name": "",
+
+  "square_access_token": "",
+  "_square_access_token": "This venue's own Square application access token (Square Developer Dashboard > Credentials).",
+  "square_location_id": "",
+  "_square_location_id": "Optional. Blank with square_webhook.auto: the merchant's only active location, if there is exactly one.",
+  "square_signature_key": "",
+  "_square_signature_key": "Leave blank with square_webhook.auto (it is created for you). Otherwise: from the webhook subscription you set up by hand.",
+
+  "square_webhook": {
+    "auto": true,
+    "_auto": "true: add-client creates/updates this venue's Square webhook subscription (payment.updated only) pointing at this environment, and remove-client deletes it.",
+    "expected_merchant_id": "",
+    "_expected_merchant_id": "Required with auto. The merchant ID the token belongs to; nothing is changed in Square if it does not match.",
+    "name": "",
+    "_name": "Optional. Defaults to <ENV_PREFIX>-<username>. Only the subscription with this name is ever touched."
+  },
+
+  "admin_username": "",
+  "admin_password": "",
+  "admin_email": "",
+  "_admin": "Optional named full-permission staff account, both username and password or neither.",
+
+  "settings": {
+    "_readme": "Optional initial Client Settings, same keys as first-client-settings.json.template. Only user-definable keys are applied.",
+    "WEB_HEADER_COMPANY": "",
+    "SENDER_EMAIL": "",
+    "OWNER_BCC_EMAIL": "",
+    "OMDB_API_KEY": "",
+    "THEATER_ID": "",
+    "EBOR_THEATRE_NO": "",
+    "ONE_PER_EMAIL_ITEMS": ""
+  }
+}

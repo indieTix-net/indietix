@@ -26,7 +26,7 @@ source "$SCRIPT_DIR/lib/build-helpers.sh"
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") <command> [--yes]
+Usage: $(basename "$0") <command> [args]
 
   up [--yes]     Deploy all 12 stacks in dependency order and onboard the
                   first client. Prompts for confirmation unless --yes is
@@ -38,13 +38,25 @@ Usage: $(basename "$0") <command> [--yes]
                   (CloudFormation only applies the diff; the webhook is
                   left alone if already correct; onboarding fails cleanly
                   once the client exists).
-  down [--yes]   Delete every stack for this EnvPrefix, in reverse order.
+  down [--yes] [--production]
+                 Delete every stack for this EnvPrefix, in reverse order.
                   Destructive and not reversible: never run it against
                   production. Removes this environment's Square webhook
                   subscription (only if it points at this environment),
                   offboards every client (DB, secret, S3 buckets), empties
                   buckets so stacks can delete, and removes the
                   ticket-templates bucket and published shared layers.
+  add-client <venue-file>
+                 Add another venue to this environment from a venue JSON
+                  file (copy venue.json.template into venues/, gitignored).
+                  With square_webhook.auto, creates/updates that venue's own
+                  Square webhook subscription first. Safe to re-run.
+  remove-client <venue-file | client-id> [--yes] [--production]
+                 Remove one venue: its database, secret and S3 buckets
+                  (and, given its venue file, its Square webhook). Only
+                  touches a client that lives in this environment.
+                  Not reversible.
+  list-clients   Show the client IDs in this environment.
   block [--yes]  Reject every request to this environment (reserved
                   concurrency 0 on each of its Lambdas) -- what the optional
                   cost-guard breaker does when the daily budget is exceeded.
@@ -55,12 +67,16 @@ Config: bootstrap.config.sh in this directory (copy from
 bootstrap.config.sh.template). ENV_PREFIX namespaces everything, so
 multiple environments can coexist in the same AWS account/region.
 Check ENV_PREFIX, AWS_REGION and AWS_PROFILE there before 'up' or 'down'.
+With ENV_IS_PRODUCTION="true", down and remove-client refuse to run
+without --production and make you type the name to confirm.
 
 Examples:
   $(basename "$0") up
   $(basename "$0") up --yes
   $(basename "$0") down
   $(basename "$0") breaker-status
+  $(basename "$0") add-client venues/newvenue.json
+  $(basename "$0") remove-client venues/newvenue.json
 
 More: CHEATSHEET.md (every command on one page), README.md (setup),
 CLIENT_SETUP.md (adding venues).
@@ -95,6 +111,9 @@ FIRST_CLIENT_SQUARE_LOCATION_ID="${FIRST_CLIENT_SQUARE_LOCATION_ID:-}"
 # "Square webhook" section. When on, `up` creates/updates the subscription
 # and fills in the signature key itself, and `down` removes it.
 SQUARE_WEBHOOK_AUTO="${SQUARE_WEBHOOK_AUTO:-false}"
+# "true" marks this environment as production: down and remove-client then
+# refuse to run without --production, and make you type the name to confirm.
+ENV_IS_PRODUCTION="${ENV_IS_PRODUCTION:-false}"
 SQUARE_EXPECTED_MERCHANT_ID="${SQUARE_EXPECTED_MERCHANT_ID:-}"
 SQUARE_WEBHOOK_NAME="${SQUARE_WEBHOOK_NAME:-$ENV_PREFIX}"
 # Optional JSON file of initial Client Settings for the first client (OMDB,
@@ -151,10 +170,18 @@ SAM_ARGS=("${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION")
 # (signature_key, location_id, subscription_id) on stdout for the caller to
 # capture -- never echo it.
 square_webhook() {
-  SQUARE_ACCESS_TOKEN="$FIRST_CLIENT_SQUARE_ACCESS_TOKEN" \
-  SQUARE_EXPECTED_MERCHANT_ID="$SQUARE_EXPECTED_MERCHANT_ID" \
-  SQUARE_WEBHOOK_NAME="$SQUARE_WEBHOOK_NAME" \
-  SQUARE_LOCATION_ID="$FIRST_CLIENT_SQUARE_LOCATION_ID" \
+  square_webhook_for "$1" "$2" "$FIRST_CLIENT_SQUARE_ACCESS_TOKEN" "$SQUARE_EXPECTED_MERCHANT_ID" \
+    "$SQUARE_WEBHOOK_NAME" "$FIRST_CLIENT_SQUARE_LOCATION_ID"
+}
+
+# square_webhook_for <sync|remove> <url> <token> <merchant-id> <name> <location>
+# -- the same for any venue (add-client / remove-client). Function arguments
+# never reach a process listing; the token goes to python via the environment.
+square_webhook_for() {
+  SQUARE_ACCESS_TOKEN="$3" \
+  SQUARE_EXPECTED_MERCHANT_ID="$4" \
+  SQUARE_WEBHOOK_NAME="$5" \
+  SQUARE_LOCATION_ID="$6" \
   WEBHOOK_URL="$2" \
     python3 "$SCRIPT_DIR/lib/square-webhook.py" "$1"
 }
@@ -717,8 +744,69 @@ cleanup_lambda_enis() {
   echo
 }
 
+# env_client_ids -- prints the client IDs that live in THIS environment, one
+# per line. Client secrets (indieTix/rds/clients/<id>/credentials) aren't
+# namespaced by EnvPrefix, so match on the database host each one points
+# at, which is always this environment's own aurora-poc cluster. Same
+# auto-discovery pattern the inbound-SMS Lambda uses.
+env_client_ids() {
+  local cluster_host_prefix secret_name host
+  cluster_host_prefix="$(echo "${ENV_PREFIX}-aurora-poc" | tr '[:upper:]' '[:lower:]')"
+  for secret_name in $(aws secretsmanager list-secrets \
+      --filters Key=name,Values=indieTix/rds/clients/ \
+      --query 'SecretList[].Name' --output text \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null); do
+    host=$(aws secretsmanager get-secret-value --secret-id "$secret_name" \
+      --query SecretString --output text \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("host",""))' 2>/dev/null || true)
+    case "$host" in
+      "$cluster_host_prefix"*)
+        secret_name="${secret_name#indieTix/rds/clients/}"
+        echo "${secret_name%/credentials}"
+        ;;
+    esac
+  done
+}
+
+# confirm_destructive <what> <word> <yes_flag> <production_flag> -- the gate
+# for down and remove-client. In an environment marked ENV_IS_PRODUCTION it
+# refuses without --production, and then always makes you type <word>
+# (--yes is ignored there). Elsewhere it is the usual y/N (or --yes).
+# production_gate <what> <production_flag> -- in an environment marked
+# ENV_IS_PRODUCTION, refuse up front (before any AWS call) without --production.
+production_gate() {
+  if [ "$ENV_IS_PRODUCTION" = "true" ] && [ "$2" != "--production" ]; then
+    echo "Refusing: bootstrap.config.sh marks '$ENV_PREFIX' as production (ENV_IS_PRODUCTION=\"true\")." >&2
+    echo "If you really mean to $1 in production, re-run with --production." >&2
+    exit 1
+  fi
+}
+
+confirm_destructive() {
+  local what="$1" word="$2" yes_flag="$3" production_flag="$4" reply
+  production_gate "$what" "$production_flag"
+  if [ "$ENV_IS_PRODUCTION" = "true" ]; then
+    echo "PRODUCTION: about to $what in '$ENV_PREFIX' ($AWS_REGION). This is NOT reversible."
+    read -r -p "Type '$word' to confirm: " reply
+    [ "$reply" = "$word" ] || { echo "Aborted."; exit 1; }
+    return 0
+  fi
+  confirm "About to $what in '$ENV_PREFIX' ($AWS_REGION). This is NOT reversible. Proceed?" "$yes_flag" \
+    || { echo "Aborted."; exit 1; }
+}
+
 cmd_down() {
-  confirm "About to DELETE every stack for environment '$ENV_PREFIX' in $AWS_REGION, including the Aurora cluster, every client database, secret, and S3 bucket in it. This is NOT reversible. Proceed?" "${1:-}" || { echo "Aborted."; exit 1; }
+  local yes_flag="" production_flag="" arg
+  for arg in "$@"; do
+    case "$arg" in
+      --yes|-y) yes_flag="--yes" ;;
+      --production) production_flag="--production" ;;
+      *) echo "down: unknown option $arg" >&2; exit 1 ;;
+    esac
+  done
+  confirm_destructive "DELETE every stack, including the Aurora cluster and every client database, secret and S3 bucket" \
+    "$ENV_PREFIX" "$yes_flag" "$production_flag"
 
   # 0. This environment's Square webhook subscription (SQUARE_WEBHOOK_AUTO),
   # while the forwarder stack still exists to say which URL is ours. Only
@@ -734,31 +822,19 @@ cmd_down() {
     fi
   fi
 
-  # 1. Find every client that lives in THIS environment. Client secrets
-  # (indieTix/rds/clients/<id>/credentials) aren't namespaced by
-  # EnvPrefix, so match on the database host each one points at, which
-  # is always this environment's own aurora-poc cluster. Same
-  # auto-discovery pattern the inbound-SMS Lambda uses.
-  local cluster_host_prefix
-  cluster_host_prefix="$(echo "${ENV_PREFIX}-aurora-poc" | tr '[:upper:]' '[:lower:]')"
-  local env_clients=""
-  local secret_name host
-  for secret_name in $(aws secretsmanager list-secrets \
-      --filters Key=name,Values=indieTix/rds/clients/ \
-      --query 'SecretList[].Name' --output text \
-      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null); do
-    host=$(aws secretsmanager get-secret-value --secret-id "$secret_name" \
-      --query SecretString --output text \
-      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null \
-      | python3 -c 'import json,sys; print(json.load(sys.stdin).get("host",""))' 2>/dev/null || true)
-    case "$host" in
-      "$cluster_host_prefix"*)
-        secret_name="${secret_name#indieTix/rds/clients/}"
-        env_clients="$env_clients ${secret_name%/credentials}"
-        ;;
-    esac
+  # 1. Find every client that lives in THIS environment.
+  local env_clients
+  env_clients="$(env_client_ids | tr '\n' ' ')"
+  env_clients="${env_clients% }"
+  echo "Clients in this environment: ${env_clients:-(none found)}"
+  local other
+  for other in $env_clients; do
+    if [ "$other" != "$FIRST_CLIENT_USERNAME" ]; then
+      echo "  Note: $other's Square webhook subscription (if add-client made one) is not"
+      echo "  removed by down -- run 'remove-client <its venue file>' first, or delete it"
+      echo "  in that venue's Square Developer Dashboard afterwards."
+    fi
   done
-  echo "Clients in this environment:${env_clients:- (none found)}"
   echo
 
   # 2. Offboard each client through client-setup-teardown's own delete path
@@ -924,10 +1000,196 @@ cmd_breaker_status() {
 # ---- END COST BREAKER CONTROLS ----
 
 
+# ---- VENUES (add-client / remove-client / list-clients) ----
+# Every venue after the first one `up` onboards. A venue file is one JSON
+# object (venue.json.template; keep real ones in venues/, gitignored);
+# lib/venue.py reads it, so secrets go from the file into shell variables
+# and the Lambda payload file, never onto a command line.
+
+venue() { python3 "$SCRIPT_DIR/lib/venue.py" "$@"; }
+
+# resolve_venue_file <path> -- relative paths are relative to this directory
+# (like FIRST_CLIENT_SETTINGS_FILE); prints the absolute path.
+resolve_venue_file() {
+  case "$1" in /*) echo "$1" ;; *) echo "$SCRIPT_DIR/$1" ;; esac
+}
+
+# forwarder_webhook_url -- this environment's Square webhook endpoint, or
+# fails if the environment isn't up.
+forwarder_webhook_url() {
+  local url
+  url="$(stack_output square-queue-forwarder ApiEndpoint 2>/dev/null || true)"
+  if [ -z "$url" ] || [ "$url" = "None" ]; then
+    echo "Environment '$ENV_PREFIX' has no square-queue-forwarder stack in $AWS_REGION -- run 'up' first." >&2
+    exit 1
+  fi
+  echo "$url"
+}
+
+# client_in_env <id> -- whether that client lives in this environment. (Not
+# `env_client_ids | grep -q`: with pipefail, grep exiting early can make a
+# match look like a failure.)
+client_in_env() {
+  local id
+  for id in $(env_client_ids); do
+    [ "$id" = "$1" ] && return 0
+  done
+  return 1
+}
+
+cmd_list_clients() {
+  echo "Clients in environment '$ENV_PREFIX' ($AWS_REGION):"
+  local ids
+  ids="$(env_client_ids)"
+  if [ -n "$ids" ]; then
+    printf '  %s\n' $ids
+  else
+    echo "  (none)"
+  fi
+}
+
+cmd_add_client() {
+  [ -n "${1:-}" ] || { echo "Usage: $(basename "$0") add-client <venue-file>" >&2; exit 1; }
+  local file client
+  file="$(resolve_venue_file "$1")"
+  client="$(venue check "$file")" || exit 1
+  mkdir -p "$STAGING"
+
+  local webhook_url signature_key="" location_id="" already=false
+  webhook_url="$(forwarder_webhook_url)"
+  if client_in_env "$client"; then
+    already=true
+    echo "Client $client already exists in '$ENV_PREFIX' -- re-checking its webhook only."
+  fi
+
+  echo "=== Adding venue $client to '$ENV_PREFIX' ($AWS_REGION) ==="
+  if [ "$(venue field "$file" square_webhook.auto)" = "true" ]; then
+    local token merchant name location webhook_json
+    token="$(venue field "$file" square_access_token)"
+    merchant="$(venue field "$file" square_webhook.expected_merchant_id)"
+    name="$(venue field "$file" square_webhook.name)"
+    name="${name:-${ENV_PREFIX}-${client}}"
+    location="$(venue field "$file" square_location_id)"
+    echo "--- Square webhook subscription '$name' ---"
+    webhook_json="$(square_webhook_for sync "$webhook_url" "$token" "$merchant" "$name" "$location")" \
+      || { echo "Square webhook setup failed -- nothing was onboarded." >&2; exit 1; }
+    signature_key="$(printf %s "$webhook_json" | json_field signature_key)"
+    location_id="$(printf %s "$webhook_json" | json_field location_id)"
+    unset token webhook_json
+  fi
+  if [ "$already" = true ]; then
+    echo "Venue $client was already onboarded; nothing else to do. (To change its settings, use Client Settings.)"
+    return 0
+  fi
+
+  local payload_file static_website_url fn_name="${ENV_PREFIX}-client-setup-teardown"
+  static_website_url="https://${STATIC_SITE_DOMAIN:-$(stack_output static-site DistributionDomainName)}"
+  payload_file="$(umask 077; mktemp "$STAGING/venue-payload.XXXXXX")"
+  ENV_PREFIX="$ENV_PREFIX" SQUARE_WEBHOOK_URL="$webhook_url" \
+    SQUARE_SIGNATURE_KEY="$signature_key" SQUARE_LOCATION_ID="$location_id" \
+    STATIC_WEBSITE_URL="$static_website_url" \
+    venue payload "$file" "$payload_file" || { rm -f "$payload_file"; exit 1; }
+  unset signature_key
+
+  echo "--- Onboarding ---"
+  local result="$STAGING/venue-result.json" invoke_ok=true
+  aws lambda invoke --function-name "$fn_name" \
+    --cli-binary-format raw-in-base64-out \
+    --payload "fileb://$payload_file" \
+    "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
+    "$result" >/dev/null || invoke_ok=false
+  rm -f "$payload_file"
+  [ "$invoke_ok" = true ] || { echo "Onboarding invoke failed." >&2; exit 1; }
+  cat "$result"; echo
+  if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("statusCode") == 200 else 1)' "$result" 2>/dev/null; then
+    rm -f "$result"
+    echo "Onboarding did not succeed (see the message above, and CloudWatch logs for $fn_name)." >&2
+    exit 1
+  fi
+  rm -f "$result"
+  echo
+  echo "Venue $client is ready."
+  echo "  Site:   $static_website_url"
+  echo "  Log in: username and client ID '$client', password = clientSecret from $(basename "$file")"
+}
+
+cmd_remove_client() {
+  local target="" confirm_id="" yes_flag="" production_flag=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --confirm) confirm_id="${2:-}"; shift ;;
+      --yes|-y) yes_flag="--yes" ;;
+      --production) production_flag="--production" ;;
+      -*) echo "remove-client: unknown option $1" >&2; exit 1 ;;
+      *) target="$1" ;;
+    esac
+    shift
+  done
+  [ -n "$target" ] || { echo "Usage: $(basename "$0") remove-client <venue-file | client-id> [--yes] [--production]" >&2; exit 1; }
+  production_gate "remove a venue" "$production_flag"
+
+  # A venue file also lets us remove the venue's Square webhook (it needs the
+  # venue's own token); a bare client ID only offboards.
+  local file="" client
+  if [ -f "$(resolve_venue_file "$target")" ]; then
+    file="$(resolve_venue_file "$target")"
+    client="$(venue check "$file")" || exit 1
+  else
+    client="$target"
+  fi
+
+  client_in_env "$client" || {
+    echo "No client '$client' in environment '$ENV_PREFIX' ($AWS_REGION). Nothing was changed." >&2
+    echo "('$(basename "$0") list-clients' shows the ones that are.)" >&2
+    exit 1
+  }
+  # --confirm <id> is the non-interactive way to say yes outside production,
+  # and must name the same client.
+  if [ -n "$confirm_id" ]; then
+    [ "$confirm_id" = "$client" ] || { echo "--confirm $confirm_id doesn't match client $client. Nothing was changed." >&2; exit 1; }
+    yes_flag="--yes"
+  fi
+  confirm_destructive "remove venue $client (its database, secret and S3 buckets)" "$client" "$yes_flag" "$production_flag"
+
+  if [ -n "$file" ] && [ "$(venue field "$file" square_webhook.auto)" = "true" ]; then
+    local token merchant name webhook_url
+    webhook_url="$(forwarder_webhook_url)"
+    token="$(venue field "$file" square_access_token)"
+    merchant="$(venue field "$file" square_webhook.expected_merchant_id)"
+    name="$(venue field "$file" square_webhook.name)"
+    name="${name:-${ENV_PREFIX}-${client}}"
+    echo "=== Removing Square webhook subscription '$name' ==="
+    square_webhook_for remove "$webhook_url" "$token" "$merchant" "$name" "" \
+      || echo "  (couldn't remove it -- delete it in the Square Developer Dashboard)"
+    unset token
+  fi
+
+  echo "=== Offboarding client $client ==="
+  mkdir -p "$STAGING"
+  local result="$STAGING/offboard-result.json"
+  aws lambda invoke --function-name "${ENV_PREFIX}-client-setup-teardown" \
+    --cli-binary-format raw-in-base64-out \
+    --payload "{\"username\": \"$client\", \"delete_flag\": true}" \
+    "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
+    "$result" >/dev/null || { echo "Offboarding invoke failed." >&2; exit 1; }
+  cat "$result"; echo
+  rm -f "$result"
+  if [ -z "$file" ]; then
+    echo
+    echo "No venue file given, so this venue's Square webhook subscription (if any)"
+    echo "was left alone -- delete it in the Square Developer Dashboard, or re-run"
+    echo "with the venue file next time."
+  fi
+}
+# ---- END VENUES ----
+
 case "${1:-}" in
   help|-h|--help) usage; exit 0 ;;
   up) cmd_up "${2:-}" ;;
-  down) cmd_down "${2:-}" ;;
+  down) shift; cmd_down "$@" ;;
+  add-client) cmd_add_client "${2:-}" ;;
+  remove-client) shift; cmd_remove_client "$@" ;;
+  list-clients) cmd_list_clients ;;
   block) cmd_block "${2:-}" ;;
   unblock) cmd_unblock ;;
   breaker-status) cmd_breaker_status ;;

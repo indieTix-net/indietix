@@ -29,6 +29,11 @@ bootstrap.config.sh
 # service account key) -- see first-client-settings.json.template
 first-client-settings.json
 
+# Venue files for add-client / remove-client (each holds that venue's Square
+# token and login secret) -- see venue.json.template
+venues/
+*.venue.json
+
 # Throwaway sandbox-proof scaffolding -- not part of the real platform,
 # excluded from scope per the bootstrap plan.
 hello-test/

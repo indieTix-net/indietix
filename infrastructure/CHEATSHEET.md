@@ -15,7 +15,7 @@ Legend: **read-only** = changes nothing · **sandbox** = sandbox only · **PROD*
 |---|---|---|
 | `./bootstrap.sh up` | Deploys all 12 stacks in order, creates or updates the Square webhook (if `SQUARE_WEBHOOK_AUTO="true"`), and onboards the first venue with `FIRST_CLIENT_SETTINGS_FILE`. Asks first. Safe to re-run; onboarding fails cleanly once the venue exists. | ENV |
 | `./bootstrap.sh up --yes` | Same, no prompt (for unattended runs). | ENV |
-| `./bootstrap.sh down` | Removes the Square webhook (only if it points at this environment), offboards every venue, deletes every stack, bucket, layer and the Aurora cluster. **Not reversible. Never against production.** | ENV |
+| `./bootstrap.sh down` | Removes the Square webhook (only if it points at this environment), offboards every venue, deletes every stack, bucket, layer and the Aurora cluster. **Not reversible. Never against production** (with `ENV_IS_PRODUCTION="true"` it refuses unless you add `--production`, then makes you type the name). | ENV |
 | `./bootstrap.sh block` | Emergency stop: every Lambda in the environment rejects all requests. What the cost-guard breaker does when the daily budget trips. | ENV |
 | `./bootstrap.sh unblock` | Undo `block` or a tripped breaker. | ENV |
 | `./bootstrap.sh breaker-status` | Shows each Lambda as open or BLOCKED. | read-only |
@@ -61,8 +61,9 @@ Usually run together: `./deploy.sh deploy-layer QRScanner && ./deploy.sh attach-
 
 | Task | How | Touches |
 |---|---|---|
-| Add a venue | `aws lambda invoke --function-name <env-prefix>-client-setup-teardown --payload fileb://new-venue.json ...`; payload fields in [CLIENT_SETUP.md](./CLIENT_SETUP.md). Keep the payload in a private temp file: it holds the Square token and client secret. | ENV |
-| Remove a venue | Same function, payload `{"username": "<clientId>", "delete_flag": true}`. Deletes that venue's database, secret and buckets. **Not reversible.** | ENV |
+| List venues | `./bootstrap.sh list-clients` | read-only |
+| Add a venue | `cp venue.json.template venues/<name>.json`, fill it in, then `./bootstrap.sh add-client venues/<name>.json`. Sets up that venue's Square webhook (with `square_webhook.auto`) and onboards it. Safe to re-run. Field details in [CLIENT_SETUP.md](./CLIENT_SETUP.md). | ENV |
+| Remove a venue | `./bootstrap.sh remove-client venues/<name>.json` (also removes its Square webhook), or `remove-client <clientId>` (offboard only). Deletes that venue's database, secret and buckets. Only acts on a venue in this environment. **Not reversible.** | ENV |
 | One-off SQL | `aws lambda invoke --function-name <env-prefix>-sql-runner --payload '{"database": "<clientId>", "sql": "...", "params": [...]}' ...` | ENV |
 | Change a venue's settings | Log in to the site → Client Settings (client login). | that venue |
 
