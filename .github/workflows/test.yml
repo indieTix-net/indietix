@@ -19,6 +19,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# paths-filter lists a PR's changed files through the GitHub API, which
+# needs pull-requests:read; the org's default token doesn't grant it.
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   changes:
     runs-on: ubuntu-latest
