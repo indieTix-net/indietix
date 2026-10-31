@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  The real client-onboarding/offboarding Lambda, deployed against this
+  environment's Aurora cluster via imported exports (no CLI parameters
+  needed). Requires a Secrets Manager secret named
+  indieTix/rds/clients/indietix/credentials to exist first, holding the
+  Aurora master credentials -- this Lambda hardcodes that exact secret
+  path (matches production convention), so it must be created separately
+  before invoking. Creates real <EnvPrefix>-<clientId> S3 buckets when
+  invoked to onboard a client. Safe to delete at any time (deletes the
+  Lambda/layer only -- does not touch Aurora or any bucket it created).
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  TicketTemplatesBucket:
+    Type: String
+    Description: >
+      This environment's own ticket-template bucket name (created and seeded
+      with default_ticket_horizontal.pdf/default_ticket_vertical.pdf by
+      bootstrap.sh before this stack deploys -- see clientSetup-Teardown's
+      own README for the source of those two files). The real
+      code's default ('indietix-ticket-templates') is production's own
+      bucket in a different AWS account; every environment needs its own.
+
+Resources:
+  ClientSetupTeardownLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${EnvPrefix}-client-setup-teardown-deps"
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  ClientSetupTeardownFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-client-setup-teardown"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 120
+      MemorySize: 256
+      Layers:
+        - !Ref ClientSetupTeardownLayer
+      Environment:
+        Variables:
+          TICKET_TEMPLATES_BUCKET: !Ref TicketTemplatesBucket
+          DB_ADMIN_SECRET_ARN: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecretArn'
+          DB_HOST: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraEndpoint'
+          DB_PORT: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraPort'
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetA'
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetB'
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+                - secretsmanager:CreateSecret
+                - secretsmanager:DeleteSecret
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"
+                - !ImportValue
+                  'Fn::Sub': '${EnvPrefix}-AuroraSecretArn'
+            - Effect: Allow
+              Action:
+                - s3:CreateBucket
+                - s3:DeleteBucket
+                - s3:PutBucketPolicy
+                - s3:PutBucketCors
+                - s3:PutBucketPublicAccessBlock
+              Resource:
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*"
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:ListBucket
+                - s3:DeleteObject
+              Resource:
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*"
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*/*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:aws:s3:::${TicketTemplatesBucket}/*"
+
+  # Not sandbox-specific -- any fresh environment's Aurora cluster also has
+  # no public access, and no real Lambda creates the first admin Users row,
+  # so seeding that (or running any other one-off SQL) needs *some* way in.
+  # Reuses this stack's pg+bcryptjs layer. Scope is deliberately broad
+  # (any SQL, any client database) since it's a bootstrap/ops tool, not a
+  # customer-facing surface -- do not expose this Lambda's URL/ARN to
+  # anything outside direct CLI invoke.
+  SqlRunnerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-sql-runner"
+      CodeUri: sql-runner/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          DB_ADMIN_SECRET_ARN: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecretArn'
+          DB_HOST: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraEndpoint'
+          DB_PORT: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraPort'
+      Layers:
+        - !Ref ClientSetupTeardownLayer
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetA'
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetB'
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"
+                - !ImportValue
+                  'Fn::Sub': '${EnvPrefix}-AuroraSecretArn'

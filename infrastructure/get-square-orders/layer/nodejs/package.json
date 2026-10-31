@@ -1,0 +1,26 @@
+{
+  "name": "ticketing-libraries",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.1068.0",
+    "@aws-sdk/client-secrets-manager": "^3.873.0",
+    "@aws-sdk/s3-request-presigner": "^3.879.0",
+    "crypto": "^1.0.1",
+    "mailcomposer": "^4.0.2",
+    "mime": "^3.0.0",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^6.10.0",
+    "pdf-lib": "^1.17.1",
+    "pg": "^8.14.0",
+    "qrcode": "^1.5.4",
+    "square": "^42.0.1"
+  }
+}

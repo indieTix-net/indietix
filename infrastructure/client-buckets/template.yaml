@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Recreates the exact S3 bucket shape that clientSetup-Teardown/src/index.js's
+  createS3Buckets() stamps out per client at onboarding time: a main bucket
+  (public-read on movie-posters/, digest-backgrounds/, digest-generated/;
+  tickets-out/ stays private, served only via presigned URLs) plus the
+  companion "-bdor" bucket (created, intentionally left unconfigured, same
+  as production). In the real system these are created dynamically per
+  client by that Lambda, not declared statically per-client in IaC -- this
+  template is one client's worth, for a fresh environment's first client.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  ClientId:
+    Type: String
+    Default: sandboxtestclient
+    Description: This client's clientId (lowercase, matches real naming convention)
+  StaticSiteDomain:
+    Type: String
+    Default: ""
+    Description: This environment's CloudFront domain for the static site (e.g. d1234abcd.cloudfront.net) -- allowed as a CORS origin for direct browser uploads. Leave blank on first deploy (before static-site's domain is known) and update later via `sam deploy` again with this parameter set.
+
+Conditions:
+  HasStaticSiteDomain: !Not [!Equals [!Ref StaticSiteDomain, ""]]
+
+Resources:
+  ClientMainBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${EnvPrefix}-${ClientId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [PUT, POST, GET]
+            AllowedOrigins: !If
+              - HasStaticSiteDomain
+              - - !Sub "https://${StaticSiteDomain}"
+                - "http://localhost:3000"
+                - "http://localhost:8080"
+              - - "http://localhost:3000"
+                - "http://localhost:8080"
+            AllowedHeaders: ["*"]
+            ExposedHeaders: ["ETag"]
+            MaxAge: 3000
+
+  ClientMainBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ClientMainBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadMoviePosters
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${ClientMainBucket.Arn}/movie-posters/*"
+          - Sid: PublicReadDigestImages
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource:
+              - !Sub "${ClientMainBucket.Arn}/digest-backgrounds/*"
+              - !Sub "${ClientMainBucket.Arn}/digest-generated/*"
+          # tickets-out/* is deliberately absent here -- stays private,
+          # served only via TICKET_SIGNER_* presigned URLs (see workspace
+          # root README, multi-tenancy exceptions section).
+
+  ClientBdorBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${EnvPrefix}-${ClientId}-bdor"
+      # Intentionally unconfigured -- matches production, which creates
+      # this bucket but never applies a policy/CORS/public-access config
+      # to it (box-office report drops land here, pulled by SFTP, never
+      # served publicly).
+
+Outputs:
+  ClientMainBucketName:
+    Value: !Ref ClientMainBucket
+  ClientBdorBucketName:
+    Value: !Ref ClientBdorBucket

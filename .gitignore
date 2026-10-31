@@ -1,0 +1,13 @@
+# Local-only working files: kept on disk, not published (yet).
+OPEN_SOURCE_CHECKLIST.md
+MONOREPO_PLAN.md
+API_V1_PROPOSAL.md
+THEME_HANDOFF.md
+/oxblood-theme.css
+josh*
+oldConfigs.josh
+
+# Never commit keys or installed packages.
+*.pem
+node_modules/
+.DS_Store

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Products</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link to your existing CSS -->
+    <!-- Add Bootstrap for styling if you're using it, or similar to your existing pages -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .product-grid {
+            margin-top: 20px;
+        }
+        .search-container {
+            margin-bottom: 20px;
+        }
+        .product-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .product-row:hover {
+            background-color: #f5f5f5;
+        }
+        .checked-in {
+            background-color: #d4edda;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+        #user-info {
+            margin-right: auto;
+            font-weight: bold;
+            color: #495057;
+        }
+        .logout-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .logout-button:hover {
+            background-color: #c82333;
+        }
+        .nav-link {
+            margin-right: 15px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>IndieTix - Liberty Hall</h1>
+        
+        <div class="header-controls">
+            <div id="user-info" style="display: none;"></div>
+            <!-- Home link -->
+            <a href="index.html" class="nav-link">Home</a>
+            <!-- Logout button will be added here by JavaScript -->
+        </div>
+        
+        <h2>QR Code Products</h2>
+        
+        <div class="search-container">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" id="search-input" class="form-control" placeholder="Search products...">
+                        <button class="btn btn-primary" id="search-button">Search</button>
+                        <button class="btn btn-secondary" id="clear-search">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="product-grid">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>QR Code</th>
+                        <th>Created At</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="products-table-body">
+                    <!-- Products will be loaded here dynamically -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="loading" class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirm check-in modal -->
+    <div class="modal fade" id="checkin-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Check-in</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to check in this product?</p>
+                    <p><strong>QR Code: </strong><span id="modal-product-name"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="confirm-checkin">Confirm Check-in</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap and custom JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const API_URL = 'https://dog5g3lykx3v6knpymly6hh6cq0cgyol.lambda-url.us-east-2.on.aws/';
+            
+            // Get elements
+            const searchInput = document.getElementById('search-input');
+            const searchButton = document.getElementById('search-button');
+            const clearSearchButton = document.getElementById('clear-search');
+            const productsTableBody = document.getElementById('products-table-body');
+            const loadingIndicator = document.getElementById('loading');
+            const checkinModal = new bootstrap.Modal(document.getElementById('checkin-modal'));
+            const modalProductName = document.getElementById('modal-product-name');
+            const confirmCheckinButton = document.getElementById('confirm-checkin');
+            const userInfo = document.getElementById('user-info');
+            
+            let currentProductId = null;
+            
+            // Check if token exists, if not redirect to login
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                console.log("No auth token found, redirecting to login");
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            // Add logout button
+            const headerControls = document.querySelector('.header-controls');
+            const logoutButton = document.createElement("button");
+            logoutButton.textContent = "Logout";
+            logoutButton.className = "logout-button";
+            logoutButton.onclick = logout;
+            headerControls.appendChild(logoutButton);
+            
+            // Display username if available from URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const username = urlParams.get('username');
+            if (username) {
+                userInfo.textContent = `Logged in as: ${username}`;
+                userInfo.style.display = 'block';
+            }
+            
+            function getAuthHeaders() {
+                return {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                };
+            }
+            
+            function logout() {
+                // Just clear the token and redirect
+                localStorage.removeItem('authToken');
+                window.location.href = 'login.html';
+            }
+            
+            // Load products when page loads
+            loadProducts();
+            
+            // Search button click
+            searchButton.addEventListener('click', function() {
+                loadProducts(searchInput.value);
+            });
+            
+            // Enter key in search input
+            searchInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    loadProducts(searchInput.value);
+                }
+            });
+            
+            // Clear search
+            clearSearchButton.addEventListener('click', function() {
+                searchInput.value = '';
+                loadProducts();
+            });
+            
+            // Function to load products
+            function loadProducts(searchTerm = '') {
+                loadingIndicator.style.display = 'block';
+                productsTableBody.innerHTML = '';
+                
+                // Build URL with optional search parameter
+                let url = `${API_URL}/api/products`;
+                if (searchTerm) {
+                    url += `?search=${encodeURIComponent(searchTerm)}`;
+                }
+                
+                console.log("Fetching products with URL:", url);
+                console.log("Headers:", getAuthHeaders());
+                
+                // Fetch products from API
+                fetch(url, {
+                    headers: getAuthHeaders()
+                })
+                .then(response => {
+                    console.log("Response status:", response.status);
+                    
+                    if (response.status === 401 || response.status === 403) {
+                        // Token expired or invalid
+                        console.log("Authentication failed, redirecting to login");
+                        localStorage.removeItem('authToken');
+                        window.location.href = 'login.html';
+                        return null;
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.status}`);
+                    }
+                    
+                    return response.json();
+                })
+                .then(products => {
+                    if (!products) return; // Handle case where we've redirected
+                    
+                    loadingIndicator.style.display = 'none';
+                    console.log("Products received:", products);
+                    
+                    if (!products.length && products.count !== undefined) {
+                        // Handle different response format
+                        products = products.qrcodes || [];
+                    }
+                    
+                    if (products.length === 0) {
+                        productsTableBody.innerHTML = `
+                            <tr>
+                                <td colspan="5" class="text-center">No products found</td>
+                            </tr>
+                        `;
+                        return;
+                    }
+                    
+                    // Render each product row
+                    products.forEach(product => {
+                        const row = document.createElement('tr');
+                        row.className = `product-row ${product.CheckedIn ? 'checked-in' : ''}`;
+                        
+                        // Format date - handle both camelCase and PascalCase field names
+                        const createdAt = new Date(product.createdAt || product.CreatedAt || product.created_at || '').toLocaleString();
+                        
+                        // Handle different field name formats (camelCase vs PascalCase)
+                        const id = product.id || product.ID;
+                        const qrCode = product.qrCodeData || product.QRCode;
+                        const checkedIn = product.checkedIn || product.CheckedIn;
+                        
+                        row.innerHTML = `
+                            <td>${id}</td>
+                            <td>${qrCode || 'N/A'}</td>
+                            <td>${createdAt}</td>
+                            <td>${checkedIn ? 
+                                `<span class="badge bg-success">Checked In</span>` : 
+                                `<span class="badge bg-warning">Not Checked In</span>`}
+                            </td>
+                            <td>
+                                ${!checkedIn ? 
+                                    `<button class="btn btn-sm btn-primary checkin-btn" data-id="${id}" data-qrcode="${qrCode || ''}">
+                                        Check In
+                                    </button>` : 
+                                    `<button class="btn btn-sm btn-outline-secondary" disabled>
+                                        Checked In
+                                    </button>`
+                                }
+                            </td>
+                        `;
+                        
+                        productsTableBody.appendChild(row);
+                    });
+                    
+                    // Add event listeners to check-in buttons
+                    document.querySelectorAll('.checkin-btn').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const productId = this.getAttribute('data-id');
+                            const qrCode = this.getAttribute('data-qrcode');
+                            
+                            // Set values for modal
+                            currentProductId = productId;
+                            modalProductName.textContent = qrCode;
+                            
+                            // Show modal
+                            checkinModal.show();
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching products:', error);
+                    loadingIndicator.style.display = 'none';
+                    productsTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center text-danger">
+                                Error loading products: ${error.message}. Please try again.
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            // Confirm check-in button click
+            confirmCheckinButton.addEventListener('click', function() {
+                if (!currentProductId) return;
+                
+                // Use the existing checkin API endpoint since it's already working
+                fetch(`${API_URL}/api/checkin`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ qrCode: modalProductName.textContent })
+                })
+                .then(response => {
+                    if (response.status === 401 || response.status === 403) {
+                        // Token expired or invalid
+                        localStorage.removeItem('authToken');
+                        window.location.href = 'login.html';
+                        return null;
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data) return; // Handle case where we've redirected
+                    
+                    // Hide modal
+                    checkinModal.hide();
+                    
+                    // Handle response based on returnStatus
+                    if (data.returnStatus === 'successful_checkin') {
+                        alert('Product checked in successfully!');
+                    } else if (data.returnStatus === 'failed_already_checked_in') {
+                        alert('This product has already been checked in.');
+                    } else if (data.returnStatus === 'failed_expired_qrcode') {
+                        alert('This QR code has expired.');
+                    } else {
+                        alert(`Check-in status: ${data.returnStatus}`);
+                    }
+                    
+                    // Reload products to show updated status
+                    loadProducts(searchInput.value);
+                })
+                .catch(error => {
+                    console.error('Error checking in product:', error);
+                    alert('Failed to check in product. Please try again.');
+                    checkinModal.hide();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+

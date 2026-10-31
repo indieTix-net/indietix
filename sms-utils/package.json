@@ -1,0 +1,24 @@
+{
+  "name": "sms-utils",
+  "version": "1.0.0",
+  "description": "Shared phone normalization + centralized SMS sending for IndieTix. Extracted from the 3 identical copies that used to live in getSquareOrders, smsOptInOptOut, and QRScanner.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indieTix-net/indietix.git",
+    "directory": "sms-utils"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.1068.0"
+  },
+  "devDependencies": {
+    "aws-sdk-client-mock": "^4.0.0"
+  }
+}

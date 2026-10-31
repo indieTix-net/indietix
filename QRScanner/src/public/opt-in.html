@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get your ticket by text</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="opt-in.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+
+        <!-- Standalone header. Not injected via header-loader.js because
+             that helper is auth-gated and this page is public.
+             #optin-venue-name is filled by opt-in.js after fetching the
+             order's client branding.
+             The logo image is optional; each client can host their own
+             logo.png at the root of their static site bucket. If the file
+             doesn't exist, we hide the img gracefully. -->
+        <div id="optin-header" class="text-center py-4 mb-4 border-bottom border-dark border-3">
+            <img id="optin-logo" src="logo.png" alt="" style="max-width: 160px;" onerror="this.style.display='none';">
+            <h4 id="optin-venue-name" class="mt-3 mb-0">Loading&hellip;</h4>
+        </div>
+
+        <!-- =============================================================
+             State: LOADING — shown until the initial GET returns.
+             ============================================================= -->
+        <div id="state-loading" class="text-center py-5">
+            <div class="spinner-border text-secondary" role="status">
+                <span class="visually-hidden">Loading&hellip;</span>
+            </div>
+            <p class="text-muted mt-3">Looking up your order&hellip;</p>
+        </div>
+
+        <!-- =============================================================
+             State: NOT FOUND — invalid or expired token.
+             ============================================================= -->
+        <div id="state-not-found" class="d-none">
+            <div class="alert alert-warning">
+                <h5 class="alert-heading">This link doesn't look right</h5>
+                <p class="mb-2">
+                    We couldn't find an order for this link. It may have expired,
+                    or the URL may have been copied incompletely.
+                </p>
+                <p class="mb-0 small text-muted">
+                    Your ticket PDF was attached to the confirmation email &mdash;
+                    check your inbox, or reply to that email for help.
+                </p>
+            </div>
+        </div>
+
+        <!-- =============================================================
+             State: ALREADY OPTED IN — customer has active consent already.
+             We fire the SMS re-send automatically; this view is
+             just confirmation. No form.
+             ============================================================= -->
+        <div id="state-already-opted-in" class="d-none">
+            <div class="alert alert-success">
+                <h5 class="alert-heading">You're all set</h5>
+                <p class="mb-0">
+                    Your phone number (<span id="already-phone-display"></span>) is
+                    already signed up for ticket texts from
+                    <span class="already-venue-name">this venue</span>.
+                    We just sent your ticket(s) to that number &mdash; it should
+                    arrive in a minute or two.
+                </p>
+            </div>
+            <div class="text-center small text-muted mt-4">
+                Not seeing the text? Reply STOP to any of our messages to
+                unsubscribe, or reply HELP for support.
+            </div>
+        </div>
+
+        <!-- =============================================================
+             State: NEW / RESUBSCRIBE — the actual opt-in form.
+             The resubscribe variant just gets a banner at the top and
+             different button copy. Same form fields, same POST endpoint.
+             ============================================================= -->
+        <div id="state-form" class="d-none">
+
+            <!-- Only visible for resubscribers: -->
+            <div id="resubscribe-banner" class="alert alert-info d-none">
+                <p class="mb-1"><strong>Welcome back.</strong></p>
+                <p class="mb-0 small">
+                    You previously unsubscribed on
+                    <span id="resubscribe-date">a previous date</span>.
+                    You can resubscribe below, or text
+                    <strong>START</strong> to
+                    <span id="resubscribe-orig-number">our number</span>
+                    from any phone you've used before.
+                </p>
+            </div>
+
+            <div class="mb-3">
+                <h5 class="mb-1" id="form-headline">Get your ticket by text</h5>
+                <p class="text-muted small mb-0" id="form-subheadline">
+                    We'll text you a link to your ticket, plus reminders
+                    the day before the show and when doors open.
+                </p>
+            </div>
+
+            <!-- Order summary (populated by JS) -->
+            <div class="card mb-3">
+                <div class="card-body py-2 px-3">
+                    <p class="small text-muted mb-1">Your order</p>
+                    <ul id="order-ticket-list" class="mb-0 ps-3 small"></ul>
+                </div>
+            </div>
+
+            <!-- Consent form -->
+            <div id="optin-form-container">
+                <div class="mb-3">
+                    <label for="phone-input" class="form-label">
+                        Mobile number
+                    </label>
+                    <input
+                        type="tel"
+                        class="form-control form-control-lg"
+                        id="phone-input"
+                        placeholder="(555) 123-4567"
+                        autocomplete="tel-national"
+                        inputmode="tel"
+                        required
+                    >
+                    <div class="form-text">
+                        US and Canada mobile numbers only.
+                    </div>
+                    <div id="phone-error" class="invalid-feedback d-block d-none"></div>
+                </div>
+
+                <div class="mb-3 form-check">
+                    <input class="form-check-input" type="checkbox" id="consent-checkbox">
+                    <label class="form-check-label small" for="consent-checkbox" id="consent-label-text">
+                        <!-- Consent text is set by JS so we can include the
+                             venue name inline. The final displayed text is
+                             what we store verbatim in SmsConsent.ConsentText. -->
+                    </label>
+                </div>
+
+                <button
+                    type="button"
+                    id="submit-button"
+                    class="btn btn-primary btn-lg w-100"
+                    disabled
+                >
+                    Text me my ticket
+                </button>
+
+                <div id="submit-error" class="alert alert-danger mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <!-- =============================================================
+             State: SUCCESS — POST returned OK.
+             ============================================================= -->
+        <div id="state-success" class="d-none">
+            <div class="alert alert-success">
+                <h5 class="alert-heading">You're signed up.</h5>
+                <p class="mb-2">
+                    We just sent your ticket(s) to
+                    <span id="success-phone-display"></span>.
+                    It should arrive in a minute or two.
+                </p>
+                <p class="mb-0 small">
+                    We'll also text you a reminder the day before the show and
+                    when doors open. Reply <strong>STOP</strong> to unsubscribe
+                    at any time, or <strong>HELP</strong> for support.
+                </p>
+            </div>
+        </div>
+
+        <!-- Legal footer, always visible. -->
+        <div class="text-center small text-muted mt-5 pt-4 border-top">
+            <p class="mb-1">
+                <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+                &middot;
+                <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>
+            </p>
+            <p class="mb-0">
+                Msg &amp; data rates may apply. Msg frequency varies.
+            </p>
+        </div>
+
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script src="opt-in.js"></script>
+</body>
+</html>

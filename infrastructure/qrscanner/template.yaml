@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  The main Express app -- operator UI + public API -- deployed as a
+  single Lambda behind a Function URL via serverless-http, matching
+  production exactly. Imports VPC/subnet/security-group from this
+  environment's foundation stack for Aurora access.
+  TICKET_SIGNER_ACCESS_KEY/SECRET_KEY are Lambda environment variables
+  set outside this template (a dedicated IAM user, not a per-client
+  secret) -- presigned ticket SMS URLs won't work until those are set.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  SmsUtilsLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's sms-utils layer (published by bootstrap.sh before this stack deploys)
+  TicketPdfLibLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's ticket-pdf-lib layer (published by bootstrap.sh before this stack deploys)
+
+Resources:
+  QrScannerLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${EnvPrefix}-qrscanner-deps"
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  QrScannerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-qrscanner"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 30
+      MemorySize: 512
+      Layers:
+        - !Ref QrScannerLayer
+        - !Ref SmsUtilsLayerArn
+        - !Ref TicketPdfLibLayerArn
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetA'
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetB'
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["*"]
+          AllowHeaders: ["*"]
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:ListBucket
+                - s3:DeleteObject
+              Resource:
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*"
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*/*"
+            - Effect: Allow
+              Action:
+                - ses:SendRawEmail
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - sms-voice:SendTextMessage
+              Resource: "*"
+
+Outputs:
+  FunctionUrl:
+    Value: !GetAtt QrScannerFunctionUrl.FunctionUrl

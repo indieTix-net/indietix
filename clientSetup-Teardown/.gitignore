@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.zip
+
+# macOS junk
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Local env
+.env
+.env.local
+
+# Superseded draft, folded into migrations.sql
+src/sms-spend-limit-migration.sql
+
+# Local notes -- not part of the distributed project.
+MEMORY.md

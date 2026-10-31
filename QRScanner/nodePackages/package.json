@@ -1,0 +1,42 @@
+{
+  "name": "qrcodewebsite",
+  "version": "1.0.0",
+  "main": "index.mjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "NODE_ENV=development node local-server.mjs",
+    "deploy": "serverless deploy",
+    "dev": "NODE_ENV=development serverless offline"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.1068.0",
+    "@aws-sdk/client-s3": "^3.1090.0",
+    "@aws-sdk/client-secrets-manager": "^3.873.0",
+    "@aws-sdk/s3-request-presigner": "^3.1090.0",
+    "@googleapis/calendar": "^14.2.0",
+    "@googleapis/drive": "^20.0.0",
+    "aws-sdk": "^2.1692.0",
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^1.20.3",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "form-data": "^4.0.0",
+    "google-auth-library": "^10.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "mailcomposer": "^4.0.2",
+    "pg": "^8.13.3",
+    "sequelize": "^6.37.7",
+    "serverless-http": "^3.2.0",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "serverless": "^4.7.0",
+    "serverless-offline": "^14.4.0",
+    "serverless-s3-sync": "^3.4.0"
+  }
+}

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Insights</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="insights.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+        <div id="header-container">
+            <!-- Header will be injected here -->
+        </div>
+        
+        <div class="insights-section">
+            
+            <div class="question-box">
+                <form id="insights-form">
+                    <div class="form-group">
+                        <label for="question-input">What would you like to know?</label>
+                        <textarea 
+                            id="question-input" 
+                            class="form-control" 
+                            rows="3" 
+                            placeholder="e.g., What are my best selling movies? What day of the week has the highest sales?"
+                            required
+                        ></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-sm" id="ask-btn">
+                        <span class="btn-text">Ask Question</span>
+                        <span class="btn-loading" style="display: none;">
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                            Analyzing...
+                        </span>
+                    </button>
+                </form>
+            </div>
+            
+            <div class="example-questions">
+                <h4>Example Questions</h4>
+                <div class="examples-grid">
+                    <button class="example-btn" data-question="What are my top 5 best-selling movies this month?">
+                        Top selling movies this month
+                    </button>
+                    <button class="example-btn" data-question="Which day of the week generates the most revenue?">
+                        Best day for revenue
+                    </button>
+                    <button class="example-btn" data-question="How many tickets have been sold in the last 7 days?">
+                        Tickets sold last week
+                    </button>
+                    <button class="example-btn" data-question="What's the average order value?">
+                        Average order value
+                    </button>
+                    <button class="example-btn" data-question="Which movie has the highest check-in rate?">
+                        Best check-in rates
+                    </button>
+                    <button class="example-btn" data-question="Show me refund statistics for this month">
+                        Refund statistics
+                    </button>
+                </div>
+            </div>
+            
+            <div id="results-section" class="results-section" style="display: none;">
+                <div class="results-header">
+                    <h4>Answer</h4>
+                    <button id="clear-results" class="btn btn-sm btn-secondary">Clear</button>
+                </div>
+                <div id="results-content" class="results-content">
+                    <!-- Results will be displayed here -->
+                </div>
+                <div id="sql-section" class="sql-section" style="display: none;">
+                    <button id="toggle-sql" class="btn btn-sm btn-outline-secondary">
+                        <span>Show SQL Query</span>
+                    </button>
+                    <pre id="sql-query" style="display: none;"><code></code></pre>
+                </div>
+            </div>
+            
+            <div id="error-message" class="error-message" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <div class="footer" style="text-align: center;">
+        <!-- Logout button will be added here by JavaScript -->
+    </div>
+</div>
+
+<!-- Bootstrap and custom JavaScript -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="auth-helper.js"></script>
+<script src="insights.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic header
+        HeaderLoader.initializeHeader('header-container');
+    });
+</script>
+</body>
+</html>

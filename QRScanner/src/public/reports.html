@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IndieTix Reports</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Tabulator CSS -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="style.css" rel="stylesheet">
+    <link href="reports.css" rel="stylesheet">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+       <div id="header-container">
+    <!-- Header will be injected here -->
+</div> 
+        <!-- Search Section -- own container, matching products.html/order.html -->
+        <div class="search-container">
+            <div class="input-group">
+                <input type="text" id="quick-filter" class="form-control" placeholder="Search across all fields...">
+                <button class="btn btn-secondary" id="clear-filter">Clear</button>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <!-- Column Visibility Section -->
+            <div class="toolbar-section">
+                <div class="column-selector">
+                    <button id="column-selector-btn" class="btn btn-outline-secondary btn-sm">
+                        Show/Hide Columns
+                    </button>
+                    <div id="column-selector-content" class="column-selector-content">
+                        <!-- Column checkboxes will be added here dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Grouping Section -->
+            <div class="toolbar-section">
+                <label for="group-select">Add Group:</label>
+                <select id="group-select" class="form-select form-select-sm">
+                    <option value="">Select Column</option>
+                    <option value="eventName">Event</option>
+                    <option value="customerName">Customer</option>
+                    <option value="eventDate">Event Date</option>
+                    <option value="distributor">Distributor</option>
+                    <option value="eventType">Event Type</option>
+                    <option value="eventVenue">Event Venue</option>
+                    <option value="eventSeatCode">Seat Code</option>
+                    <option value="checkedIn">Check-in Status</option>
+                </select>
+                <button id="add-group-btn" class="btn btn-outline-primary btn-sm">Add</button>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- View Mode Section -->
+            <div class="toolbar-section">
+                <button id="expand-toggle-btn" class="btn btn-outline-secondary btn-sm" disabled title="Expand or collapse all groups">
+                    Collapse All
+                </button>
+                <button id="live-update-toggle-btn" class="btn btn-outline-success btn-sm" title="Auto-refresh data every 30 seconds">
+                    <span class="live-dot">&#9679;</span> Live Update: Off
+                </button>
+                <span id="last-refreshed" class="last-refreshed-text" aria-live="polite"></span>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
+            <!-- Export Section -->
+            <div class="toolbar-section">
+                <button id="export-excel" class="btn btn-success btn-sm">
+                    Export to Excel
+                </button>
+                <button id="export-csv" class="btn btn-outline-primary btn-sm">
+                    Export to CSV
+                </button>
+            </div>
+        </div>
+        
+        <!-- Current Groups Display -->
+        <div id="active-groups" class="group-buttons mb-3">
+            <!-- Active group tags will be added here -->
+        </div>
+        
+        <!-- Tabulator will be created here -->
+        <div id="ticket-table" class="grid-container"></div>
+        
+        <div id="loading" class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <button id="logout-btn" class="logout-button">Logout</button>
+    </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Required for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Luxon for date handling -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    
+    <!-- Tabulator JS -->
+    <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="auth-helper.js"></script>
+    <script src="reports.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic header
+        HeaderLoader.initializeHeader('header-container');
+        
+        // Your existing page initialization
+        // ... rest of your page code
+    });
+</script>
+</body>
+</html>

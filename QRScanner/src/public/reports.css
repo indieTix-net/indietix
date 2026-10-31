@@ -1,0 +1,391 @@
+/* =======================
+   REPORTS PAGE SPECIFIC STYLES
+   ======================= */
+
+/* Override Bootstrap container constraints for full width */
+.container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+}
+
+/* Reports Grid Container */
+.grid-container {
+    width: 100% !important;
+    margin-bottom: 15px;
+}
+
+/* Force table to be full width */
+#ticket-table {
+    width: 100% !important;
+    min-width: 100% !important;
+    border-radius: 8px;
+}
+
+.tabulator {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+
+/* =======================
+   TABULATOR DARK THEME OVERRIDES
+   Tabulator ships its own CSS (tabulator.min.css + the bootstrap5 variant,
+   both loaded via CDN in reports.html) with a hardcoded light theme, and
+   the bootstrap5 variant alone defines .tabulator-row backgrounds via
+   chains up to 4 classes deep (e.g.
+   .tabulator .tabulator-tableholder .tabulator-table .tabulator-row).
+   Plain-class overrides (even with !important) can lose to those on
+   specificity, independent of stylesheet load order. Scoping every rule
+   under #ticket-table (the grid's real container id, confirmed in
+   reports.html) gives every rule here (1,0,0) specificity -- an ID beats
+   any number of chained classes outright, so this wins unconditionally
+   regardless of how many classes Tabulator chains or what order the CSS
+   links appear in. !important kept as well, as a second line of defense
+   against any inline style Tabulator sets directly via JS.
+   ======================= */
+#ticket-table.tabulator,
+#ticket-table .tabulator {
+    background: var(--lh-panel-grad, #fff) !important;
+    border: 1px solid var(--lh-border, #ccc) !important;
+    color: var(--lh-row-text, inherit) !important;
+}
+
+#ticket-table .tabulator-header {
+    background: #1F2023 !important;
+    border-bottom: 1px solid var(--lh-head-line, #ccc) !important;
+}
+
+#ticket-table .tabulator-header .tabulator-col {
+    background: transparent !important;
+    border-right: 1px solid var(--lh-border, #ccc) !important;
+}
+
+#ticket-table .tabulator-col-title,
+#ticket-table .tabulator-col-content {
+    color: var(--lh-heading, #333) !important;
+}
+
+/* Per-column header filter inputs (headerFilter: "input"/"number" in
+   reports.js) -- the bootstrap5 CDN CSS targets these with
+   .tabulator .tabulator-header .tabulator-col .tabulator-header-filter
+   input, 4 classes deep, background-color:#fff + color:#495057, no
+   !important. The oxblood-theme.css global input rule's !important
+   background wins against that regardless, but its color didn't have
+   !important until this same fix, so text was landing dark-on-dark
+   (confirmed via live DOM inspection 2026-10-26). ID-scoped here too, so
+   this can't lose regardless of whatever specificity quirk turns up next
+   in this exact rendering stack. */
+#ticket-table .tabulator-header-filter input {
+    background-color: var(--lh-input-bg, #fff) !important;
+    color: var(--lh-text, #333) !important;
+    border: 1px solid var(--lh-input-border, #ccc) !important;
+}
+#ticket-table .tabulator-header-filter input:focus {
+    background-color: var(--lh-input-bg, #fff) !important;
+    color: var(--lh-text, #333) !important;
+}
+
+/* The actual culprit: .tabulator-table is an inner wrapper sitting
+   directly behind every row (.tabulator-tableholder > .tabulator-table >
+   .tabulator-row), with its own hardcoded background-color:#fff in both
+   CDN CSS files. Rows were already set transparent so this white showed
+   straight through them -- confirmed via live DOM inspection 2026-10-26. */
+#ticket-table .tabulator-tableholder,
+#ticket-table .tabulator-table {
+    background: var(--lh-panel-grad, #fff) !important;
+    color: var(--lh-row-text, inherit) !important;
+}
+
+#ticket-table .tabulator-row {
+    background: transparent !important;
+    color: var(--lh-row-text, inherit) !important;
+    border-bottom: 1px solid var(--lh-row-line, #ccc) !important;
+}
+
+#ticket-table .tabulator-row.tabulator-row-even {
+    background: var(--lh-row-alt, rgba(255, 255, 255, 0.045)) !important;
+}
+
+#ticket-table .tabulator-row.tabulator-selectable:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+#ticket-table .tabulator-cell {
+    border-right: 1px solid var(--lh-row-line, #ccc) !important;
+    color: inherit !important;
+}
+
+#ticket-table .tabulator-footer {
+    background: #1F2023 !important;
+    border-top: 1px solid var(--lh-head-line, #ccc) !important;
+    color: var(--lh-muted, #666) !important;
+}
+
+#ticket-table .tabulator-page {
+    background: transparent !important;
+    color: var(--lh-text, #333) !important;
+    border: 1px solid var(--lh-border, #ccc) !important;
+}
+
+#ticket-table .tabulator-page.active {
+    background: #8C1C27 !important;
+    color: #fff !important;
+    border-color: #8C1C27 !important;
+}
+
+#ticket-table .tabulator-page:disabled {
+    color: var(--lh-muted, #999) !important;
+}
+
+#ticket-table .tabulator-calcs-holder,
+#ticket-table .tabulator-row.tabulator-calcs,
+#ticket-table .tabulator-row.tabulator-calcs.tabulator-row-even {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--lh-heading, #333) !important;
+}
+
+#ticket-table .tabulator-group {
+    background: #1F2023 !important;
+    color: var(--lh-heading, #333) !important;
+    border-bottom: 1px solid var(--lh-head-line, #ccc) !important;
+}
+
+/* Edit-select dropdowns and the right-click menu can render outside
+   #ticket-table's DOM subtree, so these stay unscoped -- the base library
+   defines no competing background for either at a specificity that
+   would beat a plain class selector anyway. */
+.tabulator-menu,
+.tabulator-edit-select-list {
+    background: #1F2023 !important;
+    color: var(--lh-text, #333) !important;
+    border: 1px solid var(--lh-border, #ccc) !important;
+}
+
+.tabulator-edit-select-list-item {
+    color: var(--lh-text, #333) !important;
+}
+
+.tabulator-edit-select-list-item.active,
+.tabulator-edit-select-list-item:hover {
+    background: #8C1C27 !important;
+    color: #fff !important;
+}
+
+/* Reports Toolbar */
+.toolbar {
+    display: flex;
+    gap: 10px;
+    /*margin-bottom: 15px;*/
+    padding: 15px;
+    flex-wrap: wrap;
+    width: 100% !important;
+    background: var(--lh-panel-grad, white);
+    border: 1px solid var(--lh-border, transparent);
+    border-radius: 8px;
+}
+
+.toolbar-section {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.toolbar-divider {
+    border-right: 1px solid var(--lh-border, #dee2e6);
+    height: 34px;
+    margin: 0 10px;
+}
+
+/* Reports Search Container -- now its own box above the toolbar, matching
+   products.css/order.css's .search-container instead of a flex child of
+   .toolbar (2026-10-26). */
+.search-container {
+    margin-bottom: 20px !important;
+}
+
+/* Override Bootstrap form controls */
+.toolbar .form-control,
+.toolbar .form-select {
+    font-size: 0.875rem !important;
+}
+
+/* Column Visibility Dropdown */
+.column-selector {
+    position: relative;
+    display: inline-block;
+}
+
+.column-selector-content {
+    display: none;
+    position: absolute;
+    background: var(--lh-panel-grad, white);
+    color: var(--lh-text, inherit);
+    min-width: 250px;
+    max-width: 300px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+    z-index: 1000;
+    padding: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    border-radius: 4px;
+    left: 0;
+    border: 1px solid var(--lh-border, #ddd);
+}
+
+.column-selector-content.show {
+    display: block;
+}
+
+.column-selector-item {
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+}
+
+.column-selector-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.column-selector-item input {
+    margin-right: 10px;
+}
+
+/* Group Management */
+.group-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.group-tag {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 2px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--lh-text, inherit);
+}
+
+.group-tag button {
+    background: none;
+    border: none;
+    color: var(--lh-muted, #666);
+    cursor: pointer;
+    font-weight: bold;
+    margin-left: 5px;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 2px;
+}
+
+/* Tabulator Custom Styling */
+.tabulator-row.checked-in {
+    background-color: rgba(40, 167, 69, 0.22) !important;
+    color: var(--lh-text, inherit);
+}
+
+.tabulator-row.checked-in .tabulator-cell {
+    background-color: rgba(40, 167, 69, 0.22) !important;
+    color: var(--lh-text, inherit);
+}
+
+.status-checked-in {
+    background-color: #28a745;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.status-not-checked-in {
+    background-color: #ffc107;
+    color: #212529;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+/* Ensure full width layout */
+body {
+    overflow-x: auto !important;
+}
+
+/* Loading indicator -- canonical style lives in style.css (#loading);
+   this page's old override (margin: 20px 0) fought that rule's
+   position:fixed centering, nudging the spinner off-center. Removed
+   2026-10-26, standardizing on the one shared style everywhere. */
+
+/* =======================
+   LIVE UPDATE + FLASH STYLES
+   ======================= */
+
+/* Live update toggle button */
+#live-update-toggle-btn {
+    min-width: 175px;
+    transition: all 0.2s ease;
+}
+
+#live-update-toggle-btn .live-dot {
+    color: #dc3545;
+    font-size: 0.9em;
+    margin-right: 4px;
+    transition: color 0.2s ease;
+}
+
+#live-update-toggle-btn.live-active .live-dot {
+    color: #ffffff;
+    animation: liveDotPulse 1.5s ease-in-out infinite;
+}
+
+#live-update-toggle-btn.live-active {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.5);
+    animation: liveButtonPulse 2s ease-in-out infinite;
+}
+
+@keyframes liveDotPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+@keyframes liveButtonPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.45); }
+    50%      { box-shadow: 0 0 0 6px rgba(40, 167, 69, 0); }
+}
+
+/* Expand/collapse toggle button */
+#expand-toggle-btn {
+    min-width: 110px;
+}
+
+/* "Last refreshed: 5s ago" inline label */
+.last-refreshed-text {
+    font-size: 0.8rem;
+    color: var(--lh-muted, #6c757d);
+    align-self: center;
+    white-space: nowrap;
+    font-style: italic;
+}
+
+/*
+ * Flash effect for new rows / group totals.
+ *
+ * We use `box-shadow: inset` instead of background-color so we don't fight
+ * the `!important` background on .tabulator-row.checked-in cells, and so
+ * the text remains fully readable while the green tint fades out.
+ */
+@keyframes flashShadowFade {
+    0%   { box-shadow: inset 0 0 0 9999px rgba(40, 167, 69, 0.55); }
+    100% { box-shadow: inset 0 0 0 9999px rgba(40, 167, 69, 0);    }
+}
+
+/* Apply the animation to data row cells, group headers, and calc rows */
+.tabulator-row.flash-new .tabulator-cell,
+.tabulator-row.tabulator-calcs.flash-new .tabulator-cell,
+.tabulator-row.tabulator-group.flash-new,
+.tabulator-group.flash-new {
+    animation: flashShadowFade 2.5s ease-out;
+}

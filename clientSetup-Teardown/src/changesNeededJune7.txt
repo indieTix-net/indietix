@@ -1,0 +1,11 @@
+1.  apply config block to index.js. (done june 7 2026)
+2.  run the following command to update current clients (just do indieTix for starters, not liberty hall)
+
+psql -h libertyhall-1.cluster-cvu8g6gem5f1.us-east-2.rds.amazonaws.com \
+     -U libertyhall \
+     -d M5E5N7KAHZA7Q \
+     -f migrations/2026-06-add-sms-consent.sql
+
+
+3.  Run the update statemnets on the liberty hall db
+4.  test

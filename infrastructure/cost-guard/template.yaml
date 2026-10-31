@@ -1,0 +1,160 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  IndieTix cost-guard stack (optional): daily + monthly AWS Budgets that
+  email an alert, plus an optional "breaker" that, when the daily budget is
+  exceeded, sets every Lambda in this environment to reserved concurrency 0
+  -- AWS then rejects every invocation (webhooks, the operator app, the
+  public API, scheduled jobs) until someone runs `bootstrap.sh unblock`.
+  Square retries rejected webhooks for up to 72h and queued orders wait in
+  SQS, so nothing is lost while it's tripped. Meant for sandboxes: never
+  enable the breaker for a live venue -- it takes the door scanner offline.
+  Budgets measure the whole ACCOUNT's spend (not just this environment), and
+  AWS billing data lags by several hours, so the breaker trips hours after
+  the overspend, not instantly. Deployed by bootstrap.sh only when
+  BUDGET_ALERT_EMAIL is set.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Description: Namespace prefix for this environment (same as every other stack)
+  AlertEmail:
+    Type: String
+    Description: Where budget alerts are emailed
+  DailyLimitUsd:
+    Type: Number
+    Default: 5
+    Description: Daily account spend that triggers the alert (and the breaker, if enabled). One idle sandbox runs ~$1.30-3.30/day.
+  MonthlyLimitUsd:
+    Type: Number
+    Default: 120
+    Description: Monthly account spend -- emails at 80% actual and at 100% forecasted
+  EnableBreaker:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: '"true" blocks every Lambda in this environment when the daily budget is exceeded. Sandbox only.'
+
+Conditions:
+  BreakerEnabled: !Equals [!Ref EnableBreaker, "true"]
+
+Resources:
+  BudgetAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${EnvPrefix}-budget-alerts"
+
+  # AWS Budgets publishes to SNS as the budgets service principal.
+  BudgetAlertTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref BudgetAlertTopic]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: budgets.amazonaws.com }
+            Action: sns:Publish
+            Resource: !Ref BudgetAlertTopic
+            Condition:
+              StringEquals: { 'aws:SourceAccount': !Ref AWS::AccountId }
+
+  DailyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${EnvPrefix}-daily"
+        BudgetType: COST
+        TimeUnit: DAILY
+        BudgetLimit: { Amount: !Ref DailyLimitUsd, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - { SubscriptionType: EMAIL, Address: !Ref AlertEmail }
+            - { SubscriptionType: SNS, Address: !Ref BudgetAlertTopic }
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${EnvPrefix}-monthly"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: { Amount: !Ref MonthlyLimitUsd, Unit: USD }
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - { SubscriptionType: EMAIL, Address: !Ref AlertEmail }
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - { SubscriptionType: EMAIL, Address: !Ref AlertEmail }
+
+  # ---- THE BREAKER ----
+  # Explicit function list (not a "${EnvPrefix}-*" match): one environment's
+  # prefix can be the start of another's name, and the breaker must never
+  # block a different environment. Keep in step with bootstrap.sh's
+  # ENV_FUNCTIONS. Excludes itself so `block` can be re-run.
+  BreakerFunction:
+    Type: AWS::Serverless::Function
+    Condition: BreakerEnabled
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-cost-breaker"
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Timeout: 60
+      MemorySize: 128
+      Environment:
+        Variables:
+          ENV_PREFIX: !Ref EnvPrefix
+          FUNCTION_SUFFIXES: "client-reporting client-setup-teardown daily-pg-sftp expire-modifiers get-square-orders marketing-engine qrscanner sms-inbound sql-runner square-queue-forwarder"
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: lambda:PutFunctionConcurrency
+              Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EnvPrefix}-*"
+      Events:
+        BudgetExceeded:
+          Type: SNS
+          Properties:
+            Topic: !Ref BudgetAlertTopic
+      InlineCode: |
+        const { LambdaClient, PutFunctionConcurrencyCommand } = require('@aws-sdk/client-lambda');
+        const client = new LambdaClient({});
+
+        exports.handler = async (event) => {
+          console.log('Budget breaker triggered:', JSON.stringify(event));
+          const prefix = process.env.ENV_PREFIX;
+          const results = [];
+          for (const suffix of process.env.FUNCTION_SUFFIXES.split(/\s+/).filter(Boolean)) {
+            const name = `${prefix}-${suffix}`;
+            try {
+              await client.send(new PutFunctionConcurrencyCommand({ FunctionName: name, ReservedConcurrentExecutions: 0 }));
+              results.push(`${name}: blocked`);
+            } catch (error) {
+              // A function this environment doesn't have (yet) is fine; anything
+              // else is logged and the rest still get blocked.
+              results.push(`${name}: ${error.name === 'ResourceNotFoundException' ? 'not deployed' : 'FAILED ' + error.message}`);
+            }
+          }
+          console.log(results.join('\n'));
+          return results;
+        };
+
+Outputs:
+  BudgetAlertTopicArn:
+    Value: !Ref BudgetAlertTopic
+  BreakerFunctionName:
+    Condition: BreakerEnabled
+    Value: !Ref BreakerFunction

@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Expires past showtimes / archives completed Square items. Discovers
+  clients via the Aurora master credentials (same
+  indieTix/rds/clients/indietix/credentials secret used by
+  clientSetup-Teardown and clientReporting), not Secrets Manager listing.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+
+Resources:
+  ExpireModifiersLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${EnvPrefix}-expire-modifiers-deps"
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  ExpireModifiersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-expire-modifiers"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 120
+      MemorySize: 256
+      Layers:
+        - !Ref ExpireModifiersLayer
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetA'
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetB'
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"

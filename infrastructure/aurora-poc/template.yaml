@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  IndieTix foundation stack: Aurora PostgreSQL Serverless v2 matching
+  production (16.11, 0.5-2.0 ACU, encrypted, private) + 2 private subnets
+  + a NAT Gateway, matching production's real topology so VPC Lambdas can
+  reach Secrets Manager. Every DB-touching Lambda stack built after this
+  one imports its VPC/subnet/security-group/DB values via the exported
+  names below (Fn::ImportValue), namespaced by EnvPrefix so multiple
+  environments (sandbox, prod, a self-hoster's own account) can coexist
+  in the same AWS account/region without colliding. DeletionPolicy is
+  "Delete" on the cluster/instance for a true teardown. Disposable --
+  safe to delete anytime, but deleting it breaks any stack that imports
+  its exports.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for every resource name and cross-stack export in this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  DefaultVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to build the private subnets in (the account's default VPC works fine)
+  SubnetIdA:
+    Type: AWS::EC2::Subnet::Id
+  SubnetIdB:
+    Type: AWS::EC2::Subnet::Id
+  DbName:
+    Type: String
+    Default: sandboxtest
+    Description: Aurora cluster's own internal database name (not an AWS resource identifier, so no uniqueness constraint across environments -- just avoid calling a prod cluster "sandboxtest" for clarity's sake)
+  PrivateSubnetACidr:
+    Type: String
+    Default: 172.31.32.0/20
+    Description: CIDR block for this environment's first private subnet. MUST NOT overlap any existing subnet in DefaultVpcId -- if deploying a second environment into a VPC that already has one (e.g. indietix-sandbox's default 172.31.32.0/20 and 172.31.48.0/20), pick a different /20 here and for PrivateSubnetBCidr.
+  PrivateSubnetBCidr:
+    Type: String
+    Default: 172.31.48.0/20
+    Description: CIDR block for this environment's second private subnet. See PrivateSubnetACidr.
+  AuroraMinCapacity:
+    Type: Number
+    Default: 0.5
+    Description: Aurora Serverless v2 minimum ACUs. 0.5 (production's value) keeps the database always warm. 0 lets an idle sandbox pause itself after AutoPauseSeconds with no connections, and resume automatically (~15s) on the next connection -- cuts the always-on database cost (~$2/day) to near zero. Don't use 0 for a real venue.
+  AutoPauseSeconds:
+    Type: Number
+    Default: 300
+    MinValue: 300
+    MaxValue: 86400
+    Description: Idle seconds before a paused-capable (AuroraMinCapacity 0) cluster pauses. Ignored otherwise.
+
+Conditions:
+  CanAutoPause: !Equals [!Ref AuroraMinCapacity, 0]
+
+Resources:
+  # ---- PRIVATE NETWORKING FOR VPC-ATTACHED LAMBDAS ----
+  # Matches production's real topology: DB-touching Lambdas sit in private
+  # subnets that route outbound through a NAT Gateway (not VPC endpoints),
+  # so they can reach public AWS API endpoints (Secrets Manager, etc.)
+  # while Aurora itself stays unreachable from the internet. The NAT
+  # Gateway is placed in SubnetIdA, one of the VPC's existing public
+  # (IGW-routed) subnets.
+  NatGatewayEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEip.AllocationId
+      SubnetId: !Ref SubnetIdA
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DefaultVpcId
+      CidrBlock: !Ref PrivateSubnetACidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DefaultVpcId
+      CidrBlock: !Ref PrivateSubnetBCidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DefaultVpcId
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetARouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  AuroraSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "Allow Postgres only from within the ${EnvPrefix} VPC"
+      VpcId: !Ref DefaultVpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 172.31.0.0/16
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "${EnvPrefix} Aurora subnet group (2 AZs)"
+      SubnetIds:
+        - !Ref SubnetIdA
+        - !Ref SubnetIdB
+
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Engine: aurora-postgresql
+      EngineVersion: "16.11"
+      DatabaseName: !Ref DbName
+      MasterUsername: indietixsandbox
+      ManageMasterUserPassword: true
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref AuroraSecurityGroup
+      StorageEncrypted: true
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref AuroraMinCapacity
+        MaxCapacity: 2.0
+        SecondsUntilAutoPause: !If [CanAutoPause, !Ref AutoPauseSeconds, !Ref AWS::NoValue]
+
+  AuroraInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Engine: aurora-postgresql
+      DBInstanceClass: db.serverless
+      DBClusterIdentifier: !Ref AuroraCluster
+      PubliclyAccessible: false
+
+Outputs:
+  AuroraEndpoint:
+    Value: !GetAtt AuroraCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${EnvPrefix}-AuroraEndpoint"
+  AuroraPort:
+    Value: !GetAtt AuroraCluster.Endpoint.Port
+    Export:
+      Name: !Sub "${EnvPrefix}-AuroraPort"
+  DbSecretArn:
+    Value: !GetAtt AuroraCluster.MasterUserSecret.SecretArn
+    Export:
+      Name: !Sub "${EnvPrefix}-AuroraSecretArn"
+  DbName:
+    Value: !Ref DbName
+    Export:
+      Name: !Sub "${EnvPrefix}-AuroraDbName"
+  VpcId:
+    Value: !Ref DefaultVpcId
+    Export:
+      Name: !Sub "${EnvPrefix}-VpcId"
+  PrivateSubnetAId:
+    Value: !Ref PrivateSubnetA
+    Export:
+      Name: !Sub "${EnvPrefix}-PrivateSubnetA"
+  PrivateSubnetBId:
+    Value: !Ref PrivateSubnetB
+    Export:
+      Name: !Sub "${EnvPrefix}-PrivateSubnetB"
+  AuroraSecurityGroupId:
+    Value: !Ref AuroraSecurityGroup
+    Export:
+      Name: !Sub "${EnvPrefix}-AuroraSecurityGroupId"

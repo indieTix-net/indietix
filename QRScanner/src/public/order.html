@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="order.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+        <div id="header-container">
+	    <!-- Header will be injected here -->
+	</div> 
+        <div class="search-container">
+            <div class="input-group">
+                <input type="text" id="search-input" class="form-control" placeholder="Search across all fields...">
+                <button class="btn btn-secondary" id="clear-search">Clear</button>
+            </div>
+        </div>
+        
+        <!-- Date Filters -->
+        <div class="date-filters">
+            <h6>Date Filter</h6>
+            <div class="date-input-group">
+                <label for="start-date">From:</label>
+                <input type="date" id="start-date" class="form-control">
+                
+                <label for="end-date">To:</label>
+                <input type="date" id="end-date" class="form-control">
+            </div>
+            
+            <div class="filter-actions">
+                <button class="btn btn-primary btn-sm" id="apply-date-filter">Apply Filter</button>
+                <button class="btn btn-outline-secondary btn-sm" id="clear-date-filter">Clear Dates</button>
+                <button class="btn btn-outline-info btn-sm" id="today-filter">Today Only</button>
+                <button class="btn btn-outline-success btn-sm" id="week-filter">This Week</button>
+            </div>
+        </div>
+        
+        <!-- Column Visibility Controls -->
+        <div class="column-controls">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#column-visibility" aria-expanded="false" aria-controls="column-visibility">
+                        Column Visibility
+                    </button>
+                </div>
+                <div class="collapse" id="column-visibility">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-order-id" data-column="order-id" checked>
+                                    <label class="form-check-label" for="toggle-order-id">Order ID</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-created-date" data-column="created-date" checked>
+                                    <label class="form-check-label" for="toggle-created-date">Created Date</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-customer-name" data-column="customer-name" checked>
+                                    <label class="form-check-label" for="toggle-customer-name">Customer Name</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-email" data-column="email" checked>
+                                    <label class="form-check-label" for="toggle-email">Email Address</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-phone" data-column="phone" checked>
+                                    <label class="form-check-label" for="toggle-phone">Phone Number</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-status" data-column="status" checked>
+                                    <label class="form-check-label" for="toggle-status">Status</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-last-edited" data-column="last-edited" checked>
+                                    <label class="form-check-label" for="toggle-last-edited">Last Edited</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-order-details" data-column="order-details">
+                                    <label class="form-check-label" for="toggle-order-details">Order Details</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-total-amount" data-column="total-amount" checked>
+                                    <label class="form-check-label" for="toggle-total-amount">Total $</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-secondary" id="show-all-columns">Show All</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="hide-all-columns">Hide All</button>
+                            <button class="btn btn-sm btn-outline-info" id="reset-columns">Reset to Default</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile card view (default for small screens) -->
+        <div class="mobile-cards" id="mobile-cards-container">
+            <!-- Order cards will be loaded here dynamically -->
+        </div>
+        
+        <!-- Desktop table view (shows on larger screens) -->
+        <div class="desktop-table">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th class="column-header" data-column="order-id">Order ID</th>
+                        <th class="column-header" data-column="created-date">Created Date</th>
+                        <th class="column-header" data-column="customer-name">Customer Name</th>
+                        <th class="column-header" data-column="email">Email Address</th>
+                        <th class="column-header" data-column="phone">Phone Number</th>
+                        <th class="column-header" data-column="status">Status</th>
+                        <th class="column-header" data-column="last-edited">Last Edited</th>
+                        <th class="column-header" data-column="total-amount">Total $</th>
+                        <th class="column-header" data-column="order-details">Order Details</th>
+                        <th class="action-cell">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table-body">
+                    <!-- Orders will be loaded here dynamically -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="loading" class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer" style="text-align: center;">	
+        <!-- Logout button will be added here by JavaScript -->
+    </div>
+</div>
+
+<!-- MODALS - MOVED OUTSIDE PAGE-WRAPPER -->
+
+<!-- Confirm resend email modal -->
+    <div class="modal fade" id="resend-email-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Resend Email</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to resend the QR code ticket email?</p>
+                    
+                    <div class="mb-3">
+                        <strong>Order ID: </strong>
+                        <span id="modal-order-id"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Customer: </strong>
+                        <span id="modal-customer-name"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Email Address: </strong>
+                        <span id="modal-email-address"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Phone Number: </strong>
+                        <span id="modal-phone-number"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Created Date: </strong>
+                        <span id="modal-created-date"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="confirm-resend-email">Resend Email</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+<!-- Edit Order Modal -->
+<div class="modal fade" id="edit-order-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-order-form">
+                    <div class="mb-3">
+                        <strong>Order ID: </strong>
+                        <span id="edit-modal-order-id"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-first-name" class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="edit-first-name" placeholder="Enter first name">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-last-name" class="form-label">Last Name</label>
+                        <input type="text" class="form-control" id="edit-last-name" placeholder="Enter last name">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-phone-number" class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="edit-phone-number" placeholder="Enter phone number">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-email-address" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="edit-email-address" placeholder="Enter email address" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="confirm-edit-order">Update Order</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Refund Order Modal -->
+<div class="modal fade" id="refund-order-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Confirm Refund Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> This action cannot be undone. An order can only be refunded once. The refund will be processed through Square; only the tickets you select below will be invalidated.
+                </div>
+
+                <p><strong>Are you sure you want to refund this order?</strong></p>
+
+                <div class="mb-3">
+                    <strong>Order ID: </strong>
+                    <span id="refund-modal-order-id"></span>
+                </div>
+
+                <div class="mb-3">
+                    <strong>Customer: </strong>
+                    <span id="refund-modal-customer-name"></span>
+                </div>
+
+                <div class="mb-3">
+                    <strong>Email Address: </strong>
+                    <span id="refund-modal-email-address"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label for="refund-modal-amount-input" class="form-label"><strong>Refund Amount *</strong></label>
+                    <div class="input-group" style="max-width: 200px;">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="refund-modal-amount-input" step="0.01" min="0.01" required>
+                    </div>
+                    <small class="form-text text-muted">Order total: <span id="refund-modal-order-total"></span> — the refund amount cannot exceed this.</small>
+                </div>
+
+                <div class="mb-3">
+                    <strong>Payment ID: </strong>
+                    <small class="text-muted" id="refund-modal-payment-id"></small>
+                </div>
+
+                <div class="mb-3">
+                    <strong>Tickets to invalidate:</strong>
+                    <div id="refund-modal-tickets-list" class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                        <div class="text-muted small">Loading tickets...</div>
+                    </div>
+                    <small class="form-text text-muted">Unchecked tickets remain valid and usable. All tickets are selected by default.</small>
+                </div>
+
+                <hr>
+                
+                <div class="mb-3">
+                    <label for="refund-processed-by" class="form-label"><strong>Processed By *</strong></label>
+                    <select class="form-select" id="refund-processed-by" required>
+                        <option value="">-- Select User --</option>
+                        <!-- User options will be populated dynamically -->
+                    </select>
+                    <small class="form-text text-muted">Select who is processing this refund</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="refund-reason" class="form-label"><strong>Reason for Refund *</strong></label>
+                    <textarea class="form-control" id="refund-reason" rows="3" placeholder="Enter the reason for this refund..." required></textarea>
+                    <small class="form-text text-muted">Please provide a detailed reason for the refund</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger btn-sm" id="confirm-refund-order">
+                    Process Refund
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+<div class="modal fade" id="cancel-order-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">Confirm Cancel Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3"><strong>Are you sure you want to cancel this order?</strong></p>
+                <div class="alert alert-warning">
+                    <strong>Order ID:</strong> <span id="cancel-modal-order-id"></span><br>
+                    <strong>Customer:</strong> <span id="cancel-modal-customer-name"></span><br>
+                    <strong>Email:</strong> <span id="cancel-modal-email-address"></span>
+                </div>
+                <p class="text-muted small mb-0">
+                    This action will:
+                </p>
+                <ul class="text-muted small">
+                    <li>Mark the order as Cancelled</li>
+                    <li>Invalidate all associated tickets</li>
+                    <li>Remove all action buttons from this order</li>
+                </ul>
+                <p class="text-danger small mb-0">
+                    <strong>Warning:</strong> This action cannot be undone.
+                </p>
+                
+                <hr>
+                
+                <div class="mb-3">
+                    <label for="cancel-processed-by" class="form-label"><strong>Cancelled By *</strong></label>
+                    <select class="form-select" id="cancel-processed-by" required>
+                        <option value="">-- Select User --</option>
+                        <!-- User options will be populated dynamically -->
+                    </select>
+                    <small class="form-text text-muted">Select who is cancelling this order</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="cancel-reason" class="form-label"><strong>Reason for Cancellation *</strong></label>
+                    <textarea class="form-control" id="cancel-reason" rows="3" placeholder="Enter the reason for cancelling this order..." required></textarea>
+                    <small class="form-text text-muted">Please provide a reason for the cancellation</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Go Back</button>
+                <button type="button" class="btn btn-warning btn-sm" id="confirm-cancel-order">
+                    Cancel Order
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Order Modal -->
+<div class="modal fade" id="delete-order-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">Confirm Delete Order</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3"><strong>Are you sure you want to delete this order?</strong></p>
+                <div class="alert alert-dark">
+                    <strong>Order ID:</strong> <span id="delete-modal-order-id"></span><br>
+                    <strong>Customer:</strong> <span id="delete-modal-customer-name"></span><br>
+                    <strong>Email:</strong> <span id="delete-modal-email-address"></span>
+                </div>
+                <p class="text-muted small mb-0">
+                    This action will:
+                </p>
+                <ul class="text-muted small">
+                    <li>Mark the order as Deleted</li>
+                    <li>Invalidate all associated tickets</li>
+                    <li>Remove all action buttons from this order</li>
+                </ul>
+                <p class="text-danger small mb-0">
+                    <strong>Warning:</strong> This action cannot be undone.
+                </p>
+                
+                <hr>
+                
+                <div class="mb-3">
+                    <label for="delete-processed-by" class="form-label"><strong>Deleted By *</strong></label>
+                    <select class="form-select" id="delete-processed-by" required>
+                        <option value="">-- Select User --</option>
+                        <!-- User options will be populated dynamically -->
+                    </select>
+                    <small class="form-text text-muted">Select who is deleting this order</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="delete-reason" class="form-label"><strong>Reason for Deletion *</strong></label>
+                    <textarea class="form-control" id="delete-reason" rows="3" placeholder="Enter the reason for deleting this order..." required></textarea>
+                    <small class="form-text text-muted">Please provide a reason for the deletion</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Go Back</button>
+                <button type="button" class="btn btn-dark btn-sm" id="confirm-delete-order">
+                    Delete Order
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Bootstrap and custom JavaScript -->
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="auth-helper.js"></script>
+    <script src="order.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic header
+        HeaderLoader.initializeHeader('header-container');
+        
+        // Your existing page initialization
+        // ... rest of your page code
+    });
+</script>
+</body>
+</html>

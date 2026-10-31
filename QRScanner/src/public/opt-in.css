@@ -1,0 +1,57 @@
+/* opt-in.css — public opt-in page styling.
+ *
+ * Kept minimal on purpose: most layout is via Bootstrap 5.3 utility classes.
+ * This file is for the handful of custom bits the utility classes don't
+ * cover cleanly (page background, header logo sizing, phone input styling).
+ */
+
+body {
+    min-height: 100vh;
+}
+
+.page-wrapper {
+    padding: 20px 0 60px;
+}
+
+.page-wrapper .container {
+    max-width: 500px;
+    background: var(--lh-panel-grad, white);
+    color: var(--lh-text, inherit);
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+#optin-logo {
+    height: auto;
+}
+
+#optin-venue-name {
+    color: var(--lh-heading, #333);
+    font-weight: 600;
+}
+
+/* Phone input: bigger font for tap targets on mobile */
+#phone-input {
+    font-size: 1.15rem;
+}
+
+/* The consent checkbox label is a wall of legal-ish text; give it a bit of
+   air so it reads clearly. */
+label[for="consent-checkbox"] {
+    line-height: 1.4;
+}
+
+/* Slightly tighter spacing on the mobile viewport so the form isn't
+   pushed below the fold. */
+@media (max-width: 576px) {
+    .page-wrapper {
+        padding: 0;
+    }
+    .page-wrapper .container {
+        padding: 16px;
+        border-radius: 0;
+        box-shadow: none;
+        min-height: 100vh;
+    }
+}

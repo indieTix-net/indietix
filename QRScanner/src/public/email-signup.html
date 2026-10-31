@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join our email list</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="opt-in.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+
+        <!-- Standalone header, same convention as opt-in.html -- public
+             page, not auth-gated, so header-loader.js isn't used here. -->
+        <div id="signup-header" class="text-center py-4 mb-4 border-bottom border-dark border-3">
+            <img id="signup-logo" src="logo.png" alt="" style="max-width: 160px;" onerror="this.style.display='none';">
+            <h4 id="signup-venue-name" class="mt-3 mb-0">Get show updates by email</h4>
+        </div>
+
+        <!-- State: FORM -->
+        <div id="state-form">
+            <p class="text-muted text-center mb-4">
+                Sign up to hear about upcoming movies and events. No spam, and you can unsubscribe from any email we send.
+            </p>
+            <form id="signup-form" autocomplete="off">
+                <div class="mb-3">
+                    <label for="email-input" class="form-label">Email address</label>
+                    <input type="email" class="form-control" id="email-input" required placeholder="you@example.com">
+                    <div id="email-error" class="text-danger small mt-1 d-none"></div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="submit-button">Sign Up</button>
+                <div id="submit-error" class="text-danger small mt-2 text-center d-none"></div>
+            </form>
+        </div>
+
+        <!-- State: SUCCESS -->
+        <div id="state-success" class="d-none text-center py-4">
+            <div class="alert alert-success">
+                <h5 class="alert-heading">You're on the list!</h5>
+                <p class="mb-0">We'll let you know what's playing. Every email includes a one-click unsubscribe link.</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script src="email-signup.js"></script>
+</body>
+</html>

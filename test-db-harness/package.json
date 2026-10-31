@@ -1,0 +1,21 @@
+{
+  "name": "test-db-harness",
+  "version": "1.0.0",
+  "description": "Disposable, local, real Postgres containers for IndieTix's test suites. Knows nothing about this project's schema -- that stays clientSetup-Teardown's job; this just starts/stops a container and creates/drops databases in it.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indieTix-net/indietix.git",
+    "directory": "test-db-harness"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "pg": "^8.13.3"
+  }
+}

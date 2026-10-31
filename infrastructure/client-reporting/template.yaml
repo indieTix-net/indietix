@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Read-only client-info reporting Lambda -- connects with the Aurora
+  master credentials (same indieTix/rds/clients/indietix/credentials
+  secret as clientSetup-Teardown) and queries pg_database directly to
+  discover client databases, no S3 access needed. Imports VPC/subnet/
+  security-group from this environment's foundation stack.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+
+Resources:
+  ClientReportingLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${EnvPrefix}-client-reporting-deps"
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  ClientReportingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-client-reporting"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 256
+      Layers:
+        - !Ref ClientReportingLayer
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetA'
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetB'
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"

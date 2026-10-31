@@ -1,0 +1,11 @@
+# Copy this file to deploy.config.sh (gitignored -- never commit it) and
+# fill in your own deployment's values. deploy.sh refuses to run without
+# a deploy.config.sh present, so this is a required one-time setup step.
+
+REGION="us-east-2"                      # AWS region your Lambdas are deployed to
+ACCOUNT_ID="000000000000"               # Your AWS account ID
+DISTRIBUTION_ID="YOUR_DISTRIBUTION_ID"  # CloudFront distribution serving the static site
+STATIC_BUCKET="your-static-site-bucket" # S3 bucket backing that distribution
+
+DEV_PROFILE="your-sandbox-profile"      # AWS CLI profile name for your sandbox/dev account (see infrastructure/ SAM templates)
+DEV_REGION="us-west-1"                  # Region your sandbox stacks are deployed to

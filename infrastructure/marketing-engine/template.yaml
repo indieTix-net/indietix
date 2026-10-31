@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  The Marquee Engine poller -- generates/sends marketing posts.
+  Discovers clients via the Aurora master credentials
+  (indieTix/rds/clients/indietix/credentials), same as
+  clientReporting/expireQRCodeSquareModifiers. Includes the 5-minute
+  EventBridge schedule as a proper SAM Schedule event -- production's own
+  copy of this rule was created by hand via the CLI (`aws events put-rule`),
+  not from any IaC file (see marketingEngine/README); this bootstrap
+  gets a freshly-deployed environment the same live trigger without that
+  manual step. Real sends require real Square/SES/social credentials set
+  on a client's configuration after onboarding -- nothing here can
+  provide those.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  EnablePollerSchedule:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Set to "true" once you're ready for this to actually run every 5 minutes against real client data. Defaults off so a fresh deploy doesn't start firing before any client has MARKETING_ENGINE_ENABLED reviewed.
+
+Conditions:
+  SchedulerEnabled: !Equals [!Ref EnablePollerSchedule, "true"]
+
+Resources:
+  MarketingEngineLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${EnvPrefix}-marketing-engine-deps"
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  MarketingEngineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-marketing-engine"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 120
+      MemorySize: 512
+      Layers:
+        - !Ref MarketingEngineLayer
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetA'
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetB'
+      Events:
+        PollerSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Enabled: !If [SchedulerEnabled, true, false]
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:ListBucket
+              Resource:
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*"
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*/*"
+            - Effect: Allow
+              Action:
+                - ses:SendRawEmail
+              Resource: "*"

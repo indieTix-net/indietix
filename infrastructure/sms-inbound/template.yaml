@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Recreates the one documented shared-resource exception in the real
+  architecture: a single SNS topic that every client's SMS origination
+  number publishes inbound messages to, with the smsOptInOptOut
+  (handleInboundSms) Lambda subscribed to it. The Lambda auto-discovers
+  clients from Secrets Manager at invocation time (indieTix/rds/clients/*)
+  -- no per-client wiring needed here.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  SmsUtilsLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's sms-utils layer (published by bootstrap.sh before this stack deploys)
+
+Resources:
+  InboundSmsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${EnvPrefix}-inbound-sms"
+
+  SmsInboundLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${EnvPrefix}-sms-inbound-deps"
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  SmsInboundFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-sms-inbound"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 15
+      MemorySize: 128
+      Layers:
+        - !Ref SmsInboundLayer
+        - !Ref SmsUtilsLayerArn
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:ListSecrets
+              Resource: "*" # ListSecrets has no resource-level restriction in IAM
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"
+            - Effect: Allow
+              Action:
+                - sms-voice:DeleteOptedOutNumber
+              Resource: "*"
+      Events:
+        InboundSms:
+          Type: SNS
+          Properties:
+            Topic: !Ref InboundSmsTopic
+
+Outputs:
+  InboundSmsTopicArn:
+    Description: Shared inbound SMS SNS topic ARN
+    Value: !Ref InboundSmsTopic

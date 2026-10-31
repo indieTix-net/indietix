@@ -1,0 +1,240 @@
+/* ==========================================================================
+   IndieTix admin theme: "G · Oxblood to charcoal"
+   Drop-in overrides for the Bootstrap-based admin pages (Manual Checkin etc.).
+   Load AFTER bootstrap.css. Selectors are a best guess at the current
+   markup; adapt them to the real class names, and keep the token values.
+   ========================================================================== */
+
+:root {
+  /* Page */
+  --lh-page-bg: #09090A;
+  --lh-star-dot: rgba(220, 220, 230, 0.45);
+
+  /* Surfaces */
+  --lh-header-grad: linear-gradient(135deg, #4E0F18 0%, #2A1D20 50%, #1B1C1F 100%);
+  --lh-panel-grad:  linear-gradient(160deg, #36121A 0%, #1F2023 55%, #18191C 100%);
+  --lh-search-grad: linear-gradient(180deg, #281C1F 0%, #161719 100%);
+  --lh-border: rgba(255, 255, 255, 0.10);
+  --lh-shadow: 0 10px 28px rgba(0, 0, 0, 0.40);
+  --lh-radius: 12px;
+
+  /* Text */
+  --lh-text: #ECE8EA;
+  --lh-heading: #FFFFFF;
+  --lh-muted: #C4BEC0;
+  --lh-link: #F2A9B0;
+  --lh-link-hover: #FFD0D5;
+
+  /* Inputs */
+  --lh-input-bg: rgba(0, 0, 0, 0.40);
+  --lh-input-border: rgba(255, 255, 255, 0.18);
+
+  /* Buttons */
+  --lh-primary: #8C1C27; /* flat fill -- was a gradient, per feedback that buttons (unlike header/panel surfaces) shouldn't have one */
+  --lh-clear-bg: #45474D;
+  --lh-neutral: #9A9AA6;      --lh-neutral-text: #DADAE2;
+  --lh-info: #3DD5F3;         --lh-info-text: #5FE0F7;
+  --lh-success: #3FB97B;      --lh-success-text: #6EDCA4;
+  --lh-colvis: #E58C95;       --lh-colvis-text: #F2A9B0;
+
+  /* Table */
+  --lh-head-line: rgba(255, 255, 255, 0.20);
+  --lh-row-line: rgba(255, 255, 255, 0.08);
+  --lh-row-alt: rgba(255, 255, 255, 0.045);
+  --lh-row-text: #E2E0E4;
+}
+
+/* ---------- Page background (starfield over near-black) ---------- */
+body {
+  color: var(--lh-text);
+  background:
+    radial-gradient(circle, var(--lh-star-dot) 1.5px, transparent 2px) 0 0 / 300px 270px,
+    radial-gradient(circle, rgba(255,255,255,0.28) 1px, transparent 1.5px) 140px 90px / 190px 170px,
+    var(--lh-page-bg);
+  background-attachment: fixed;
+  color-scheme: dark; /* dark native date pickers / scrollbars */
+}
+
+a { color: var(--lh-link); }
+a:hover, a:focus { color: var(--lh-link-hover); }
+h1, h2, h3, h4, h5, h6 { color: var(--lh-heading); }
+.text-muted, small { color: var(--lh-muted) !important; }
+
+/* ---------- Header block (logo, title, nav) ----------
+   Not a guess -- header-loader.js's real injected markup is
+   id="app-header" (confirmed in src/public/header-loader.js), mounted
+   into each page's own #header-container. Used on every page that calls
+   HeaderLoader.initializeHeader(), admin and customer-facing alike. */
+.lh-header,
+#app-header {
+  background: var(--lh-header-grad) !important;
+  border: 1px solid var(--lh-border);
+  border-radius: 14px;
+  box-shadow: var(--lh-shadow);
+}
+.lh-header .nav-link,
+#app-header nav a,
+#app-header a {
+  color: var(--lh-link);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Real white logo now in place (replaced 2026-10-26) -- no invert needed. */
+
+/* ---------- Panels / cards (Date Filter, Column Visibility, table wrap) ----------
+   !important on the background declarations only: several pages' own
+   CSS (products.css, order.css, client.css, etc.) set white
+   backgrounds on more specific compound selectors --
+   .column-controls .card-body, #ftp-settings, #success-modal, and so
+   on -- written long before this theme existed. Those beat a plain
+   .card/.card-body rule on specificity alone regardless of which
+   stylesheet loads last, so the theme's surface color has to win on
+   purpose here. Not applied to border/shadow/color -- no real fight
+   over those. */
+.card, .lh-panel {
+  background: var(--lh-panel-grad) !important;
+  border: 1px solid var(--lh-border);
+  border-radius: var(--lh-radius);
+  box-shadow: var(--lh-shadow);
+  color: var(--lh-text);
+}
+.card-header, .card-body, .card-footer {
+  background: transparent !important;
+  border-color: var(--lh-border);
+  color: inherit;
+}
+
+/* ---------- Inputs ---------- */
+/* color needs !important too, not just background -- found via a
+   third-party widget (Tabulator's own column header-filter inputs) whose
+   CSS sets color with much higher selector specificity than this rule;
+   background won here via !important alone, color didn't, so text ended
+   up dark-on-dark. input[type="number"] was also missing outright. */
+.form-control, .form-select, input[type="date"], input[type="number"], input[type="search"], input[type="text"] {
+  background-color: var(--lh-input-bg) !important;
+  border: 1px solid var(--lh-input-border);
+  color: var(--lh-text) !important;
+}
+/* --lh-muted is already a deliberately dimmer tone than --lh-text --
+   stacking opacity on top of it compounded with --lh-input-bg's own
+   translucency (a 40%-black overlay, so it renders extra-dark against the
+   already-dark panel behind it) made placeholder text read as too low-
+   contrast. Full opacity, let --lh-muted alone do the dimming. */
+.form-control::placeholder { color: var(--lh-muted); opacity: 1; }
+.form-control:focus, .form-select:focus {
+  background-color: var(--lh-input-bg) !important;
+  color: var(--lh-text) !important;
+  border-color: var(--lh-colvis);
+  box-shadow: 0 0 0 0.2rem rgba(229, 140, 149, 0.25);
+}
+
+/* Search bar */
+.lh-search .form-control, #searchInput {
+  background: var(--lh-search-grad) !important;
+}
+.lh-search .btn, #clearSearch {
+  background: var(--lh-clear-bg);
+  border-color: var(--lh-clear-bg);
+  color: #fff;
+}
+
+/* ---------- Buttons ---------- */
+.btn-primary {
+  background: var(--lh-primary);
+  border: 0;
+  color: #fff;
+}
+.btn-primary:hover, .btn-primary:focus { filter: brightness(1.1); }
+
+.btn-outline-secondary { border-color: var(--lh-neutral); color: var(--lh-neutral-text); }
+.btn-outline-info      { border-color: var(--lh-info);    color: var(--lh-info-text); }
+.btn-outline-success   { border-color: var(--lh-success); color: var(--lh-success-text); }
+.btn-outline-primary   { /* Column Visibility */
+  border-color: var(--lh-colvis);
+  color: var(--lh-colvis-text);
+  background: rgba(229, 140, 149, 0.08);
+}
+.btn-outline-secondary:hover, .btn-outline-info:hover,
+.btn-outline-success:hover, .btn-outline-primary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.btn-secondary { background: var(--lh-clear-bg); border-color: var(--lh-clear-bg); }
+
+/* Actions dropdown */
+.dropdown-toggle.btn-outline-secondary, .btn-light {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: #E6E2E4;
+}
+.dropdown-menu {
+  background: #1F2023 !important;
+  border: 1px solid var(--lh-border);
+}
+.dropdown-item { color: var(--lh-text); }
+.dropdown-item:hover, .dropdown-item:focus { background: #36121A; color: #fff; }
+
+/* ---------- Table ---------- */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--lh-row-text);
+  --bs-table-striped-bg: var(--lh-row-alt);
+  --bs-table-striped-color: var(--lh-row-text);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.07);
+  --bs-table-hover-color: #fff;
+  --bs-table-border-color: var(--lh-row-line);
+  color: var(--lh-row-text);
+  background: var(--lh-panel-grad) !important;
+  border-radius: var(--lh-radius);
+  overflow: hidden;
+}
+.table thead th {
+  color: var(--lh-heading);
+  background: transparent !important;
+  border-bottom: 2px solid var(--lh-head-line);
+}
+.table td, .table th { border-color: var(--lh-row-line); }
+
+/* DataTables, if it's in use */
+.dataTables_wrapper, .dataTables_info, .dataTables_length, .dataTables_filter { color: var(--lh-muted); }
+.page-link { background: #1F2023; border-color: var(--lh-border); color: var(--lh-link); }
+.page-item.active .page-link { background: #8C1C27; border-color: #8C1C27; color: #fff; }
+
+/* Modals */
+.modal-content {
+  background: var(--lh-panel-grad) !important;
+  border: 1px solid var(--lh-border);
+  color: var(--lh-text);
+}
+.btn-close { filter: invert(1); }
+/* A modal header with its own Bootstrap color utility (order.html's
+   bg-warning text-dark Cancel header, bg-danger/bg-dark text-white ones)
+   should keep that text color -- the h1-h6 rule above otherwise forces the
+   title white, which is white-on-yellow on the Cancel Order modal. */
+.modal-header.text-dark .modal-title,
+.modal-header.text-white .modal-title { color: inherit; }
+
+/* ---------- Alerts ----------
+   Bootstrap's alerts are pale pastel boxes, and the theme's light text
+   (e.g. order.css's .modal-body span values in the Delete/Cancel Order
+   modals) ends up light-on-light inside them. Dark, tinted versions
+   instead: a translucent wash of the variant color over the panel, light
+   text, a colored left edge. background-color is set directly too, since
+   some page CSS (client.css .alert-success) sets it without the variable. */
+.alert {
+  --bs-alert-color: var(--lh-text);
+  --bs-alert-link-color: var(--lh-link);
+  color: var(--lh-text);
+  background-color: var(--bs-alert-bg);
+  border: 1px solid var(--lh-border);
+  border-left: 4px solid var(--bs-alert-border-color);
+}
+.alert strong, .alert .alert-heading { color: var(--lh-heading); }
+.alert-primary   { --bs-alert-bg: rgba(140, 28, 39, 0.22);   --bs-alert-border-color: #C0505C; }
+.alert-secondary,
+.alert-dark,
+.alert-light     { --bs-alert-bg: rgba(255, 255, 255, 0.06); --bs-alert-border-color: var(--lh-neutral); }
+.alert-success   { --bs-alert-bg: rgba(63, 185, 123, 0.14);  --bs-alert-border-color: var(--lh-success); }
+.alert-info      { --bs-alert-bg: rgba(61, 213, 243, 0.12);  --bs-alert-border-color: var(--lh-info); }
+.alert-warning   { --bs-alert-bg: rgba(255, 193, 7, 0.14);   --bs-alert-border-color: #E0A800; }
+.alert-danger    { --bs-alert-bg: rgba(220, 53, 69, 0.18);   --bs-alert-border-color: #E5606D; }

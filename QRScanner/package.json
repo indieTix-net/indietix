@@ -1,0 +1,46 @@
+{
+  "name": "qrscanner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Express app: operator UI + public API endpoints.",
+  "type": "module",
+  "main": "src/app.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "comment:node-version": "Must run under Node 22 (matching production's actual Lambda runtime), not whatever 'node' happens to resolve to -- jsonwebtoken's transitive dependency buffer-equal-constant-time uses the legacy SlowBuffer API, which Node 25 removed outright (confirmed: fails identically with no symlinks involved, a real version incompatibility, not a test-setup bug). CI pins this via actions/setup-node. Locally, make sure Node 22 is the active version on PATH (nvm/Volta/`brew install node@22` + manual PATH) before running `npm test`.",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.1068.0",
+    "@aws-sdk/client-s3": "^3.1090.0",
+    "@aws-sdk/client-secrets-manager": "^3.873.0",
+    "@aws-sdk/s3-request-presigner": "^3.1090.0",
+    "@googleapis/calendar": "^14.2.0",
+    "@googleapis/drive": "^20.0.0",
+    "aws-sdk": "^2.1692.0",
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^1.20.3",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "form-data": "^4.0.0",
+    "google-auth-library": "^10.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "mailcomposer": "^4.0.2",
+    "pg": "^8.13.3",
+    "sequelize": "^6.37.7",
+    "serverless-http": "^3.2.0",
+    "sharp": "^0.35.5",
+    "sms-utils": "file:../sms-utils",
+    "ticket-pdf-lib": "file:../ticket-pdf-lib"
+  },
+  "devDependencies": {
+    "aws-sdk-client-mock": "^4.0.0",
+    "nock": "^14.0.0",
+    "pdf-lib": "^1.17.1",
+    "test-db-harness": "file:../test-db-harness"
+  }
+}

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.zip
+
+# macOS junk
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Local env
+.env
+.env.local
+
+# Personal scratch notes with real credentials -- never commit
+oldConfigs.josh
+joshSetupExamples.txt
+joshTemplate.yml
+libertyhall-db-key.pem
+
+# Stale code snapshot -- note: already tracked in git, this alone won't untrack it
+app.mjs.beforeIterateOverCatalogIDs
+
+# Local notes -- not part of the distributed project.
+MEMORY.md

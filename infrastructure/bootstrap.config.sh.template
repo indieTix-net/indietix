@@ -1,0 +1,104 @@
+# Copy this file to bootstrap.config.sh (gitignored -- never commit it) and
+# fill in your own values. bootstrap.sh refuses to run without a
+# bootstrap.config.sh present, same convention as deploy.config.sh.
+#
+# This drives a from-scratch deploy of the ENTIRE platform (all 12 SAM
+# stacks, in dependency order) into a fresh AWS account/region, plus
+# onboarding your first client. It does not configure any third-party
+# integration (Square, Google Calendar, social media, SMS/10DLC) --
+# those need real accounts/approvals on the other end and go into the
+# client's own Client.configuration afterward, via Client Settings or a
+# direct DB update. See bootstrap.sh's own final-summary output for the
+# exact manual-steps checklist after a run.
+
+# ---- AWS target ----
+ENV_PREFIX="myvenue-prod"      # Namespace for every resource name + cross-stack export (lowercase, hyphens ok, no trailing hyphen). Lets multiple environments (sandbox, prod, a self-hoster's own account) coexist in the same AWS account/region without colliding.
+AWS_REGION="us-east-2"         # Region to deploy everything into
+AWS_PROFILE=""                 # Optional named AWS CLI profile. Leave blank to use the default profile/credentials.
+
+# ---- Networking (aurora-poc) ----
+DEFAULT_VPC_ID=""               # A VPC to build the private subnets in -- the account's default VPC works fine (aws ec2 describe-vpcs --filters Name=isDefault,Values=true)
+SUBNET_ID_A=""                  # One of that VPC's existing public (IGW-routed) subnets -- the NAT Gateway goes here
+SUBNET_ID_B=""                  # A second subnet in the SAME vpc, a DIFFERENT availability zone than SUBNET_ID_A (Aurora's subnet group needs 2 AZs)
+PRIVATE_SUBNET_A_CIDR="172.31.32.0/20"  # MUST NOT overlap any subnet already in DEFAULT_VPC_ID -- confirmed this is a real, not theoretical, failure mode: deploying a second environment into a VPC that already has one of these stacks with the default CIDRs fails outright. Pick a different /20 here (and below) for any environment after your first one in a given VPC.
+PRIVATE_SUBNET_B_CIDR="172.31.48.0/20"  # See PRIVATE_SUBNET_A_CIDR.
+
+# ---- Database cost (aurora-poc) ----
+AURORA_MIN_CAPACITY="0.5"       # 0.5 = always warm (use this for a real venue). 0 = an idle sandbox pauses itself after 5 min with no connections and resumes automatically on the next one (first request waits ~15s). Cuts the always-on database cost (~$2/day) to near zero -- good for a sandbox you only use now and then.
+
+# ---- Cost guard (optional) ----
+# Deploys the cost-guard stack: AWS Budgets that email BUDGET_ALERT_EMAIL
+# when daily spend goes over BUDGET_DAILY_USD, or monthly spend passes 80%
+# of BUDGET_MONTHLY_USD (or is forecast to pass 100%). Leave the email blank
+# to skip all of it. Budgets measure the whole AWS ACCOUNT's spend, and AWS
+# billing data lags several hours. For reference, one idle sandbox costs
+# ~$1.30/day with AURORA_MIN_CAPACITY=0, ~$3.30/day with 0.5.
+BUDGET_ALERT_EMAIL=""            # e.g. you@example.com -- blank = no budgets, no breaker
+BUDGET_DAILY_USD="5"
+BUDGET_MONTHLY_USD="120"
+# "true" = when the daily budget is exceeded, block EVERY request to this
+# environment (all its Lambdas set to concurrency 0) until you run
+# ./bootstrap.sh unblock. Square retries rejected webhooks for up to 72h and
+# queued orders wait, so nothing is lost -- but the door scanner, ticket
+# delivery and the API are offline while it's tripped. SANDBOX ONLY: never
+# "true" for a live venue.
+BUDGET_BREAKER="false"
+
+# ---- First client (client-buckets + client-setup-teardown invoke) ----
+# client-setup-teardown's handler hard-requires a real Square access
+# token + signature key just to create the client row at all (not
+# optional, not something you can fill in later through Client Settings
+# for the FIRST client) -- so despite Square setup otherwise being a
+# later step in root README.md's walkthrough, for this one Lambda call
+# you need a Square app already created and these two values in hand
+# first. See README.md's "Connecting Square" section for how to get them.
+FIRST_CLIENT_USERNAME="myvenue"             # Lowercase, 3-63 chars, letters/numbers/dots/hyphens, must start+end with letter/number (S3 bucket naming rules) -- becomes the client's database name and S3 bucket suffix
+FIRST_CLIENT_SECRET=""                      # The client-level login secret (not a person's password) -- pick a long random string, this is effectively a root credential for this client
+FIRST_CLIENT_CONTACT_NAME=""                # The actual person to contact -- a real name, not the venue's name
+FIRST_CLIENT_CONTACT_EMAIL=""               # Real email -- used for login/notifications
+FIRST_CLIENT_THEATER_NAME="My Venue"        # Shown in reports and (unless overridden later) web branding
+FIRST_CLIENT_SQUARE_ACCESS_TOKEN=""         # Your Square application's own access token (Square Developer Dashboard > Credentials)
+FIRST_CLIENT_SQUARE_SIGNATURE_KEY=""        # Leave blank with SQUARE_WEBHOOK_AUTO="true" (below) -- `up` fills it in. Otherwise: generated when you set up the webhook subscription in Square by hand, see README.md
+FIRST_CLIENT_SQUARE_LOCATION_ID=""          # Optional. Blank: `up` uses the merchant's only active location if there's exactly one (needs SQUARE_WEBHOOK_AUTO), otherwise set it later in Client Settings
+
+# ---- Square webhook (optional, recommended) ----
+# "true" makes `up` create (or update) this environment's Square webhook
+# subscription itself -- pointed at this environment's webhook endpoint,
+# payment.updated only -- and hand its signature key, the webhook URL, and
+# the location straight to the first client's onboarding. `down` deletes
+# that same subscription, if it still points at this environment.
+#
+# Subscriptions belong to the Square application, so FIRST_CLIENT_SQUARE_
+# ACCESS_TOKEN has to be the application's own access token, not an OAuth
+# token a merchant granted it. Nothing is touched unless that token's
+# merchant matches SQUARE_EXPECTED_MERCHANT_ID, and only the one
+# subscription named SQUARE_WEBHOOK_NAME is ever created, changed, or
+# deleted -- every other subscription on the app is left alone. Meant for
+# environments bootstrap.sh owns; don't point it at a production venue's
+# subscription.
+SQUARE_WEBHOOK_AUTO="false"
+SQUARE_EXPECTED_MERCHANT_ID=""  # The merchant that token belongs to (Square Dashboard > Account & Settings > Business information, or GET /v2/merchants/me)
+SQUARE_WEBHOOK_NAME=""          # Subscription name to manage. Blank defaults to ENV_PREFIX
+
+# ---- First client's other Client Settings (optional) ----
+# Path to a JSON file of initial Client Settings for the first client --
+# OMDB, Google Calendar, FTP reporting, API keys, social media, and so on.
+# Copy first-client-settings.json.template to first-client-settings.json
+# (gitignored) and fill in what you have. Only applied when the client is
+# first onboarded; after that, use Client Settings. Blank skips it.
+FIRST_CLIENT_SETTINGS_FILE=""
+
+# Optional: a named personal login, instead of sharing the client-level
+# credential (FIRST_CLIENT_USERNAME/SECRET above) day to day for actual
+# operator use. NOT required -- the client-level login already works
+# immediately with no Users row at all (see CLIENT_SETUP.md's "After
+# onboarding" section). Leave both blank to skip; both-or-neither.
+FIRST_CLIENT_ADMIN_USERNAME=""              # A real username for this person, separate from FIRST_CLIENT_USERNAME
+FIRST_CLIENT_ADMIN_PASSWORD=""              # This person's own password, not the client secret above
+FIRST_CLIENT_ADMIN_EMAIL=""                 # Optional; defaults to FIRST_CLIENT_CONTACT_EMAIL if left blank
+
+# ---- Static site (optional, can be set after the first deploy) ----
+STATIC_SITE_DOMAIN=""           # This environment's CloudFront domain, once known (e.g. d1234abcd.cloudfront.net) -- allowed as a CORS origin for direct browser uploads. Blank is fine on the very first run; bootstrap.sh prints the real domain at the end, and re-running `up` with this filled in tightens the client-buckets CORS policy.
+
+# ---- Marquee Engine poller (optional) ----
+ENABLE_MARKETING_POLLER="false" # "true" starts the 5-minute EventBridge schedule immediately on deploy. Leave "false" until you've actually reviewed MARKETING_ENGINE_ENABLED for the first client -- see marketing-engine/template.yaml's own description for why this defaults off.

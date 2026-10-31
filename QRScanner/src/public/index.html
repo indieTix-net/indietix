@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IndieTix - Liberty Hall</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="index.css">
+  <script src="config.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+  <div class="container">
+<div id="header-container">
+    <!-- Header will be injected here -->
+</div>
+    <div id="reader"></div>
+
+    <div id="result">
+      <h2>Scan Result:</h2>
+      <div id="scanner-controls" style="margin: 10px 0 15px 0; text-align: center;">
+        <label style="display: inline-block; margin-right: 20px;">
+          <input type="checkbox" id="auto-checkin" style="margin-right: 5px; vertical-align: middle;">
+          <span style="vertical-align: middle;">Auto Check-in</span>
+        </label>
+        <label style="display: inline-block;">
+          <input type="checkbox" id="sound-enabled" style="margin-right: 5px; vertical-align: middle;">
+          <span style="vertical-align: middle;">Sound</span>
+        </label>
+      </div>
+      <p id="result-text">No QR code detected yet</p>
+    </div>
+
+    <div id="action-container">
+      <!-- Check-in/Check-out and Scan Again buttons will be added here by JavaScript -->
+    </div>
+
+    <div id="api-status">API Status: Checking...</div>
+    
+    <hr>
+    
+    <div class="footer" style="text-align: center;">
+      <!-- Logout button will be added here by JavaScript -->
+    </div>
+  </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="auth-helper.js"></script>
+  <script src="index.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic header
+        HeaderLoader.initializeHeader('header-container');
+        
+        // Your existing page initialization
+        // ... rest of your page code
+    });
+</script>
+</body>
+</html>

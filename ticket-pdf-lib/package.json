@@ -1,0 +1,28 @@
+{
+  "name": "ticket-pdf-lib",
+  "version": "1.0.0",
+  "description": "Shared QR-code + ticket-PDF rendering logic, packaged as a Lambda layer. Fresh port of getSquareOrders' existing ticket-generation code -- getSquareOrders itself is intentionally not yet changed to consume this; QRScanner's ticket-transfer feature is the first (and so far only) real consumer.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indieTix-net/indietix.git",
+    "directory": "ticket-pdf-lib"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4"
+  },
+  "peerDependencies": {
+    "@aws-sdk/client-s3": "^3.0.0"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.0.0"
+  }
+}

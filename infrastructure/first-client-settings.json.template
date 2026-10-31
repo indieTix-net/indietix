@@ -1,0 +1,44 @@
+{
+  "_comment": "Initial Client Settings for bootstrap.sh's first client. Copy to first-client-settings.json (gitignored), fill in what you have (blank values are skipped, so the defaults stay), and set FIRST_CLIENT_SETTINGS_FILE=\"first-client-settings.json\" in bootstrap.config.sh. Keys are the same names Client Settings uses; any key that isn't user-definable is skipped (and named in the onboarding log), and keys starting with _ are ignored. Applied only when the client is first onboarded -- after that, change things in Client Settings. Square credentials don't go here: they come from bootstrap.config.sh (and SQUARE_WEBHOOK_AUTO).",
+
+  "_comment_movies": "Movie lookup on Add Movie (free key at omdbapi.com).",
+  "OMDB_API_KEY": "",
+
+  "_comment_calendar": "Google Calendar: paste the whole service account key as a JSON object, and share each calendar with its client_email.",
+  "GOOGLE_SERVICE_ACCOUNT_KEY": {},
+  "CINEMA_CALENDAR_ID": "",
+  "EVENT_CALENDAR_ID": "",
+
+  "_comment_ai": "Marquee Engine captions and Insights.",
+  "ANTHROPIC_API_KEY": "",
+
+  "_comment_ftp": "Nightly box office reporting. USE_FTP 'true' turns delivery on; FTP1_TYPE is 'ftp' or 'sftp' (port defaults to 21 or 22). FTP2_*/FTP3_* work the same way.",
+  "USE_FTP": "",
+  "FTP1_TYPE": "",
+  "FTP1_HOST": "",
+  "FTP1_PORT": "",
+  "FTP1_USER": "",
+  "FTP1_PASSWORD": "",
+  "FTP1_REMOTE_PATH": "",
+
+  "_comment_reporting": "Box office report identity.",
+  "THEATER_ID": "",
+  "EBOR_THEATRE_NO": "",
+
+  "_comment_social": "Marquee Engine posting.",
+  "META_PAGE_ACCESS_TOKEN": "",
+  "META_PAGE_ID": "",
+  "META_IG_BUSINESS_ID": "",
+  "TIKTOK_CLIENT_KEY": "",
+  "TIKTOK_CLIENT_SECRET": "",
+  "TIKTOK_ACCESS_TOKEN": "",
+  "TIKTOK_REFRESH_TOKEN": "",
+
+  "_comment_email": "The address emails come from. Must be verified in Amazon SES (the address or its whole domain). Blank keeps the default, <contact name>@indietix.net.",
+  "SENDER_EMAIL": "",
+
+  "_comment_misc": "Optional extras.",
+  "WEB_HEADER_COMPANY": "",
+  "OWNER_BCC_EMAIL": "",
+  "ONE_PER_EMAIL_ITEMS": ""
+}

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.zip
+
+# macOS junk
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Local env
+.env
+.env.local
+
+# Per-deployment static config (contains this deployment's Lambda Function
+# URL) -- see src/public/config.js.template
+src/public/config.js
+
+# Serverless Framework
+.serverless/
+
+# Real credential files found committed to this repo (2026-10-26) -- orphaned,
+# not referenced by any code. Treat as compromised; git history still has
+# them until the planned history rewrite.
+opportune-sylph-484900-b1-c0ab4a236138.json
+libertyhall-db-key.pem
+
+# AWS-console-exported SAM template (2026-10-27) -- real DB password, AWS
+# account ID, RDS/Secrets Manager ARNs, VPC details. Not referenced by any
+# code (an orphaned export, same category as the other two files above).
+# Renamed from template.yml, matching getSquareOrders' joshTemplate.yml
+# convention. Treat the DB password as compromised -- rotate it.
+joshTemplate.yml
+
+# Local notes -- not part of the distributed project.
+MEMORY.md

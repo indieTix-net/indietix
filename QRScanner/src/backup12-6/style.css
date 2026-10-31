@@ -1,0 +1,640 @@
+/* =======================
+   COMMON LAYOUT STYLES
+   ======================= */
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Page wrapper with border */
+.page-wrapper {
+    border: 2px dashed #ccc;
+    border-radius: 5px;
+    margin: 10px;
+    padding: 15px;
+    min-height: calc(100vh - 20px);
+    box-sizing: border-box;
+}
+
+.container {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.footer {
+  margin-top: 30px;
+  text-align: center !important;
+  width: 100% !important;
+}
+
+/* =======================
+   COMMON TYPOGRAPHY
+   ======================= */
+
+h1 {
+  text-align: center;
+  color: #333;
+}
+
+#user-info {
+  font-weight: bold;
+  color: #495057;
+  margin-bottom: 10px;
+  display: none;
+}
+
+/* =======================
+   COMMON NAVIGATION - ULTRA-STRONG BOOTSTRAP OVERRIDES
+   ======================= */
+
+/* Multiple ultra-specific selectors to beat any Bootstrap selector */
+body .header-controls a.nav-link,
+body .header-controls .nav-link,
+body a.nav-link, 
+body .nav-link, 
+body div a.nav-link,
+.container .header-controls a.nav-link,
+.container .header-controls .nav-link,
+.container a.nav-link,
+.container .nav-link {
+  margin-right: 0px !important;
+  text-decoration: underline !important;
+  margin-bottom: 0px !important;
+  display: inline-block !important;
+  color: #007bff !important;
+  text-decoration-line: underline !important;
+  text-decoration-style: solid !important;
+  text-decoration-color: currentColor !important;
+  text-underline-offset: auto !important;
+}
+
+body .header-controls a.nav-link:hover,
+body .header-controls .nav-link:hover,
+body a.nav-link:hover,
+body .nav-link:hover,
+.container .header-controls a.nav-link:hover,
+.container .header-controls .nav-link:hover,
+.container a.nav-link:hover,
+.container .nav-link:hover {
+  text-decoration: underline !important;
+  color: #0056b3 !important;
+  text-decoration-line: underline !important;
+  text-decoration-style: solid !important;
+  text-decoration-color: currentColor !important;
+}
+
+/* Override any Bootstrap link reset */
+body a.nav-link:not(.btn),
+body .nav-link:not(.btn),
+.container a.nav-link:not(.btn),
+.container .nav-link:not(.btn) {
+  text-decoration: underline !important;
+}
+
+/* =======================
+   COMMON BUTTONS - ULTRA-STRONG BOOTSTRAP OVERRIDES
+   ======================= */
+
+/* Multiple ultra-specific selectors to beat Bootstrap .btn class */
+body .footer #logout-btn,
+body .footer .logout-button,
+body #logout-btn.logout-button,
+body button#logout-btn.logout-button, 
+body .footer button.logout-button,
+body button.logout-button,
+body .logout-button,
+.container .footer #logout-btn,
+.container .footer .logout-button,
+.container #logout-btn.logout-button,
+.container button#logout-btn.logout-button,
+.container .footer button.logout-button,
+.container button.logout-button,
+.container .logout-button,
+html body .footer #logout-btn,
+html body .footer .logout-button,
+html body #logout-btn.logout-button {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  color: white !important;
+  border-radius: 0.375rem !important;
+  padding: 0.375rem 0.75rem !important;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+  margin: 20px auto !important;
+  display: block !important;
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  width: auto !important;
+  min-width: 120px !important;
+  cursor: pointer !important;
+  font-weight: 400 !important;
+  text-transform: none !important;
+  vertical-align: middle !important;
+  user-select: none !important;
+  transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out, box-shadow .15s ease-in-out !important;
+  border: 1px solid #dc3545 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+}
+
+body .footer #logout-btn:hover,
+body .footer .logout-button:hover,
+body #logout-btn.logout-button:hover,
+body button#logout-btn.logout-button:hover,
+body .footer button.logout-button:hover,
+body button.logout-button:hover,
+body .logout-button:hover,
+.container .footer #logout-btn:hover,
+.container .footer .logout-button:hover,
+.container #logout-btn.logout-button:hover,
+html body .footer #logout-btn:hover,
+html body .footer .logout-button:hover,
+html body #logout-btn.logout-button:hover {
+  background-color: #c82333 !important;
+  border-color: #bd2130 !important;
+  color: white !important;
+  text-decoration: none !important;
+}
+
+body .footer #logout-btn:focus,
+body .footer .logout-button:focus,
+body #logout-btn.logout-button:focus,
+body button#logout-btn.logout-button:focus,
+body .footer button.logout-button:focus,
+body button.logout-button:focus,
+body .logout-button:focus,
+.container .footer #logout-btn:focus,
+.container .footer .logout-button:focus,
+.container #logout-btn.logout-button:focus,
+html body .footer #logout-btn:focus,
+html body .footer .logout-button:focus,
+html body #logout-btn.logout-button:focus {
+  background-color: #c82333 !important;
+  border-color: #bd2130 !important;
+  color: white !important;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.5) !important;
+  outline: 0 !important;
+}
+
+/* =======================
+   COMMON FORM ELEMENTS
+   ======================= */
+
+.search-container {
+  margin-bottom: 0;
+}
+
+/* =======================
+   COMMON QR SCANNER BASE
+   ======================= */
+
+#reader {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+#result {
+  background-color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+#result h2 {
+  margin-top: 0;
+  color: #555;
+  font-size: 18px;
+}
+
+#result-text {
+  word-break: break-all;
+  color: #333;
+  font-size: 16px;
+}
+
+#action-container {
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+#api-status {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #6c757d;
+  text-align: center;
+}
+
+/* =======================
+   COMMON STATUS STATES
+   ======================= */
+
+.checked-in {
+  background-color: #d4edda;
+}
+
+.refunded {
+  background-color: #f8d7da;
+}
+/* =======================
+   NAVIGATION MENU STYLING
+   Add this to your style.css file for better menu appearance
+   ======================= */
+
+/* Navigation Links */
+.nav-link {
+    display: inline-block;
+    padding: 10px 16px;
+    text-decoration: none;
+    color: #495057;
+    font-weight: 500;
+    border-radius: 0;
+    transition: all 0.3s ease;
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.nav-link:hover {
+    color: #000;
+    border-bottom: 3px solid #000;
+    padding-bottom: 8px; /* Adjust padding to prevent layout shift */
+}
+
+.nav-link:active {
+    color: #000;
+}
+
+/* Active/Current Page Link */
+.nav-link.active,
+.nav-link[href="${window.location.pathname}"] {
+    color: #000;
+    border-bottom: 3px solid #000;
+    padding-bottom: 8px;
+}
+
+/* Header Controls Container Enhancement */
+.header-controls {
+    margin-top: 5px;
+}
+
+/* User Info Styling (if used) */
+#user-info {
+    font-weight: 500;
+    color: #495057;
+    padding: 10px 16px;
+}
+
+/* =======================
+   MOBILE HAMBURGER MENU
+   ======================= */
+
+/* Hide hamburger button on desktop */
+.mobile-menu-toggle {
+    display: none;
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+    /* Show hamburger button on mobile */
+    .mobile-menu-toggle {
+        display: block;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 10px;
+        margin: 10px auto;
+        width: 40px;
+        height: 40px;
+        position: relative;
+        z-index: 1000;
+    }
+    
+    /* Hamburger lines */
+    .mobile-menu-toggle span {
+        display: block;
+        width: 30px;
+        height: 3px;
+        background-color: #000;
+        margin: 6px 0;
+        transition: all 0.3s ease;
+        border-radius: 2px;
+    }
+    
+    /* Hamburger animation to X when open */
+    .mobile-menu-toggle.menu-open span:nth-child(1) {
+        transform: rotate(45deg) translate(8px, 8px);
+    }
+    
+    .mobile-menu-toggle.menu-open span:nth-child(2) {
+        opacity: 0;
+    }
+    
+    .mobile-menu-toggle.menu-open span:nth-child(3) {
+        transform: rotate(-45deg) translate(8px, -8px);
+    }
+    
+    /* Hide menu by default on mobile */
+    .header-controls {
+        display: none !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 10px !important;
+        background-color: white;
+        border-top: 1px solid #e9ecef;
+        margin-top: 10px;
+    }
+    
+    /* Show menu when toggle is active */
+    .header-controls.mobile-menu-open {
+        display: flex !important;
+    }
+    
+    /* Mobile navigation links - full width */
+    .nav-link {
+        width: 100%;
+        text-align: center;
+        margin: 0 !important;
+        padding: 15px 16px !important;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .nav-link:hover {
+        background-color: #f8f9fa;
+        padding-bottom: 15px !important;
+        border-bottom: 1px solid #e9ecef !important;
+    }
+    
+    /* Active link on mobile */
+    .nav-link.active,
+    .nav-link[href="${window.location.pathname}"] {
+        background-color: #000;
+        color: white;
+        border-bottom: 1px solid #000 !important;
+        padding-bottom: 15px !important;
+    }
+}
+
+/* Tablet and larger - keep desktop layout */
+@media (min-width: 769px) {
+    .header-controls {
+        flex-direction: row !important;
+        align-items: center !important;
+        padding: 0 15px !important;
+    }
+}
+
+/* =======================
+   TRON-STYLE ANIMATED BACKGROUND - PURE CSS VERSION
+   No HTML changes needed! Just add to style.css
+   ======================= */
+
+/* Dark gradient background base */
+body {
+    position: relative;
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 50%, #0a0e27 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+}
+
+/* Animated grid pattern using body::before */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: -2;
+    animation: gridScroll 20s linear infinite;
+    pointer-events: none;
+}
+
+/* Scanning line effect using body::after */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(0, 255, 255, 0.8) 50%, 
+        transparent 100%);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+    z-index: -1;
+    animation: scanLine 8s linear infinite;
+    pointer-events: none;
+}
+
+/* Vertical accent lines using page-wrapper pseudo-elements */
+.page-wrapper::before {
+    content: '';
+    position: fixed;
+    left: 20%;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, 
+        transparent 0%, 
+        rgba(0, 255, 255, 0.2) 50%, 
+        transparent 100%);
+    z-index: -1;
+    animation: pulseGlow 4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.page-wrapper::after {
+    content: '';
+    position: fixed;
+    left: 80%;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, 
+        transparent 0%, 
+        rgba(0, 255, 255, 0.2) 50%, 
+        transparent 100%);
+    z-index: -1;
+    animation: pulseGlow 4s ease-in-out infinite 2s;
+    pointer-events: none;
+}
+
+/* Additional vertical line using container */
+.container::before {
+    content: '';
+    position: fixed;
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, 
+        transparent 0%, 
+        rgba(0, 255, 255, 0.2) 50%, 
+        transparent 100%);
+    z-index: -1;
+    animation: pulseGlow 4s ease-in-out infinite 1s;
+    pointer-events: none;
+}
+
+/* Floating particles using header and footer pseudo-elements */
+#header-container::before {
+    content: '';
+    position: fixed;
+    left: 15%;
+    width: 3px;
+    height: 3px;
+    background: rgba(0, 255, 255, 0.6);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    z-index: -1;
+    animation: floatParticle 15s linear infinite;
+    pointer-events: none;
+}
+
+#header-container::after {
+    content: '';
+    position: fixed;
+    left: 65%;
+    width: 3px;
+    height: 3px;
+    background: rgba(0, 255, 255, 0.6);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    z-index: -1;
+    animation: floatParticle 18s linear infinite 3s;
+    pointer-events: none;
+}
+
+.footer::before {
+    content: '';
+    position: fixed;
+    left: 35%;
+    width: 3px;
+    height: 3px;
+    background: rgba(0, 255, 255, 0.6);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    z-index: -1;
+    animation: floatParticle 20s linear infinite 6s;
+    pointer-events: none;
+}
+
+.footer::after {
+    content: '';
+    position: fixed;
+    left: 85%;
+    width: 3px;
+    height: 3px;
+    background: rgba(0, 255, 255, 0.6);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    z-index: -1;
+    animation: floatParticle 12s linear infinite 9s;
+    pointer-events: none;
+}
+
+/* Animations */
+@keyframes gridScroll {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 50px 50px;
+    }
+}
+
+@keyframes scanLine {
+    0% {
+        top: -2px;
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        top: 100%;
+        opacity: 0;
+    }
+}
+
+@keyframes pulseGlow {
+    0%, 100% {
+        opacity: 0.2;
+        box-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+    }
+    50% {
+        opacity: 0.6;
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+    }
+}
+
+@keyframes floatParticle {
+    0% {
+        top: 100%;
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        top: -10px;
+        opacity: 0;
+    }
+}
+
+/* Ensure content is above the background */
+.page-wrapper {
+    position: relative;
+    z-index: 1;
+    background: rgba(10, 14, 39, 0.85);
+    backdrop-filter: blur(5px);
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+}
+
+/* Responsive - reduce effects on mobile for performance */
+@media (max-width: 768px) {
+    body::before {
+        animation-duration: 30s; /* Slower on mobile */
+    }
+    
+    /* Hide particles on mobile */
+    #header-container::before,
+    #header-container::after,
+    .footer::before,
+    .footer::after {
+        display: none;
+    }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "daily-pg-query-and-sftp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily box-office report job (BDOR/EBOR -> SFTP/FTP).",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.873.0",
+    "@aws-sdk/client-secrets-manager": "^3.873.0",
+    "basic-ftp": "^5.0.5",
+    "pg": "^8.16.3",
+    "ssh2-sftp-client": "^10.0.3"
+  },
+  "devDependencies": {
+    "aws-sdk-client-mock": "^4.0.0",
+    "test-db-harness": "file:../test-db-harness"
+  }
+}

@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  IndieTix square-queue-forwarder stack: a FIFO queue + the webhook
+  receiver Lambda, matching production's current real shape exactly --
+  no DLQ, no redrive policy, no depth alarm. An earlier sandbox version
+  of this template had those, but production's own queue has none
+  (confirmed directly against the live queue's attributes): the
+  DLQ/retry design was built, caused a real production outage (a
+  deterministically-failing message blocks every later message in its
+  FIFO MessageGroupId until retries exhaust), and was deliberately torn
+  down in favor of getSquareOrders always marking every message handled
+  and never retrying. Do not reintroduce a DLQ/redrive policy here
+  without re-reading that incident writeup first.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+
+Resources:
+  WebhookQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${EnvPrefix}-square-webhook-queue.fifo"
+      FifoQueue: true
+      MessageRetentionPeriod: 345600 # 4 days, matches SQS default
+      VisibilityTimeout: 90 # must be >= consuming Lambda's timeout (getSquareOrders: 60s)
+
+  SquareQueueForwarderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-square-queue-forwarder"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          WEBHOOK_QUEUE_URL: !Ref WebhookQueue
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt WebhookQueue.QueueName
+      Events:
+        WebhookPost:
+          Type: HttpApi
+          Properties:
+            Path: /webhook/square
+            Method: post
+
+Outputs:
+  WebhookQueueUrl:
+    Description: SQS queue URL the Lambda forwards webhooks into
+    Value: !Ref WebhookQueue
+  WebhookQueueArn:
+    Description: Needed by get-square-orders' SQS event source mapping
+    Value: !GetAtt WebhookQueue.Arn
+    Export:
+      Name: !Sub "${EnvPrefix}-SquareWebhookQueueArn"
+  ApiEndpoint:
+    Description: Invoke URL for the webhook receiver
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/webhook/square"

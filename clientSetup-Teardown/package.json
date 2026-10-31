@@ -1,0 +1,23 @@
+{
+  "name": "clientsetup-teardown",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Client onboarding/offboarding Lambda.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.876.0",
+    "@aws-sdk/client-secrets-manager": "^3.876.0",
+    "bcryptjs": "^3.0.2",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "test-db-harness": "file:../test-db-harness"
+  }
+}

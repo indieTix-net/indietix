@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.873.0",
+    "pg": "^8.16.3"
+  }
+}

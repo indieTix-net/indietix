@@ -1,0 +1,167 @@
+/* =======================
+   REPORTS PAGE SPECIFIC STYLES
+   ======================= */
+
+/* Override Bootstrap container constraints for full width */
+.container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+}
+
+/* Reports Grid Container */
+.grid-container {
+    width: 100% !important;
+    margin-bottom: 15px;
+}
+
+/* Force table to be full width */
+#ticket-table {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+
+.tabulator {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+
+/* Reports Toolbar */
+.toolbar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    width: 100% !important;
+}
+
+.toolbar-section {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.toolbar-divider {
+    border-right: 1px solid #dee2e6;
+    height: 34px;
+    margin: 0 10px;
+}
+
+/* Reports Search Container Override */
+.search-container {
+    flex-grow: 1;
+    max-width: 400px;
+}
+
+/* Override Bootstrap form controls */
+.toolbar .form-control,
+.toolbar .form-select {
+    font-size: 0.875rem !important;
+}
+
+/* Column Visibility Dropdown */
+.column-selector {
+    position: relative;
+    display: inline-block;
+}
+
+.column-selector-content {
+    display: none;
+    position: absolute;
+    background-color: white;
+    min-width: 250px;
+    max-width: 300px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1000;
+    padding: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    border-radius: 4px;
+    right: 0;
+    border: 1px solid #ddd;
+}
+
+.column-selector-content.show {
+    display: block;
+}
+
+.column-selector-item {
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+}
+
+.column-selector-item:hover {
+    background-color: #f1f1f1;
+}
+
+.column-selector-item input {
+    margin-right: 10px;
+}
+
+/* Group Management */
+.group-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.group-tag {
+    background-color: #e9ecef;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 2px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.group-tag button {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-weight: bold;
+    margin-left: 5px;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 2px;
+}
+
+/* Tabulator Custom Styling */
+.tabulator-row.checked-in {
+    background-color: #d4edda !important;
+}
+
+.tabulator-row.checked-in .tabulator-cell {
+    background-color: #d4edda !important;
+}
+
+.status-checked-in {
+    background-color: #28a745;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.status-not-checked-in {
+    background-color: #ffc107;
+    color: #212529;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+/* Ensure full width layout */
+body {
+    overflow-x: auto !important;
+}
+
+/* Loading indicator positioning */
+#loading {
+    text-align: center;
+    margin: 20px 0;
+}

@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SQS-triggered order processor -- consumes the square-webhook-queue.fifo
+  created by the square-queue-forwarder stack. No FunctionResponseTypes /
+  ReportBatchItemFailures here, matching production's current real
+  configuration exactly (confirmed directly against the live event source
+  mapping): that retry mechanism caused a real production outage (see
+  square-queue-forwarder/template.yaml's description) and was deliberately
+  removed in favor of always marking every message handled. Do not
+  reintroduce it here without re-reading that incident writeup first.
+  Real Square API calls will fail without a real Square access token in a
+  client's config -- that's expected; this proves DB/S3/SQS wiring, not
+  the Square business logic. TICKET_SIGNER_ACCESS_KEY/SECRET_KEY are
+  Lambda environment variables set outside this template (a dedicated
+  IAM user, not a per-client secret) -- presigned SMS ticket URLs won't
+  work until those are set.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-sandbox
+    Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  SmsUtilsLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's sms-utils layer (published by bootstrap.sh before this stack deploys)
+  TicketPdfLibLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's ticket-pdf-lib layer (published by bootstrap.sh before this stack deploys)
+
+Resources:
+  GetSquareOrdersLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "${EnvPrefix}-get-square-orders-deps"
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+
+  GetSquareOrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${EnvPrefix}-get-square-orders"
+      CodeUri: src/
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Layers:
+        - !Ref GetSquareOrdersLayer
+        - !Ref SmsUtilsLayerArn
+        - !Ref TicketPdfLibLayerArn
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetA'
+          - !ImportValue
+            'Fn::Sub': '${EnvPrefix}-PrivateSubnetB'
+      Events:
+        SquareWebhookQueue:
+          Type: SQS
+          Properties:
+            Queue: !ImportValue
+              'Fn::Sub': '${EnvPrefix}-SquareWebhookQueueArn'
+            BatchSize: 10
+      Policies:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:ListBucket
+              Resource:
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*"
+                - !Sub "arn:aws:s3:::${EnvPrefix}-*/*"
+            - Effect: Allow
+              Action:
+                - ses:SendRawEmail
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - sms-voice:SendTextMessage
+              Resource: "*"

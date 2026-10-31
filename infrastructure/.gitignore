@@ -1,0 +1,61 @@
+# Dependencies -- regenerate with: npm install --omit=dev (--os=linux --cpu=x64 --libc=glibc for sharp-dependent layers)
+node_modules/
+
+# SAM build artifacts -- regenerate with: sam build
+.aws-sam/
+
+# macOS junk
+.DS_Store
+
+# Editor swap files
+*.swp
+*.swo
+
+# Local env
+.env
+.env.local
+
+# Per-deployment deploy.sh settings (real AWS account ID, CloudFront
+# distribution ID, bucket names, sandbox profile/region) -- see
+# deploy.config.sh.template
+deploy.config.sh
+
+# Per-environment bootstrap.sh settings (VPC/subnet IDs, first client's
+# contact email, etc.) -- see bootstrap.config.sh.template
+bootstrap.config.sh
+.prod-backups/
+
+# First client's initial Client Settings (API keys, FTP passwords, Google
+# service account key) -- see first-client-settings.json.template
+first-client-settings.json
+
+# Throwaway sandbox-proof scaffolding -- not part of the real platform,
+# excluded from scope per the bootstrap plan.
+hello-test/
+
+# Scratch files with real credentials pasted in for a specific task --
+# never meant to be committed. Catch-all pattern so a similarly-named
+# scratch file doesn't slip through next time.
+newClientTest.txt
+*scratch*.txt
+*Test.txt
+
+# Lambda function source, for every stack whose code actually lives in a
+# real sibling repo (see lib/repo-config.sh) -- bootstrap.sh's
+# sync_stack_source freshly regenerates each of these from the real repo
+# immediately before every `sam build`, so these are disposable build
+# output, never a second source of truth to keep in sync by hand. This is
+# the fix for the bug where this directory held a one-time, never-
+# resynced manual copy that silently drifted for weeks (see QRScanner's
+# AWS_REGION/STATIC_WEBSITE_URL incident, 2026-10-27). aurora-poc/src/ and
+# hello-test/src/ are NOT covered -- those are infra-only Lambdas with no
+# real sibling repo to sync from.
+qrscanner/src/
+get-square-orders/src/
+client-setup-teardown/src/
+client-reporting/src/
+daily-pg-sftp/src/
+expire-modifiers/src/
+marketing-engine/src/
+sms-inbound/src/
+square-queue-forwarder/src/

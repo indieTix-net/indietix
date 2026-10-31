@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email List</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="client.css">
+    <link rel="stylesheet" href="marketing.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+        <div id="header-container">
+            <!-- Header will be injected here -->
+        </div>
+
+        <div class="client-form-container">
+
+            <!-- Email contact list -->
+            <div class="form-section">
+                <div class="section-header">
+                    <h4>Email List</h4>
+                    <p class="text-muted">Everyone who's opted in to show updates, whether they signed up themselves or you added them here.</p>
+                </div>
+                <div class="row align-items-end mb-3">
+                    <div class="col-md-5">
+                        <label for="email-contact-input" class="form-label">Add an email address</label>
+                        <input type="email" class="form-control" id="email-contact-input" placeholder="someone@example.com">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-primary btn-sm w-100" id="add-email-contact-btn">Add</button>
+                    </div>
+                    <div class="col-md-5">
+                        <label for="email-contact-search" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="email-contact-search" placeholder="Filter by email&hellip;">
+                    </div>
+                </div>
+                <div id="email-contact-status" class="text-muted mb-2">Loading&hellip;</div>
+                <div id="email-contact-add-error" class="text-danger small mb-2 d-none"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm" id="email-contact-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Added</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="email-contact-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="footer" style="text-align: center;">
+            <!-- Logout button will be added here by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="auth-helper.js"></script>
+<script src="email-list.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        HeaderLoader.initializeHeader('header-container');
+    });
+</script>
+</body>
+</html>

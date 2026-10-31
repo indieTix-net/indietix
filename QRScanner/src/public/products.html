@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Event Checkin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="products.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+<div id="header-container">
+    <!-- Header will be injected here -->
+</div> 
+        <div class="search-container">
+            <div class="input-group">
+                <input type="text" id="search-input" class="form-control" placeholder="Search across all fields...">
+                <button class="btn btn-secondary" id="clear-search">Clear</button>
+            </div>
+        </div>
+
+
+        <!-- Date Filters -->
+        <div class="date-filters">
+            <h6>Date Filter</h6>
+            <div class="date-input-group">
+                <label for="start-date">From:</label>
+                <input type="date" id="start-date" class="form-control">
+                
+                <label for="end-date">To:</label>
+                <input type="date" id="end-date" class="form-control">
+            </div>
+            
+            <div class="filter-actions">
+                <button class="btn btn-primary btn-sm" id="apply-date-filter">Apply Filter</button>
+                <button class="btn btn-outline-secondary btn-sm" id="clear-date-filter">Clear Dates</button>
+                <button class="btn btn-outline-info btn-sm" id="today-filter">Today Only</button>
+                <button class="btn btn-outline-success btn-sm" id="week-filter">This Week</button>
+            </div>
+        </div>
+        
+        <!-- Column Visibility Toggle -->
+        <div class="column-controls">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#column-visibility" aria-expanded="false" aria-controls="column-visibility">
+                        Column Visibility
+                    </button>
+                </div>
+                <div class="collapse" id="column-visibility">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-event" data-column="event" checked>
+                                    <label class="form-check-label" for="toggle-event">Event</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-date" data-column="date" checked>
+                                    <label class="form-check-label" for="toggle-date">Date</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-details" data-column="details" checked>
+                                    <label class="form-check-label" for="toggle-details">Details</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-customer-name" data-column="customer-name" checked>
+                                    <label class="form-check-label" for="toggle-customer-name">Customer Name</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-email" data-column="email" checked>
+                                    <label class="form-check-label" for="toggle-email">Email</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-phone" data-column="phone" checked>
+                                    <label class="form-check-label" for="toggle-phone">Phone</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-price" data-column="price" checked>
+                                    <label class="form-check-label" for="toggle-price">Price</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input column-toggle" type="checkbox" id="toggle-expiration" data-column="expiration" checked>
+                                    <label class="form-check-label" for="toggle-expiration">Expiration</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-secondary" id="show-all-columns">Show All</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="hide-all-columns">Hide All</button>
+                            <button class="btn btn-sm btn-outline-info" id="reset-columns">Reset to Default</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        
+        <!-- Mobile card view (default for small screens) -->
+        <div class="mobile-cards" id="mobile-cards-container">
+            <!-- Event cards will be loaded here dynamically -->
+        </div>
+        
+        <!-- Desktop table view (shows on larger screens) -->
+        <div class="desktop-table">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th data-column="event">Event</th>
+                        <th data-column="date">Date</th>
+                        <th data-column="details">Details</th>
+                        <th data-column="customer-name">Customer Name</th>
+                        <th data-column="email">Email</th>
+                        <th data-column="phone">Phone</th>
+                        <th data-column="price">Price</th>
+                        <th data-column="expiration">Expiration</th>
+                        <th class="action-cell">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="products-table-body">
+                    <!-- Events will be loaded here dynamically -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div id="loading" class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer" style="text-align: center;">	
+        <!-- Logout button will be added here by JavaScript -->
+    </div>
+</div>
+
+<!-- MODALS - MOVED OUTSIDE PAGE-WRAPPER -->
+
+<!-- Confirm check-in modal -->
+    <div class="modal fade" id="checkin-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Check-in</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to check into this event?</p>
+                    
+                    <div class="mb-3">
+                        <strong>Event: </strong>
+                        <span id="modal-event-name"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Customer: </strong>
+                        <span id="modal-customer-name"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Phone: </strong>
+                        <span id="modal-phone"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Email: </strong>
+                        <span id="modal-email"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>QR Code: </strong>
+                        <div class="qr-code-display" id="modal-product-name"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success btn-sm" id="confirm-checkin">Confirm Check-in</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirm check-out modal -->
+    <div class="modal fade" id="checkout-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Check-out</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to check this person out of the event?</p>
+                    
+                    <div class="mb-3">
+                        <strong>Event: </strong>
+                        <span id="checkout-modal-event-name"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Customer: </strong>
+                        <span id="checkout-modal-customer-name"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Phone: </strong>
+                        <span id="checkout-modal-phone"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Email: </strong>
+                        <span id="checkout-modal-email"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>QR Code: </strong>
+                        <div class="qr-code-display" id="checkout-modal-product-name"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning btn-sm" id="confirm-checkout">Confirm Check-out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirm refund toggle modal -->
+    <div class="modal fade" id="refund-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Status Change</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to change the status of this ticket?</p>
+                    
+                    <div class="mb-3">
+                        <strong>Event: </strong>
+                        <span id="refund-modal-event-name"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Customer: </strong>
+                        <span id="refund-modal-customer-name"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Current Status: </strong>
+                        <span id="refund-modal-current-status"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>New Status: </strong>
+                        <span id="refund-modal-new-status"></span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>QR Code: </strong>
+                        <div class="qr-code-display" id="refund-modal-product-name"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="confirm-refund">Confirm Status Change</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Ticket Modal -->
+    <div class="modal fade" id="transfer-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Transfer Ticket</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>This ticket will be invalidated and a new ticket will be generated and emailed to the recipient below.</p>
+
+                    <div class="mb-3">
+                        <strong>Event: </strong>
+                        <span id="transfer-modal-event-name"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Current Holder: </strong>
+                        <span id="transfer-modal-customer-name"></span>
+                    </div>
+
+                    <form id="transfer-form">
+                        <div class="mb-3">
+                            <label for="transfer-first-name" class="form-label">Recipient First Name</label>
+                            <input type="text" class="form-control" id="transfer-first-name" placeholder="Enter first name">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="transfer-last-name" class="form-label">Recipient Last Name</label>
+                            <input type="text" class="form-control" id="transfer-last-name" placeholder="Enter last name">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="transfer-phone" class="form-label">Recipient Phone Number</label>
+                            <input type="tel" class="form-control" id="transfer-phone" placeholder="Enter phone number (optional)">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="transfer-email" class="form-label">Recipient Email Address</label>
+                            <input type="email" class="form-control" id="transfer-email" placeholder="Enter email address" required>
+                            <div class="form-text">The new ticket PDF is sent here. This is the only delivery method for transfers right now.</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning btn-sm" id="confirm-transfer">Transfer Ticket</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Bootstrap and custom JavaScript -->
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="auth-helper.js"></script>
+    <script src="products.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic header
+        HeaderLoader.initializeHeader('header-container');
+        
+        // Your existing page initialization
+        // ... rest of your page code
+    });
+</script>
+</body>
+</html>

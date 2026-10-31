@@ -1,0 +1,38 @@
+.offset-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.offset-row input[type="number"] {
+    width: 110px;
+}
+
+.offset-row input[type="time"] {
+    width: 130px;
+}
+
+.offset-preview-date {
+    min-width: 160px;
+}
+
+.preset-row {
+    display: flex;
+    align-items: center;
+}
+
+.channel-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--lh-text, #333);
+    margin-left: 0.5rem;
+}
+
+.channel-badge.enabled {
+    background: #d1e7dd;
+    color: #0f5132;
+}

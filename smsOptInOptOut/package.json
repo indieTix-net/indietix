@@ -1,0 +1,24 @@
+{
+  "name": "handle-inbound-sms",
+  "version": "1.0.0",
+  "description": "IndieTix inbound SMS handler — keeps SmsConsent in sync with AWS End User Messaging",
+  "main": "handleInboundSms.mjs",
+  "type": "module",
+  "scripts": {
+    "check": "node --check handleInboundSms.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.11.3",
+    "@aws-sdk/client-secrets-manager": "^3.658.0",
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.658.0",
+    "sms-utils": "file:../sms-utils"
+  },
+  "devDependencies": {
+    "aws-sdk-client-mock": "^4.0.0",
+    "test-db-harness": "file:../test-db-harness"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "printer",
+  "version": "1.0.0",
+  "description": "Local print agent: receives a ticket PDF URL over the LAN and prints it to a network-connected Brother QL-820NWB.",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indieTix-net/indietix.git",
+    "directory": "printer"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/indieTix-net/indietix/issues"
+  },
+  "homepage": "https://github.com/indieTix-net/indietix/tree/main/printer#readme",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.12",
+    "@thermal-label/brother-ql-core": "^0.6.3",
+    "@thermal-label/brother-ql-node": "^0.6.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "pdf-to-img": "^7.0.1"
+  }
+}

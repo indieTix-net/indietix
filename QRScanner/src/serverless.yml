@@ -1,0 +1,79 @@
+service: qr-code-scanner
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment:
+    STATIC_WEBSITE_URL: ${self:custom.staticWebsiteUrl}
+    DB_HOST: ${self:custom.database.host}
+    DB_PORT: ${self:custom.database.port}
+    DB_NAME: ${self:custom.database.name}
+    DB_USER: ${self:custom.database.username}
+    DB_PASSWORD: ${self:custom.database.password}
+    DB_SSL: ${self:custom.database.ssl}
+custom:
+  # S3 and website configuration
+  staticWebsiteUrl: https://dyme6dznlnzgk.cloudfront.net
+  s3Bucket: qr-scanner-website-assets
+  
+ # Database configuration
+  database:
+    host: 
+    port: 
+    name: 
+    username: 
+    password: 
+    ssl: 'true'
+  # S3 sync configuration
+  s3Sync:
+    - bucketName: ${self:custom.s3Bucket}
+      localDir: public
+
+functions:
+  api:
+    handler: index.handler
+    events:
+      - http:
+          path: /
+          method: GET
+          cors: true
+      - http:
+          path: /api/health
+          method: ANY
+          cors: true
+      - http:
+          path: /api/checkin
+          method: POST
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+
+resources:
+  Resources:
+    StaticSite:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.s3Bucket}
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+    StaticSiteS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref StaticSite
+        PolicyDocument:
+          Statement:
+            - Action: s3:GetObject
+              Effect: Allow
+              Resource: !Join ['', ['arn:aws:s3:::', !Ref StaticSite, '/*']]
+              Principal: '*'
+
+plugins:
+  - serverless-offline
+  - serverless-s3-sync

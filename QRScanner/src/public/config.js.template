@@ -1,0 +1,13 @@
+// Copy this file to config.js and set your own deployment's Lambda Function
+// URL below. config.js is gitignored -- every deployment has its own value,
+// and this repo should never hardcode one specific deployment's endpoint.
+// Must be loaded before every other script on every page (see the first
+// <script> tag in each .html file).
+window.INDIETIX_API_URL = 'REPLACE_WITH_YOUR_LAMBDA_FUNCTION_URL';
+
+// Local print agent (see the separate "printer" repo) for "Print Ticket"
+// on the Products page -- one agent instance serves every computer on
+// the venue's LAN, so this is the agent's LAN address, not localhost,
+// unless this specific computer IS the one running the agent. Optional:
+// leave blank/unset if this venue doesn't use ticket printing.
+window.INDIETIX_PRINT_AGENT_URL = 'REPLACE_WITH_YOUR_PRINT_AGENT_LAN_URL';

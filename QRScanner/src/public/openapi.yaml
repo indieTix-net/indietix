@@ -1,0 +1,376 @@
+openapi: 3.1.0
+info:
+  title: IndieTix API
+  version: "1.0.0"
+  summary: Read your venue's showtimes, tickets, orders and sales, and check tickets in.
+  description: |
+    The IndieTix v1 API lets the tools around your venue -- a third-party door
+    scanner, a promoter's dashboard, your website, a spreadsheet -- work with
+    your IndieTix data. It's read-mostly: check-in is the only write. Selling,
+    pricing and refunds stay in Square.
+
+    **Getting started**
+    1. Log in to IndieTix with your venue's client login and open
+       **Client Settings → API Keys**.
+    2. Create a key with only the scopes the tool needs. Copy it right away --
+       it's shown once.
+    3. Call the API with `Authorization: Bearer <your key>`:
+       `curl -H "Authorization: Bearer itk_..." https://<your-api-host>/v1/showtimes`
+
+    **Conventions**
+    - Success: `{ "data": ... }`; list endpoints add `"next_cursor"` (pass it
+      back as `?cursor=` for the next page; `null` means no more pages).
+    - Errors: `{ "error": { "code": "...", "message": "..." } }` with a real
+      HTTP status. Match on `code`, not `message`.
+    - Times are ISO 8601. Showtimes carry the venue's UTC offset
+      (`2026-07-04T19:30:00-05:00`); record timestamps are UTC (`...Z`).
+      Date filters (`from`, `to`, `date`) are venue-local `YYYY-MM-DD`.
+    - Rate limit: 120 requests per minute per key (HTTP 429 + `Retry-After`).
+    - `/v1` only changes additively. Anything breaking becomes `/v2`.
+
+    **Scopes**
+    | Scope | Grants |
+    |---|---|
+    | `showtimes:read` | `GET /v1/showtimes` |
+    | `tickets:read` | `GET /v1/tickets`, `GET /v1/tickets/{qrCode}` |
+    | `orders:read` | `GET /v1/orders`, `GET /v1/orders/{id}` (no buyer contact info) |
+    | `orders:pii` | Adds buyer name, email and phone to orders and tickets |
+    | `reports:read` | `GET /v1/reports/sales` |
+    | `checkin:write` | `POST /v1/checkins`, `POST /v1/checkins/{qrCode}/undo` |
+
+    A key can also carry **data filters** (exact event name, event name
+    contains, event type, date), set when the key is created, in which case
+    it only ever sees -- and can only check in -- tickets inside them. Anything outside it answers exactly like "not found".
+  license:
+    name: See repository LICENSE
+servers:
+  - url: https://{apiHost}
+    variables:
+      apiHost:
+        default: your-indietix-api-host
+        description: Your IndieTix deployment's API URL (QRScanner's Lambda Function URL)
+security:
+  - apiKey: []
+
+tags:
+  - name: Showtimes
+  - name: Tickets
+  - name: Orders
+  - name: Check-ins
+  - name: Reports
+
+paths:
+  /v1/showtimes:
+    get:
+      tags: [Showtimes]
+      summary: List showtimes
+      description: Showtimes from the venue's Square catalog. Cached for up to 60 seconds. Requires `showtimes:read`.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: "First venue-local date (default: today)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Last venue-local date, inclusive (default: from + 30 days)" }
+      responses:
+        "200":
+          description: Showtimes, earliest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Showtime" } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+
+  /v1/tickets:
+    get:
+      tags: [Tickets]
+      summary: List tickets
+      description: Requires `tickets:read`. Buyer details only with `orders:pii`.
+      parameters:
+        - { name: event, in: query, schema: { type: string }, description: Event name (case-insensitive exact match) }
+        - { name: date, in: query, schema: { type: string, format: date }, description: Venue-local showtime date }
+        - { name: showtime, in: query, schema: { type: string }, description: "A showtime `id` from /v1/showtimes" }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/TicketStatus" } }
+        - { name: updated_since, in: query, schema: { type: string, format: date-time }, description: Only tickets changed after this instant (for sync) }
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: A page of tickets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Ticket" } }
+                  next_cursor: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/tickets/{qrCode}:
+    get:
+      tags: [Tickets]
+      summary: Get one ticket by QR code
+      description: Requires `tickets:read`.
+      parameters:
+        - { $ref: "#/components/parameters/QrCode" }
+      responses:
+        "200":
+          description: The ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Ticket" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/orders:
+    get:
+      tags: [Orders]
+      summary: List orders
+      description: Requires `orders:read`. Buyer details only with `orders:pii`. A data-filtered key sees only orders with at least one ticket inside its filter.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: First venue-local creation date }
+        - { name: to, in: query, schema: { type: string, format: date }, description: Last venue-local creation date, inclusive }
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: A page of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Order" } }
+                  next_cursor: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get one order with its tickets
+      description: Requires `orders:read`.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: The order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/Order"
+                      - type: object
+                        properties:
+                          tickets: { type: array, items: { $ref: "#/components/schemas/Ticket" } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/checkins:
+    post:
+      tags: [Check-ins]
+      summary: Check a ticket in
+      description: |
+        Requires `checkin:write`. Real tickets only -- skeleton keys are not
+        accepted through the API. Only a `valid`, unexpired, not-yet-checked-in
+        ticket succeeds. Send an `Idempotency-Key` so a retry after a dropped
+        connection replays the original answer instead of returning
+        `ticket_already_checked_in`.
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qr_code]
+              properties:
+                qr_code: { type: string }
+      responses:
+        "201":
+          description: Checked in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Ticket" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409":
+          description: "`ticket_already_checked_in`, `ticket_not_valid` (refunded, cancelled, deleted or transferred) or `ticket_expired`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/checkins/{qrCode}/undo:
+    post:
+      tags: [Check-ins]
+      summary: Undo a check-in
+      description: Requires `checkin:write`. For a mis-scan or re-entry.
+      parameters:
+        - { $ref: "#/components/parameters/QrCode" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      responses:
+        "200":
+          description: Check-in reversed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Ticket" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409":
+          description: "`ticket_not_checked_in`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+  /v1/reports/sales:
+    get:
+      tags: [Reports]
+      summary: Sales and attendance summary
+      description: |
+        Requires `reports:read`. Counts by showtime (default) or by event, over
+        venue-local showtime dates. `sold` and `revenue` exclude refunded,
+        cancelled, deleted and transferred tickets.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: "First showtime date (default: today)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Last showtime date, inclusive (default: from)" }
+        - { name: group_by, in: query, schema: { type: string, enum: [showtime, event], default: showtime } }
+      responses:
+        "200":
+          description: One row per showtime or event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/SalesRow" } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: "itk_<clientId>_<secret>"
+
+  parameters:
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+    Cursor: { name: cursor, in: query, schema: { type: string }, description: "`next_cursor` from the previous page" }
+    QrCode: { name: qrCode, in: path, required: true, schema: { type: string } }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      schema: { type: string, minLength: 1, maxLength: 100 }
+      description: Any unique string per logical request (e.g. a scan id). Retries with the same key replay the first response.
+
+  responses:
+    Error:
+      description: "Error -- see `error.code`"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, examples: [ticket_not_found] }
+            message: { type: string }
+
+    TicketStatus:
+      type: string
+      enum: [valid, refunded, cancelled, deleted, transferred]
+
+    Buyer:
+      type: object
+      description: Only present with the `orders:pii` scope.
+      properties:
+        first_name: { type: [string, "null"] }
+        last_name: { type: [string, "null"] }
+        email: { type: [string, "null"] }
+        phone: { type: [string, "null"], description: E.164 }
+
+    Showtime:
+      type: object
+      properties:
+        id: { type: string, description: Square modifier id -- use as `showtime` filter on /v1/tickets }
+        item_id: { type: string, description: Square catalog item id }
+        title: { type: string }
+        date: { type: string, format: date }
+        starts_at: { type: string, format: date-time }
+        location: { type: string }
+        descriptors: { type: array, items: { type: string } }
+        runtime: { type: [integer, string, "null"] }
+
+    Ticket:
+      type: object
+      properties:
+        qr_code: { type: string }
+        event: { type: string }
+        event_type: { type: string }
+        showtime_id: { type: [string, "null"] }
+        starts_at: { type: [string, "null"], format: date-time }
+        location: { type: [string, "null"] }
+        seat: { type: [string, "null"] }
+        price: { type: [number, "null"] }
+        status: { $ref: "#/components/schemas/TicketStatus" }
+        checked_in: { type: boolean }
+        created_at: { type: [string, "null"], format: date-time }
+        updated_at: { type: [string, "null"], format: date-time }
+        buyer: { $ref: "#/components/schemas/Buyer" }
+
+    Order:
+      type: object
+      properties:
+        id: { type: integer }
+        square_order_id: { type: string }
+        status: { type: string }
+        ticket_count: { type: integer }
+        total: { type: [number, "null"] }
+        created_at: { type: string, format: date-time }
+        buyer: { $ref: "#/components/schemas/Buyer" }
+
+    SalesRow:
+      type: object
+      properties:
+        event: { type: string }
+        starts_at: { type: string, format: date-time, description: Only when group_by=showtime }
+        sold: { type: integer }
+        checked_in: { type: integer }
+        refunded: { type: integer }
+        revenue: { type: number }

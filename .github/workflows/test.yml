@@ -1,0 +1,147 @@
+# One CI workflow for the whole monorepo.
+#
+# `changes` works out which test suites a push or PR affects; `test` runs
+# each of those suites in its own job. A folder's suite runs when the folder
+# itself changes OR when anything it depends on at test time changes, so a
+# change to a shared package (sms-utils, ticket-pdf-lib, test-db-harness,
+# or clientSetup-Teardown's schema) re-tests every consumer.
+#
+# When adding a dependency between folders, update BOTH places below:
+# the folder's path filter in `changes`, and its sibling list in the
+# "Install sibling dependencies" step. Test-time siblings are the
+# package.json `file:../<sibling>` deps, plus clientSetup-Teardown for
+# any test that imports its schema by relative path (never a declared dep).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      # A manual run (Actions tab -> Run workflow) tests every suite.
+      suites: ${{ github.event_name == 'workflow_dispatch' && steps.all.outputs.suites || steps.filter.outputs.changes }}
+    steps:
+      - id: all
+        run: echo 'suites=["QRScanner","getSquareOrders","smsOptInOptOut","marketingEngine","DailyPgQueryAndSftp","expireQRCodeSquareModifiers","clientReporting","clientSetup-Teardown","test-db-harness","square-queue-forwarder","sms-utils","ticket-pdf-lib"]' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: github.event_name != 'workflow_dispatch'
+      - id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            QRScanner:
+              - '.github/workflows/test.yml'
+              - 'QRScanner/**'
+              - 'sms-utils/**'
+              - 'ticket-pdf-lib/**'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            getSquareOrders:
+              - '.github/workflows/test.yml'
+              - 'getSquareOrders/**'
+              - 'sms-utils/**'
+              - 'ticket-pdf-lib/**'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            smsOptInOptOut:
+              - '.github/workflows/test.yml'
+              - 'smsOptInOptOut/**'
+              - 'sms-utils/**'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            marketingEngine:
+              - '.github/workflows/test.yml'
+              - 'marketingEngine/**'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            DailyPgQueryAndSftp:
+              - '.github/workflows/test.yml'
+              - 'DailyPgQueryAndSftp/**'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            expireQRCodeSquareModifiers:
+              - '.github/workflows/test.yml'
+              - 'expireQRCodeSquareModifiers/**'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            clientReporting:
+              - '.github/workflows/test.yml'
+              - 'clientReporting/**'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            clientSetup-Teardown:
+              - '.github/workflows/test.yml'
+              - 'clientSetup-Teardown/**'
+              - 'test-db-harness/**'
+            test-db-harness:
+              - '.github/workflows/test.yml'
+              - 'test-db-harness/**'
+              - 'clientSetup-Teardown/**'
+            square-queue-forwarder:
+              - '.github/workflows/test.yml'
+              - 'square-queue-forwarder/**'
+            sms-utils:
+              - '.github/workflows/test.yml'
+              - 'sms-utils/**'
+            ticket-pdf-lib:
+              - '.github/workflows/test.yml'
+              - 'ticket-pdf-lib/**'
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.suites != '[]' && needs.changes.outputs.suites != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.changes.outputs.suites) }}
+    name: test (${{ matrix.suite }})
+    steps:
+      - uses: actions/checkout@v4
+
+      # Matches the production Lambda runtime.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Docker is preinstalled on ubuntu-latest, so test-db-harness's
+      # per-test disposable Postgres containers need no setup here.
+
+      # npm's file: protocol symlinks a sibling as-is and does not install
+      # the sibling's own dependencies, so each sibling gets its own
+      # install first. --ignore-scripts is safe for these (no native
+      # postinstall); the suite's own install below keeps scripts, since
+      # sharp's postinstall fetches the binary it needs.
+      - name: Install sibling dependencies
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          case "$SUITE" in
+            QRScanner|getSquareOrders) siblings="sms-utils ticket-pdf-lib test-db-harness clientSetup-Teardown" ;;
+            smsOptInOptOut)            siblings="sms-utils test-db-harness clientSetup-Teardown" ;;
+            marketingEngine|DailyPgQueryAndSftp|expireQRCodeSquareModifiers|clientReporting)
+                                       siblings="test-db-harness clientSetup-Teardown" ;;
+            clientSetup-Teardown)      siblings="test-db-harness" ;;
+            test-db-harness)           siblings="clientSetup-Teardown" ;;
+            *)                         siblings="" ;;
+          esac
+          for sibling in $siblings; do
+            echo "::group::npm install ($sibling)"
+            (cd "$sibling" && npm install --ignore-scripts)
+            echo "::endgroup::"
+          done
+
+      - name: Install ${{ matrix.suite }} dependencies
+        working-directory: ${{ matrix.suite }}
+        run: npm install
+
+      - name: Run ${{ matrix.suite }} test suite
+        working-directory: ${{ matrix.suite }}
+        run: npm test

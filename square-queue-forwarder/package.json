@@ -1,0 +1,18 @@
+{
+  "name": "square-queue-forwarder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Square webhook receiver. First hop for every Square order/catalog event.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.700.0"
+  },
+  "devDependencies": {
+    "aws-sdk-client-mock": "^4.0.0"
+  }
+}

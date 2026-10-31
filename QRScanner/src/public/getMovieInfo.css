@@ -1,0 +1,772 @@
+/* =======================
+   MOVIE INFO PAGE SPECIFIC STYLES
+   ======================= */
+
+/* =======================
+   MOVIE INFO PAGE CONTAINER OVERRIDES
+   ======================= */
+.container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+}
+
+/* =======================
+   MOVIE INFO PAGE HEADER OVERRIDES
+   ======================= */
+#user-info {
+    width: 100%;
+}
+
+/* =======================
+   SEARCH SECTION
+   ======================= */
+.search-section {
+    background: var(--lh-panel-grad, white);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.search-section h3 {
+    margin-top: 0;
+    color: var(--lh-heading, #333);
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.instructions {
+    color: var(--lh-muted, #666);
+    margin-bottom: 20px;
+}
+
+.search-form {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.form-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: var(--lh-text, #555);
+}
+
+/* =======================
+   ERROR MESSAGE
+   ======================= */
+.error-message {
+    background-color: rgba(140, 28, 39, 0.28);
+    color: #F2A9B0;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(140, 28, 39, 0.55);
+    margin-bottom: 20px;
+}
+
+/* =======================
+   SEARCH RESULTS
+   ======================= */
+.search-results {
+    margin-bottom: 30px;
+}
+
+.search-results h3 {
+    margin-bottom: 20px;
+    color: var(--lh-heading, #333);
+    font-weight: 600;
+}
+
+#results-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.result-card {
+    background: var(--lh-panel-grad, white);
+    border: 1px solid var(--lh-border, #ddd);
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.result-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.result-card img {
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.result-card h4 {
+    margin: 10px 0 5px 0;
+    color: var(--lh-heading, #333);
+    font-weight: 600;
+}
+
+.result-card p {
+    margin: 0;
+    color: var(--lh-muted, #666);
+    font-size: 14px;
+}
+
+/* =======================
+   MOVIE DETAILS
+   ======================= */
+.movie-details {
+    background: var(--lh-panel-grad, white);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--lh-border, #eee);
+}
+
+.details-header h3 {
+    margin: 0;
+    color: var(--lh-heading, #333);
+    font-weight: 600;
+}
+
+.movie-content {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 40px;
+}
+
+/* =======================
+   MOVIE POSTER SECTION
+   ======================= */
+.movie-poster-section {
+    text-align: center;
+}
+
+/* Square poster container with black letterboxing */
+.poster-container {
+    width: 400px;
+    height: 400px;
+    background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    margin: 0 auto 15px auto;
+    overflow: hidden;
+}
+
+.poster-container a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.movie-poster {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.no-poster {
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 14px;
+    border-radius: 4px;
+}
+
+.poster-upload-section {
+    margin-top: 15px;
+}
+
+#custom-poster-status {
+    background-color: rgba(61, 213, 243, 0.14);
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(61, 213, 243, 0.4);
+    color: var(--lh-text, inherit);
+}
+
+/* =======================
+   MOVIE INFO SECTION
+   ======================= */
+.movie-info-section {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.movie-info-section h2 {
+    margin-top: 0;
+    color: var(--lh-heading, #333);
+    font-size: 28px;
+    font-weight: 600;
+}
+
+/* Editable form controls in movie info */
+.movie-info-section .form-control {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 16px;
+    width: 100%;
+}
+
+.movie-info-section .form-control:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.movie-info-section .form-control-lg {
+    font-size: 24px;
+    font-weight: 600;
+    padding: 10px 15px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.info-item {
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+}
+
+.info-item strong {
+    display: block;
+    color: var(--lh-muted, #666);
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.info-item .form-control {
+    background-color: #fff;
+    margin-top: 5px;
+}
+
+.info-section {
+    margin-bottom: 20px;
+}
+
+.info-section strong {
+    display: block;
+    color: var(--lh-muted, #666);
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.info-section p {
+    margin: 0;
+    color: var(--lh-text, #333);
+    line-height: 1.6;
+}
+
+.plot-text {
+    font-size: 16px;
+    line-height: 1.8;
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Ensure all sections stay within bounds */
+.info-grid,
+.info-section,
+.showtime-section,
+.copy-section {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* =======================
+   SHOWTIME BUILDER SECTION
+   ======================= */
+.showtime-section {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid var(--lh-border, #eee);
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.showtime-section h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: var(--lh-heading, #333);
+    font-weight: 600;
+}
+
+.showtime-section .text-muted {
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.showtime-builder {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.showtime-builder .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 15px;
+    align-items: end;
+}
+
+.showtime-builder .form-group {
+    margin-bottom: 0;
+}
+
+.showtime-builder .form-control {
+    width: 100%;
+}
+
+.showtime-builder #add-showtime-btn {
+    height: 38px;
+    white-space: nowrap;
+}
+
+/* Descriptor checkboxes */
+.descriptors-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.descriptor-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.descriptor-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.descriptor-checkbox label {
+    margin: 0;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    color: var(--lh-text, #495057);
+}
+
+.showtimes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.showtime-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--lh-border, #eee);
+    border-radius: 6px;
+}
+/* Add to getMovieInfo.css */
+
+/* ========================================
+   IMPROVED HORIZONTAL TIMELINE - V2
+   Clean, Simple, Readable (12pm-12am)
+   ======================================== */
+
+.timeline-container-v2 {
+    background: var(--lh-panel-grad, #f8f9fa);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    display: block;
+}
+/* display was "block !important" -- that beats a plain inline
+   style="display:none" (and the identical JS-set style.display='none'),
+   so the "Show multi-venue timeline" checkbox's toggle logic in
+   getMovieInfo.js was always functionally a no-op: unchecking it set
+   display:none correctly, but this rule overrode it right back to
+   visible every time. Confirmed via a real browser render before fixing.
+   Dropped the flex-direction declaration too -- it never did anything
+   since this has always been display:block, not flex. Fixed 2026-10-27. */
+
+.timeline-container-v2 * {
+    box-sizing: border-box;
+}
+
+/* Header */
+.timeline-header-simple {
+    margin-bottom: 15px;
+}
+
+.timeline-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.timeline-title-row h5 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--lh-heading, #333);
+}
+
+.timeline-location-badge {
+    background: #007bff;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Status Message - One Clear Line */
+.status-message {
+    padding: 10px 15px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.status-message.success {
+    background: rgba(40, 167, 69, 0.18);
+    color: #6EDCA4;
+    border-left: 4px solid #28a745;
+}
+
+.status-message.warning {
+    background: rgba(255, 193, 7, 0.16);
+    color: #F2D27A;
+    border-left: 4px solid #ffc107;
+}
+
+.status-message.error {
+    background: rgba(220, 53, 69, 0.2);
+    color: #F2A9B0;
+    border-left: 4px solid #dc3545;
+}
+
+.status-icon {
+    font-size: 18px;
+}
+
+.status-text {
+    flex: 1;
+}
+
+/* Quick Time Buttons */
+.quick-time-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.btn-quick {
+    padding: 8px 16px;
+    background: var(--lh-input-bg, white);
+    color: var(--lh-text, inherit);
+    border: 2px solid var(--lh-input-border, #dee2e6);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-quick:hover {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* Timeline Grid - Horizontal 12pm-12am - FORCE layout */
+.timeline-scroll-wrapper {
+    overflow-x: auto;
+    margin-bottom: 10px;
+    width: 100%;
+    display: block !important;
+}
+
+.timeline-grid-horizontal {
+    position: relative;
+    min-width: 800px;
+    height: 120px;
+    background: var(--lh-panel-grad, white);
+    border-radius: 6px;
+    padding: 10px;
+    display: block !important;
+    flex-direction: row !important;
+}
+
+/* Hour Labels (Top) - FORCE Horizontal with !important */
+.timeline-hours-top {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    position: relative;
+    height: 20px;
+    margin-bottom: 5px;
+    width: 100% !important;
+}
+
+.hour-mark {
+    flex: 1 !important;
+    text-align: center;
+    font-size: 11px;
+    color: var(--lh-muted, #666);
+    font-weight: 500;
+    display: inline-block !important;
+}
+
+/* Hour Lines (Vertical Guides) - Using Flexbox */
+.timeline-hour-lines {
+    position: absolute;
+    top: 30px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.hour-line {
+    flex: 1;
+    border-left: 1px solid var(--lh-row-line, #e9ecef);
+}
+
+.hour-line:first-child {
+    border-left: 2px solid var(--lh-head-line, #dee2e6);  /* Noon marker */
+}
+
+/* Timeline Track (Where Movies Go) */
+.timeline-track-horizontal {
+    position: relative;
+    height: 70px;
+    margin-top: 5px;
+}
+
+/* Empty State */
+.empty-timeline {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--lh-muted, #999);
+    font-size: 13px;
+}
+
+.empty-timeline p {
+    margin: 0;
+}
+
+/* Movie Blocks */
+.movie-block {
+    position: absolute;
+    height: 60px;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 12px;
+    color: white;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.movie-block:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Movie Block Types */
+.movie-block.existing {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid #5568d3;
+}
+
+.movie-block.preview-ok {
+    background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+    border: 2px solid #4a9628;
+    animation: pulse-ok 2s infinite;
+}
+
+.movie-block.preview-conflict {
+    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+    border: 2px solid #d62828;
+    animation: pulse-error 1s infinite;
+}
+
+.movie-block.preview-warning {
+    background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    border: 2px solid #e88a0f;
+    color: #333;
+}
+
+@keyframes pulse-ok {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+}
+
+@keyframes pulse-error {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
+}
+
+/* Movie Block Content */
+.movie-title {
+    font-weight: 600;
+    font-size: 9px;  /* 30% smaller (was 13px) */
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.movie-time {
+    font-size: 8px;  /* 30% smaller (was 11px) */
+    opacity: 0.9;
+}
+
+/* Buffer Zone (Hatched Pattern) */
+.buffer-zone {
+    position: absolute;
+    height: 60px;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(0,0,0,0.05),
+        rgba(0,0,0,0.05) 5px,
+        transparent 5px,
+        transparent 10px
+    );
+    border: 1px dashed var(--lh-border, #ccc);
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Legend */
+.timeline-legend-bottom {
+    display: flex;
+    gap: 20px;
+    padding-top: 10px;
+    border-top: 1px solid var(--lh-head-line, #dee2e6);
+    font-size: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--lh-muted, #666);
+}
+
+.legend-item .dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.dot.existing {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.dot.preview-ok {
+    background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+}
+
+.dot.preview-conflict {
+    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    /* .movie-content's fixed 400px first column (and the poster box's
+       own fixed 400x400 size) forced the whole page wider than any
+       phone viewport, pushing .movie-info-section -- the entire form,
+       showtime builder, and timeline -- off-screen to the right.
+       Stack instead of side-by-side, and let the poster shrink to fit.
+       Fixed 2026-10-27. */
+    .movie-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .poster-container {
+        width: 100%;
+        max-width: 400px;
+        height: auto;
+        aspect-ratio: 1 / 1;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .showtime-builder .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .timeline-grid-horizontal {
+        min-width: 600px;  /* Still scrollable on mobile */
+    }
+
+    .quick-time-buttons {
+        flex-direction: column;
+    }
+
+    .btn-quick {
+        width: 100%;
+    }
+}

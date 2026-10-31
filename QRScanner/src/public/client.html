@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Settings</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="client.css">
+    <script src="config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+        <div id="header-container">
+	    <!-- Header will be injected here -->
+	</div> 
+        <!-- Client Information Form -->
+        <div class="client-form-container">
+            <form id="client-form" autocomplete="off">
+                <!-- Client Information Section -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Client Information</h4>
+                        <p class="text-muted">Update your basic account information</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="contact-name" class="form-label">Contact Name *</label>
+                                <input type="text" class="form-control" id="contact-name" name="contact_name" autocomplete="off" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="client-email" class="form-label">Email Address *</label>
+                                <input type="email" class="form-control" id="client-email" name="client_email" autocomplete="off" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="client-secret" class="form-label">New Password</label>
+                                <input type="password" class="form-control" id="client-secret" name="client_secret_new" autocomplete="new-password" placeholder="Leave blank to keep current password">
+                                <div class="form-text">Only enter a new password if you want to change it</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="confirm-password" class="form-label">Confirm New Password</label>
+                                <input type="password" class="form-control" id="confirm-password" name="client_secret_confirm" autocomplete="new-password" placeholder="Confirm new password">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+<!-- API Configuration Section -->
+<div class="form-section">
+    <div class="section-header">
+        <h4>API Configuration</h4>
+        <p>Configure API keys and calendar settings for integrations</p>
+    </div>
+
+    <div class="mb-3">
+        <label for="google_service_account_key" class="form-label">Google Service Account Key (JSON)</label>
+        <textarea class="form-control" id="google_service_account_key" name="google_service_account_key" autocomplete="off" rows="6" placeholder='{"type": "service_account", ...}'></textarea>
+        <div class="form-text">Paste the entire JSON service account key from Google Cloud Console</div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label for="cinema_calendar_id" class="form-label">Cinema Calendar ID</label>
+            <input type="text" class="form-control" id="cinema_calendar_id" name="cinema_calendar_id" autocomplete="off" placeholder="calendar-id@group.calendar.google.com">
+            <div class="form-text">Google Calendar ID for cinema events</div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label for="event_calendar_id" class="form-label">Event Calendar ID</label>
+            <input type="text" class="form-control" id="event_calendar_id" name="event_calendar_id" autocomplete="off" placeholder="calendar-id@group.calendar.google.com">
+            <div class="form-text">Google Calendar ID for general events</div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="anthropic_api_key" class="form-label">Anthropic API Key</label>
+        <input type="password" class="form-control" id="anthropic_api_key" name="anthropic_api_key" autocomplete="new-password" placeholder="sk-ant-...">
+        <div class="form-text">API key for Claude AI integration</div>
+    </div>
+
+    <div class="mb-3">
+        <label for="omdb_api_key" class="form-label">OMDB API Key</label>
+        <input type="password" class="form-control" id="omdb_api_key" name="omdb_api_key" autocomplete="new-password">
+        <div class="form-text">Used by Add Movie to look up titles, cast, plot and posters. Free key from omdbapi.com.</div>
+    </div>
+
+    <div class="mb-3">
+        <label for="ecommerce_site_url" class="form-label">E-Commerce Site URL</label>
+        <input type="url" class="form-control" id="ecommerce_site_url" name="ecommerce_site_url" autocomplete="off" placeholder="https://your-store.square.site">
+        <div class="form-text">Your Square Online or e-commerce site URL</div>
+    </div>
+
+    <div class="mb-3">
+        <label for="sender_email" class="form-label">Sender Email</label>
+        <input type="email" class="form-control" id="sender_email" name="sender_email" autocomplete="off" placeholder="tickets@yourvenue.com">
+        <div class="form-text">The address ticket, password reset, and marketing emails come from. It has to be verified in Amazon SES (the address itself, or its whole domain), or emails won't send. Leaving it blank keeps the current address.</div>
+    </div>
+
+    <div class="mb-3">
+        <label for="owner_bcc_email" class="form-label">Owner BCC Email</label>
+        <input type="email" class="form-control" id="owner_bcc_email" name="owner_bcc_email" autocomplete="off" placeholder="you@example.com">
+        <div class="form-text">Optional: every ticket confirmation email sent to a customer is also BCC'd here. Leave blank to disable.</div>
+    </div>
+
+    <div class="mb-3">
+        <label for="one_per_email_items" class="form-label">One Per Email Items</label>
+        <input type="text" class="form-control" id="one_per_email_items" name="one_per_email_items" autocomplete="off" placeholder="e.g. Free Sample Ticket">
+        <div class="form-text">Optional: Square item names (comma-separated) that each email address can only ever get one ticket for, like a free sample. Repeat orders for them get no ticket. Leave blank for no limit.</div>
+    </div>
+</div>
+                <!-- Square Payment Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Square Payment Settings</h4>
+                        <p class="text-muted">Configure your Square payment integration</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label for="square-access-token" class="form-label">Square Access Token</label>
+                                <input type="text" class="form-control" id="square-access-token" name="square_access_token" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="square-signature-key" class="form-label">Square Signature Key</label>
+                                <input type="text" class="form-control" id="square-signature-key" name="square_signature_key" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="square-webhook-url" class="form-label">Square Webhook URL</label>
+                                <input type="url" class="form-control" id="square-webhook-url" name="square_webhook_url" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="square-location-id" class="form-label">Square Location ID</label>
+                                <input type="text" class="form-control" id="square-location-id" name="square_location_id" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Theater Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Theater Settings</h4>
+                        <p class="text-muted">Configure your theater information and branding</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="theater-id" class="form-label">Theater ID</label>
+                                <input type="text" class="form-control" id="theater-id" name="theater_id" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="theater-name" class="form-label">Theater Name</label>
+                                <input type="text" class="form-control" id="theater-name" name="theater_name" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="distributor-name" class="form-label">Distributor Name</label>
+                                <input type="text" class="form-control" id="distributor-name" name="distributor_name" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="event-type" class="form-label">Event Type</label>
+                                <input type="text" class="form-control" id="event-type" name="event_type" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="web-header-company" class="form-label">Web Header Company</label>
+                                <input type="text" class="form-control" id="web-header-company" name="web_header_company" autocomplete="off" placeholder="Company name for web headers">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="logo-file" class="form-label">Logo File</label>
+                                <input type="text" class="form-control" id="logo-file" name="logo_file" autocomplete="off" placeholder="e.g., company-logo.png">
+                                <div class="form-text">Filename for your company logo (defaults to indieTixLogo.png)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ebor-theatre-no" class="form-label">EBOR Theatre No.</label>
+                                <input type="text" class="form-control" id="ebor-theatre-no" name="ebor_theatre_no" autocomplete="off">
+                                <div class="form-text">comScore theatre number for EBOR reporting</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Marquee Engine: Social Media Integration -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Social Media Integration</h4>
+                        <p class="text-muted">Credentials for the Marquee Engine's Facebook, Instagram, and TikTok posting. Leave blank for any channel you don't use -- posts for that channel stay in dry-run mode until credentials are present.</p>
+                    </div>
+
+                    <h6 class="text-muted mb-2">Facebook &amp; Instagram (Meta)</h6>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label for="meta-page-access-token" class="form-label">Meta Page Access Token</label>
+                                <input type="password" class="form-control" id="meta-page-access-token" name="meta_page_access_token" autocomplete="new-password">
+                                <div class="form-text">System User access token from Meta Business Settings, with pages_manage_posts, pages_read_engagement, instagram_basic, and instagram_content_publish.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="meta-page-id" class="form-label">Facebook Page ID</label>
+                                <input type="text" class="form-control" id="meta-page-id" name="meta_page_id" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="meta-ig-business-id" class="form-label">Instagram Business Account ID</label>
+                                <input type="text" class="form-control" id="meta-ig-business-id" name="meta_ig_business_id" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-muted mb-2 mt-3">TikTok</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tiktok-client-key" class="form-label">TikTok Client Key</label>
+                                <input type="text" class="form-control" id="tiktok-client-key" name="tiktok_client_key" autocomplete="off">
+                                <div class="form-text">Your TikTok developer app's own key -- required for automatic token refresh.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tiktok-client-secret" class="form-label">TikTok Client Secret</label>
+                                <input type="password" class="form-control" id="tiktok-client-secret" name="tiktok_client_secret" autocomplete="new-password">
+                                <div class="form-text">Paired with the Client Key above.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tiktok-access-token" class="form-label">TikTok Access Token</label>
+                                <input type="password" class="form-control" id="tiktok-access-token" name="tiktok_access_token" autocomplete="new-password">
+                                <div class="form-text">From the initial OAuth exchange. Expires in ~24h -- once Client Key/Secret/Refresh Token are all set, the Marquee Engine poller refreshes this automatically before every send.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tiktok-refresh-token" class="form-label">TikTok Refresh Token</label>
+                                <input type="password" class="form-control" id="tiktok-refresh-token" name="tiktok_refresh_token" autocomplete="new-password">
+                                <div class="form-text">From the same OAuth exchange as the access token above.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tiktok-privacy-level" class="form-label">TikTok Privacy Level (optional)</label>
+                                <input type="text" class="form-control" id="tiktok-privacy-level" name="tiktok_privacy_level" autocomplete="off" placeholder="e.g. PUBLIC_TO_EVERYONE">
+                                <div class="form-text">Must match one of the creator's actual privacy_level_options or posts auto-downgrade to the first option TikTok offers. Leave blank to always use that default.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Locations Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Event Locations</h4>
+                        <p class="text-muted">Manage venue locations for your events (used in movie showtime selection)</p>
+                    </div>
+                    
+                    <div class="event-locations-manager">
+                        <div class="form-row" style="display: flex; gap: 15px; align-items: flex-end; margin-bottom: 15px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="new-location" class="form-label">Location Name *</label>
+                                <input type="text" id="new-location" class="form-control" placeholder="e.g., Main Auditorium">
+                            </div>
+                            <button type="button" id="add-location-btn" class="btn btn-success btn-sm">
+                                + Add Location
+                            </button>
+                        </div>
+                        
+                        <div id="locations-list" class="locations-list">
+                            <!-- Locations will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Event Descriptors Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Event Descriptors</h4>
+                        <p class="text-muted">Manage optional descriptors for your events (e.g., "All Ages", "Closed Caption", "21+")</p>
+                    </div>
+                    
+                    <div class="event-descriptors-manager">
+                        <div class="form-row" style="display: flex; gap: 15px; align-items: flex-end; margin-bottom: 15px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="new-descriptor" class="form-label">Descriptor Name *</label>
+                                <input type="text" id="new-descriptor" class="form-control" placeholder="e.g., All Ages">
+                            </div>
+                            <button type="button" id="add-descriptor-btn" class="btn btn-success btn-sm">
+                                + Add Descriptor
+                            </button>
+                        </div>
+                        
+                        <div id="descriptors-list" class="descriptors-list">
+                            <!-- Descriptors will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- User Names Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>User Names</h4>
+                        <p class="text-muted">Manage authorized users for refund processing (users who can process refunds will be selected from this list)</p>
+                    </div>
+                    
+                    <div class="user-names-manager">
+                        <div class="form-row" style="display: flex; gap: 15px; align-items: flex-end; margin-bottom: 15px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="new-user-name" class="form-label">User Name *</label>
+                                <input type="text" id="new-user-name" class="form-control" placeholder="e.g., John Smith">
+                            </div>
+                            <button type="button" id="add-user-name-btn" class="btn btn-success btn-sm">
+                                + Add User
+                            </button>
+                        </div>
+                        
+                        <div id="user-names-list" class="user-names-list">
+                            <!-- User names will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                
+                <!-- Ticket Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Ticket Settings</h4>
+                        <p class="text-muted">Configure ticket formatting and naming options</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ticket-orientation" class="form-label">Ticket Orientation</label>
+                                <select class="form-select" id="ticket-orientation">
+                                    <option value="">Select orientation...</option>
+                                    <option value="vertical">Portrait</option>
+                                    <option value="horizontal">Landscape</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ticket-filename" class="form-label">Ticket Filename</label>
+                                <input type="text" class="form-control" id="ticket-filename" name="ticket_filename" autocomplete="off" placeholder="e.g., ticket_template.pdf">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- FTP Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>FTP Settings</h4>
+                        <p class="text-muted">Configure FTP servers for data export</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="use-ftp">
+                            <label class="form-check-label" for="use-ftp">
+                                Enable FTP uploads
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="ftp-settings" style="display: none;">
+                        <!-- FTP Server 1 -->
+                        <h5>FTP Server 1</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="ftp1-host" class="form-label">FTP1 Host</label>
+                                    <input type="text" class="form-control" id="ftp1-host" name="ftp1_host" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label for="ftp1-port" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="ftp1-port" name="ftp1_port" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="ftp1-type" class="form-label">Type</label>
+                                    <select class="form-select" id="ftp1-type">
+                                        <option value="ftp">FTP</option>
+                                        <option value="sftp">SFTP</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="ftp1-remote-path" class="form-label">Remote Path</label>
+                                    <input type="text" class="form-control" id="ftp1-remote-path" name="ftp1_remote_path" autocomplete="off">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ftp1-user" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="ftp1-user" name="ftp1_username_config" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ftp1-password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="ftp1-password" name="ftp1_password_config" autocomplete="new-password">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- FTP Server 2 -->
+                        <h5>FTP Server 2</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="ftp2-host" class="form-label">FTP2 Host</label>
+                                    <input type="text" class="form-control" id="ftp2-host" name="ftp2_host" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label for="ftp2-port" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="ftp2-port" name="ftp2_port" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="ftp2-type" class="form-label">Type</label>
+                                    <select class="form-select" id="ftp2-type">
+                                        <option value="ftp">FTP</option>
+                                        <option value="sftp">SFTP</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="ftp2-remote-path" class="form-label">Remote Path</label>
+                                    <input type="text" class="form-control" id="ftp2-remote-path" name="ftp2_remote_path" autocomplete="off">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ftp2-user" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="ftp2-user" name="ftp2_username_config" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ftp2-password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="ftp2-password" name="ftp2_password_config" autocomplete="new-password">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FTP Server 3 -->
+                        <h5>FTP Server 3</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="ftp3-host" class="form-label">FTP3 Host</label>
+                                    <input type="text" class="form-control" id="ftp3-host" name="ftp3_host" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label for="ftp3-port" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="ftp3-port" name="ftp3_port" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="ftp3-type" class="form-label">Type</label>
+                                    <select class="form-select" id="ftp3-type">
+                                        <option value="ftp">FTP</option>
+                                        <option value="sftp">SFTP</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="ftp3-remote-path" class="form-label">Remote Path</label>
+                                    <input type="text" class="form-control" id="ftp3-remote-path" name="ftp3_remote_path" autocomplete="off">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ftp3-user" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="ftp3-user" name="ftp3_username_config" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="ftp3-password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="ftp3-password" name="ftp3_password_config" autocomplete="new-password">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Display & Filter Settings</h4>
+                        <p class="text-muted">Customize display options and filters</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="modifier-name-filter" class="form-label">Modifier Name Filter</label>
+                                <input type="text" class="form-control" id="modifier-name-filter" name="modifier_name_filter" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="target-categories" class="form-label">Target Categories</label>
+                                <input type="text" class="form-control" id="target-categories" name="target_categories" autocomplete="off" placeholder="e.g., Cinema,Events">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Communication Settings -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Communication Settings</h4>
+                        <p class="text-muted">Configure SMS and notification options</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="send-sms">
+                            <label class="form-check-label" for="send-sms">
+                                Enable SMS notifications
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Skeleton Keys Management -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Skeleton Keys</h4>
+                        <p class="text-muted">Manage master check-in keys for comps and re-entry</p>
+                    </div>
+
+                    <!-- Create New Skeleton Key -->
+                    <div class="skeleton-key-create mb-4">
+                        <h5 class="mb-3">Create New Skeleton Key</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="sk-qrcode" class="form-label">QR Code Value *</label>
+                                <input type="text" class="form-control" id="sk-qrcode" placeholder="e.g., COMP2024, REENTRY2024">
+                                <div class="form-text">Unique identifier for this skeleton key</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="sk-type" class="form-label">Key Type *</label>
+                                <select class="form-select" id="sk-type">
+                                    <option value="">Select type...</option>
+                                    <option value="comp">Comp Pass</option>
+                                    <option value="re-entry">Re-entry Pass</option>
+                                    <option value="staff">Staff Pass</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="sk-description" class="form-label">Description *</label>
+                                <input type="text" class="form-control" id="sk-description" placeholder="e.g., Media Comps, Bathroom Break">
+                                <div class="form-text">Short description of this key's purpose</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="sk-event-name" class="form-label">Event Name (Optional)</label>
+                                <input type="text" class="form-control" id="sk-event-name" placeholder="e.g., The Godfather 7pm">
+                                <div class="form-text">Associate with a specific event (leave blank for generic)</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="sk-max-uses" class="form-label">Max Uses Per Day</label>
+                                <input type="number" class="form-control" id="sk-max-uses" placeholder="Leave blank for unlimited" min="1">
+                                <div class="form-text">Rate limit to prevent abuse</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="sk-max-total-uses" class="form-label">Max Total Uses</label>
+                                <input type="number" class="form-control" id="sk-max-total-uses" placeholder="Leave blank for unlimited" min="1">
+                                <div class="form-text">Lifetime cap across all days, e.g. a 10-use comp pass</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="sk-expires-at" class="form-label">Expiration Date</label>
+                                <input type="date" class="form-control" id="sk-expires-at">
+                                <div class="form-text">Leave blank for a key that never expires</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="sk-is-active" checked>
+                                    <label class="form-check-label" for="sk-is-active">
+                                        Active (can be used for check-in)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-success btn-sm" id="create-skeleton-key-btn">
+                            <span>Create Skeleton Key</span>
+                        </button>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Skeleton Keys List -->
+                    <div class="skeleton-keys-list">
+                        <h5 class="mb-3">Existing Skeleton Keys</h5>
+                        <div id="skeleton-keys-container" class="skeleton-keys-container">
+                            <!-- Skeleton keys will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Keys (public API v1) -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>API Keys</h4>
+                        <p class="text-muted">Let other tools (a door scanner, a promoter's dashboard, your website) use the IndieTix API. Give each tool its own key with only the access it needs. <a href="api-docs.html" target="_blank" rel="noopener">API reference</a></p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5 class="mb-3">Create New API Key</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="ak-name" class="form-label">Name *</label>
+                                <input type="text" class="form-control" id="ak-name" maxlength="100" placeholder="e.g., Promoter dashboard - Jazz Fest">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label d-block">Data filters (optional)</label>
+                            <div id="ak-filters"></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="ak-add-filter">Add Filter</button>
+                            <div class="form-text">Limits the key to matching tickets and orders, e.g. one promoter's shows. Within a filter every field must match; a ticket matching any one filter is visible. No filters means the whole venue.</div>
+                        </div>
+                        <div class="mb-3" id="ak-scopes">
+                            <label class="form-label d-block">Access *</label>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" value="showtimes:read" id="ak-scope-showtimes"><label class="form-check-label" for="ak-scope-showtimes">Read showtimes</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" value="tickets:read" id="ak-scope-tickets"><label class="form-check-label" for="ak-scope-tickets">Read tickets</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" value="orders:read" id="ak-scope-orders"><label class="form-check-label" for="ak-scope-orders">Read orders</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" value="reports:read" id="ak-scope-reports"><label class="form-check-label" for="ak-scope-reports">Read sales reports</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" value="checkin:write" id="ak-scope-checkin"><label class="form-check-label" for="ak-scope-checkin">Check tickets in</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" value="orders:pii" id="ak-scope-pii"><label class="form-check-label" for="ak-scope-pii">Include buyer contact info (name, email, phone)</label></div>
+                            <div class="form-text">Only include buyer contact info if this tool truly needs it -- anyone holding the key can read your customers' details.</div>
+                        </div>
+                        <button type="button" class="btn btn-success btn-sm" id="create-api-key-btn">
+                            <span>Create API Key</span>
+                        </button>
+                        <div class="alert alert-danger mt-3" id="ak-error" hidden></div>
+                        <div class="alert alert-success mt-3" id="ak-created" hidden>
+                            <strong>Copy this key now -- it won't be shown again.</strong>
+                            <input type="text" class="form-control mt-2 font-monospace" id="ak-created-value" readonly>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="mb-3">Existing API Keys</h5>
+                    <div id="api-keys-container"></div>
+                </div>
+                
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-primary btn-sm" id="save-client-btn">
+                            <span class="btn-text">Save Changes</span>
+                            <div class="spinner-border spinner-border-sm d-none" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="cancel-btn">Cancel</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div id="loading" class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Success Modal -->
+    <div class="modal fade" id="success-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Success</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-success mb-0">
+                        Your client settings have been updated successfully!
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skeleton Key QR Code Modal -->
+    <div class="modal fade" id="skeleton-key-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Skeleton Key QR Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 text-center">
+                            <div id="qrcode-display" class="mb-3"></div>
+                            <button type="button" class="btn btn-primary btn-sm" id="download-qr-btn">Download QR Code</button>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="skeleton-key-details">
+                                <h6>Key Details:</h6>
+                                <p><strong>QR Code:</strong> <span id="modal-qrcode"></span></p>
+                                <p><strong>Type:</strong> <span id="modal-type"></span></p>
+                                <p><strong>Description:</strong> <span id="modal-description"></span></p>
+                                <p><strong>Event:</strong> <span id="modal-event-name"></span></p>
+                                <p><strong>Max Uses/Day:</strong> <span id="modal-max-uses"></span></p>
+                                <p><strong>Total Uses:</strong> <span id="modal-total-uses"></span></p>
+                                <p><strong>Last Used:</strong> <span id="modal-last-used"></span></p>
+                                <p><strong>Status:</strong> <span id="modal-status"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer" style="text-align: center;">	
+        <!-- Logout button will be added here by JavaScript -->
+    </div>
+</div>
+
+<!-- Bootstrap and custom JavaScript -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="auth-helper.js"></script>
+<script src="client.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic header
+        HeaderLoader.initializeHeader('header-container');
+        
+        // Your existing page initialization
+        // ... rest of your page code
+    });
+</script>
+</body>
+</html>
