@@ -780,6 +780,14 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
     // Gross is tax-inclusive (the price the customer paid).
     // Net is tax-exclusive (Gross / 1.093). Tax = Gross - Net.
     //
+    // TheatreID and Theatre Name are baked into the function body as SQL
+    // literals, so the ID must be digits and the name has its quotes
+    // doubled (a venue like "Joe's Cinema" used to break onboarding here).
+    if (!/^[0-9]+$/.test(String(theaterId))) {
+      throw new Error(`theater_id must be digits only, got "${theaterId}"`);
+    }
+    const sqlTheaterId = Number(theaterId);
+    const sqlTheaterName = String(theaterName).replace(/'/g, "''");
     const createBdorForDateFunction = `
       CREATE OR REPLACE FUNCTION public.bdor_for_date(p_report_date date)
        RETURNS TABLE("TheatreID" integer, "Theatre Name" text, "Film Code" text, "Screen" text, "Title" character varying, "Distributor" character varying, "Showtime" text, "Ticket Type" character varying, "Gross" numeric, "Net" numeric, "Tax" numeric, "Sold" integer, "Refunded" integer, "Open" integer, "Close" integer)
@@ -787,8 +795,8 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
        STABLE
       AS $$
           SELECT
-              ${theaterId} AS "TheatreID",
-              '${theaterName}'::text AS "Theatre Name",
+              ${sqlTheaterId} AS "TheatreID",
+              '${sqlTheaterName}'::text AS "Theatre Name",
               '${filmCodePrefix}'::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
               CASE
                   WHEN "ProductVenue"::text ILIKE '%little%' THEN '2'::text

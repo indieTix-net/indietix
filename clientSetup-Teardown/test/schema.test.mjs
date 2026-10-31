@@ -6,9 +6,8 @@ import { createDatabaseObjects } from '../src/index.js';
 
 const { Client } = pg;
 
-// Liberty Hall's real baked-in values, matching migrations.sql's own
-// per-client literal substitution convention (see the 2026-10-24 migration
-// block in src/migrations.sql).
+// Per-venue values createDatabaseObjects bakes into bdor_for_date (the
+// shared src/migrations.sql reads the same three from each venue's config).
 const THEATER_ID = 69938;
 const THEATER_NAME = 'Test Theatre';
 const FILM_CODE_PREFIX = 'TT';

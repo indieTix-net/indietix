@@ -7,7 +7,7 @@
 --
 -- Idempotent: safe to re-run.
 -- No foreign keys (matches existing schema convention).
--- Run per-client database (e.g. M5E5N7KAHZA7Q for Liberty Hall).
+-- Run per-client database (the database named after the client ID).
 -- ============================================================
 
 BEGIN;
@@ -183,7 +183,7 @@ COMMIT;
 --
 -- Idempotent: safe to re-run.
 -- No foreign keys (matches existing schema convention).
--- Run per-client database (e.g. M5E5N7KAHZA7Q for Liberty Hall).
+-- Run per-client database (the database named after the client ID).
 -- ============================================================
 
 BEGIN;
@@ -297,14 +297,15 @@ COMMIT;
 -- ============================================================
 -- clientSetup-Teardown/src/index.js's createDatabaseObjects now bakes a
 -- per-client film-code prefix into bdor_for_date at creation time
--- (previously hardcoded to 'LH' for every client). This only affects
+-- (previously hardcoded to the first venue's prefix for every client). This only affects
 -- NEW clients going forward -- it does not retroactively change an
 -- existing client's bdor_for_date function, since the prefix is
 -- interpolated into the function body at creation, not read at query
 -- time. Run this against each existing client database to record what
 -- prefix is actually baked into their function already, so the
--- configuration JSON matches reality. For Liberty Hall (M5E5N7KAHZA7Q),
--- that value is 'LH'.
+-- configuration JSON matches reality. The prefix is read straight out of
+-- the venue's existing bdor_for_date definition, so it records exactly
+-- what's baked in (nothing is set if the function or prefix isn't found).
 --
 -- Idempotent: safe to re-run.
 -- Run per-client database.
@@ -313,9 +314,14 @@ COMMIT;
 BEGIN;
 
 UPDATE public."Client"
-SET "configuration" = "configuration"::jsonb || '{"FILM_CODE_PREFIX": "LH"}'::jsonb,
+SET "configuration" = "configuration"::jsonb || jsonb_build_object('FILM_CODE_PREFIX', baked.prefix),
   "updatedDate" = CURRENT_TIMESTAMP
-WHERE NOT ("configuration"::jsonb ? 'FILM_CODE_PREFIX');
+FROM (
+  SELECT substring(pg_get_functiondef(to_regprocedure('public.bdor_for_date(date)'))
+                   FROM '''([A-Z0-9]{2,4})''::text \|\| substring\(md5') AS prefix
+) AS baked
+WHERE NOT ("configuration"::jsonb ? 'FILM_CODE_PREFIX')
+  AND baked.prefix IS NOT NULL;
 
 UPDATE public."Client"
 SET "configuration" = jsonb_set(
@@ -335,7 +341,7 @@ COMMIT;
 -- ============================================================
 -- 2026-08-31: Reconcile USER_DEFINABLE + config keys with reality
 -- ============================================================
--- A diff of Liberty Hall's live configuration against
+-- A diff of the first venue's live configuration against
 -- clientSetup-Teardown/src/index.js turned up drift in both
 -- directions:
 --   1. Five keys exist live (with real values) but were never added
@@ -353,9 +359,8 @@ COMMIT;
 --
 -- Section 1 backfills the 5 missing keys with placeholder/empty
 -- defaults ONLY if genuinely absent, so it never clobbers an existing
--- client's real values (Liberty Hall already has real values for all
--- five, so this is a no-op there -- it matters for any other client
--- database missing them).
+-- client's real values (a no-op for a venue that already has real
+-- values for all five; it matters for any client database missing them).
 --
 -- Section 2 replaces USER_DEFINABLE outright with the complete,
 -- current list from index.js, superseding the incomplete replacement
@@ -939,28 +944,51 @@ COMMIT;
 --
 -- This function's body has per-client literals baked in at CREATE time
 -- (TheatreID, Theatre Name, Film Code prefix) rather than reading them
--- from config at query time -- this specific CREATE OR REPLACE is
--- Liberty Hall's (M5E5N7KAHZA7Q) values (TheatreID 69938, "Liberty Hall
--- Cinema", film code prefix "LH"). Run per client; a different client
--- needs this same statement with their own baked-in values substituted.
+-- from config at query time, so the block below reads this venue's own
+-- THEATER_ID, THEATER_NAME and FILM_CODE_PREFIX from its configuration
+-- (the same values createDatabaseObjects bakes in at onboarding),
+-- validates them, and recreates the function with them. It stops with an
+-- error, changing nothing, if any of the three is missing or malformed.
 -- New clients created after this date in clientSetup-Teardown's
 -- createDatabaseObjects already get the fix automatically.
 --
 -- Idempotent: CREATE OR REPLACE FUNCTION is always safe to re-run.
--- Run against Liberty Hall's own database (M5E5N7KAHZA7Q).
+-- Run per-client database.
 -- ============================================================
 
+DO $migration$
+DECLARE
+  cfg jsonb;
+  theatre_id text;
+  theatre_name text;
+  film_code_prefix text;
+BEGIN
+  SELECT "configuration"::jsonb INTO cfg FROM public."Client" LIMIT 1;
+  theatre_id := cfg->>'THEATER_ID';
+  theatre_name := cfg->>'THEATER_NAME';
+  film_code_prefix := cfg->>'FILM_CODE_PREFIX';
+  IF theatre_id IS NULL OR theatre_id !~ '^[0-9]+$' THEN
+    RAISE EXCEPTION 'bdor_for_date: THEATER_ID must be digits, got %', coalesce(theatre_id, '(missing)');
+  END IF;
+  IF coalesce(theatre_name, '') = '' THEN
+    RAISE EXCEPTION 'bdor_for_date: THEATER_NAME is missing';
+  END IF;
+  IF film_code_prefix IS NULL OR film_code_prefix !~ '^[A-Z0-9]{2,4}$' THEN
+    RAISE EXCEPTION 'bdor_for_date: FILM_CODE_PREFIX must be 2-4 uppercase letters/digits, got %', coalesce(film_code_prefix, '(missing)');
+  END IF;
+
+  EXECUTE format($sql$
 CREATE OR REPLACE FUNCTION public.bdor_for_date(p_report_date date)
  RETURNS TABLE("TheatreID" integer, "Theatre Name" text, "Film Code" text, "Screen" text, "Title" character varying, "Distributor" character varying, "Showtime" text, "Ticket Type" character varying, "Gross" numeric, "Net" numeric, "Tax" numeric, "Sold" integer, "Refunded" integer, "Open" integer, "Close" integer)
  LANGUAGE sql
  STABLE
-AS $$
+AS $fn$
     SELECT
-        69938 AS "TheatreID",
-        'Liberty Hall Cinema'::text AS "Theatre Name",
-        'LH'::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
+        %s AS "TheatreID",
+        %L::text AS "Theatre Name",
+        %L::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
         CASE
-            WHEN "ProductVenue"::text ILIKE '%little%' THEN '2'::text
+            WHEN "ProductVenue"::text ILIKE '%%little%%' THEN '2'::text
             ELSE '1'::text
         END AS "Screen",
         "ProductName" AS "Title",
@@ -994,7 +1022,10 @@ AS $$
     WHERE "ProductType"::text = 'Movie'
       AND "ProductDate" IS NOT NULL
       AND "ProductDate"::date = p_report_date;
-$$;
+$fn$;
+$sql$, theatre_id::integer, theatre_name, film_code_prefix);
+END
+$migration$;
 
 
 -- ============================================================
@@ -1014,26 +1045,48 @@ $$;
 -- isn't necessarily a refund, so it just contributes nothing rather than
 -- being misclassified as a refund.
 --
--- Same per-client-baked-in-literals caveat as the 2026-10-24 migration
--- above: this CREATE OR REPLACE is Liberty Hall's (M5E5N7KAHZA7Q) values.
+-- Same per-client-baked-in-literals handling as the 2026-10-24 migration
+-- above: the block reads this venue's own values from its configuration.
 -- New clients created after this date in clientSetup-Teardown's
 -- createDatabaseObjects already get the fix automatically.
 --
 -- Idempotent: CREATE OR REPLACE FUNCTION is always safe to re-run.
--- Run against Liberty Hall's own database (M5E5N7KAHZA7Q).
+-- Run per-client database.
 -- ============================================================
 
+DO $migration$
+DECLARE
+  cfg jsonb;
+  theatre_id text;
+  theatre_name text;
+  film_code_prefix text;
+BEGIN
+  SELECT "configuration"::jsonb INTO cfg FROM public."Client" LIMIT 1;
+  theatre_id := cfg->>'THEATER_ID';
+  theatre_name := cfg->>'THEATER_NAME';
+  film_code_prefix := cfg->>'FILM_CODE_PREFIX';
+  IF theatre_id IS NULL OR theatre_id !~ '^[0-9]+$' THEN
+    RAISE EXCEPTION 'bdor_for_date: THEATER_ID must be digits, got %', coalesce(theatre_id, '(missing)');
+  END IF;
+  IF coalesce(theatre_name, '') = '' THEN
+    RAISE EXCEPTION 'bdor_for_date: THEATER_NAME is missing';
+  END IF;
+  IF film_code_prefix IS NULL OR film_code_prefix !~ '^[A-Z0-9]{2,4}$' THEN
+    RAISE EXCEPTION 'bdor_for_date: FILM_CODE_PREFIX must be 2-4 uppercase letters/digits, got %', coalesce(film_code_prefix, '(missing)');
+  END IF;
+
+  EXECUTE format($sql$
 CREATE OR REPLACE FUNCTION public.bdor_for_date(p_report_date date)
  RETURNS TABLE("TheatreID" integer, "Theatre Name" text, "Film Code" text, "Screen" text, "Title" character varying, "Distributor" character varying, "Showtime" text, "Ticket Type" character varying, "Gross" numeric, "Net" numeric, "Tax" numeric, "Sold" integer, "Refunded" integer, "Open" integer, "Close" integer)
  LANGUAGE sql
  STABLE
-AS $$
+AS $fn$
     SELECT
-        69938 AS "TheatreID",
-        'Liberty Hall Cinema'::text AS "Theatre Name",
-        'LH'::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
+        %s AS "TheatreID",
+        %L::text AS "Theatre Name",
+        %L::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
         CASE
-            WHEN "ProductVenue"::text ILIKE '%little%' THEN '2'::text
+            WHEN "ProductVenue"::text ILIKE '%%little%%' THEN '2'::text
             ELSE '1'::text
         END AS "Screen",
         "ProductName" AS "Title",
@@ -1067,7 +1120,10 @@ AS $$
     WHERE "ProductType"::text = 'Movie'
       AND "ProductDate" IS NOT NULL
       AND "ProductDate"::date = p_report_date;
-$$;
+$fn$;
+$sql$, theatre_id::integer, theatre_name, film_code_prefix);
+END
+$migration$;
 
 
 -- ============================================================
@@ -1075,17 +1131,15 @@ $$;
 -- ============================================================
 -- Found while writing getSquareOrders' test suite: sendEmailWithMultipleAttachments
 -- (the one live function that sends every ticket confirmation email, for
--- every client) had Liberty Hall's own inbox hardcoded as an
+-- every client) had the first venue's own inbox hardcoded as an
 -- unconditional BCC + SES Destination on every send, and as the fallback
 -- recipient for a walk-up/cash sale with no captured buyer email -- a
 -- cross-client PII leak the moment a second client goes live (every other
 -- venue's customer emails + QR ticket PDFs would've been copied to
--- Liberty Hall's personal inbox). Replaced with this new per-client,
+-- that venue's inbox). Replaced with this new per-client,
 -- user-settable (via QRScanner's Client Settings page) config key, unset
--- by default; every client starts unset. (Liberty Hall's own value was
--- set once, directly on its database, when this ran on 2026-10-25 -- a
--- venue's own address belongs in its Client Settings, not in this
--- shared file.)
+-- by default; every client starts unset. A venue that wants a copy of
+-- every ticket email sets its own address in Client Settings.
 BEGIN;
 
 UPDATE public."Client"
