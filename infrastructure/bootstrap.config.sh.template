@@ -15,6 +15,7 @@
 ENV_PREFIX="myvenue-prod"      # Namespace for every resource name + cross-stack export (lowercase, hyphens ok, no trailing hyphen). Lets multiple environments (sandbox, prod, a self-hoster's own account) coexist in the same AWS account/region without colliding.
 AWS_REGION="us-east-2"         # Region to deploy everything into
 AWS_PROFILE=""                 # Optional named AWS CLI profile. Leave blank to use the default profile/credentials.
+ENV_IS_PRODUCTION="false"      # "true" for a production environment: `down` and `remove-client` then refuse without --production and make you type the name to confirm.
 
 # ---- Networking (aurora-poc) ----
 DEFAULT_VPC_ID=""               # A VPC to build the private subnets in -- the account's default VPC works fine (aws ec2 describe-vpcs --filters Name=isDefault,Values=true)

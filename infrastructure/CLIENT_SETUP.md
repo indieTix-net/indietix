@@ -25,7 +25,25 @@ Skip to [After onboarding](#after-onboarding) below once it completes.
 
 ## Scenario B: adding another client to an existing environment
 
-`bootstrap.sh up` only ever onboards *the first* client for a given `ENV_PREFIX` — every client after that is a direct, one-off invoke of the already-deployed `client-setup-teardown` Lambda with that new venue's details. This is exactly what `bootstrap.sh` itself does internally; you're just doing it by hand for client #2, #3, etc.
+`bootstrap.sh up` only ever onboards *the first* client for a given `ENV_PREFIX`. Every client after that goes through `add-client`, with one JSON file per venue:
+
+```bash
+mkdir -p venues && cp venue.json.template venues/newvenue.json   # venues/ is gitignored
+# fill in venues/newvenue.json, then:
+./bootstrap.sh add-client venues/newvenue.json
+./bootstrap.sh list-clients
+```
+
+The venue file holds the onboarding fields below (same names), plus:
+
+- **`square_webhook`**: with `"auto": true` and the venue's `expected_merchant_id`, `add-client` checks the token belongs to that merchant, then creates (or updates) that venue's own Square webhook subscription pointing at this environment, `payment.updated` only. It uses that subscription's signature key and the merchant's only active location. The subscription is named `<ENV_PREFIX>-<username>` unless you set `name`, and only that one is ever touched. Without `auto`, set `square_signature_key` yourself.
+- **`settings`**: initial Client Settings, same keys as `first-client-settings.json.template`. `STATIC_WEBSITE_URL` is filled in for you.
+
+`add-client` is safe to re-run: the webhook is left alone if it's already right, and onboarding refuses cleanly once the client exists.
+
+**Removing a venue:** `./bootstrap.sh remove-client venues/newvenue.json` removes its Square webhook (only if it points at this environment), then deletes its database, secret and S3 buckets. `remove-client <clientId>` does the same without the webhook step. It refuses a client ID that doesn't live in this environment, and in an environment marked `ENV_IS_PRODUCTION="true"` it needs `--production` and makes you type the client ID. `bootstrap.sh down` doesn't remove these venues' webhooks (it doesn't have their tokens), so remove venues first if you're tearing an environment down.
+
+Under the hood, `add-client` is a single invoke of the already-deployed `client-setup-teardown` Lambda, the same one `up` makes. You can still invoke it by hand; the handler's fields are below.
 
 The handler's full parameter list (from `clientSetup-Teardown/src/index.js`'s `exports.handler`):
 
