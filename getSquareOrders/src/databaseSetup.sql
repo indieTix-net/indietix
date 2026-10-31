@@ -67,7 +67,7 @@ CREATE INDEX idx_client_clientid ON "Client" ("clientID");
 -- Sample insert of client credentials
 INSERT INTO "Client" ("clientID", "clientSecret", "contactName", "clientEmail")
 VALUES 
-    ('M5E5N7KAHZA7Q', 'client_secret_here', 'Josh Millstein', 'lawrence.liberty.hall@gmail.com');
+    ('YOUR_CLIENT_ID', 'client_secret_here', 'Contact Name', 'contact@example.com');
 
 
 alter table "Client" ADD COLUMN "OrderID" VARCHAR(100),

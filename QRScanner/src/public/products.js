@@ -593,7 +593,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const eventDate = (product.ProductDate || product.productDate);
                 const eventDetails = product.ProductDetails || product.productDetails || product.Details || product.details || 'No Details';
                 const eventPrice = product.ProductPrice || product.productPrice || product.Price || product.price || 'N/A';
-                const emailAddress = product.EmailAddress || product.emailAddress || product.Email || product.email || 'lawrence.liberty.hall@gmail.com';
+                const emailAddress = product.EmailAddress || product.emailAddress || product.Email || product.email || '';
                 const expirationDate = (product.ExpirationDate || product.expirationDate);
                 const checkedIn = product.CheckedIn || product.checkedIn || false;
                 const status = product.Status || product.status || 'valid';
@@ -614,7 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td data-column="date">${eventDate}</td>
                     <td data-column="details">${eventDetails}</td>
                     <td data-column="customer-name">${customerName}</td>
-                    <td data-column="email">${emailAddress}</td>
+                    <td data-column="email">${emailAddress || 'No Email'}</td>
                     <td data-column="phone">${customerPhoneNumber}</td>
                     <td data-column="price">${eventPrice}</td>
                     <td data-column="expiration">${expirationDate}</td>
@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <dd data-column="phone">${customerPhoneNumber}</dd>
                             
                             <dt data-column="email">Email</dt>
-                            <dd data-column="email">${emailAddress}</dd>
+                            <dd data-column="email">${emailAddress || 'No Email'}</dd>
                             
                             <dt data-column="price">Price</dt>
                             <dd data-column="price">${eventPrice}</dd>

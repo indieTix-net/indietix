@@ -1075,29 +1075,23 @@ $$;
 -- ============================================================
 -- Found while writing getSquareOrders' test suite: sendEmailWithMultipleAttachments
 -- (the one live function that sends every ticket confirmation email, for
--- every client) had 'lawrence.liberty.hall@gmail.com' hardcoded as an
+-- every client) had Liberty Hall's own inbox hardcoded as an
 -- unconditional BCC + SES Destination on every send, and as the fallback
 -- recipient for a walk-up/cash sale with no captured buyer email -- a
 -- cross-client PII leak the moment a second client goes live (every other
 -- venue's customer emails + QR ticket PDFs would've been copied to
 -- Liberty Hall's personal inbox). Replaced with this new per-client,
 -- user-settable (via QRScanner's Client Settings page) config key, unset
--- by default. This migration backfills Liberty Hall's own existing
--- database with the real address, preserving their current owner-email
--- monitoring behavior; every other/future client starts unset.
+-- by default; every client starts unset. (Liberty Hall's own value was
+-- set once, directly on its database, when this ran on 2026-10-25 -- a
+-- venue's own address belongs in its Client Settings, not in this
+-- shared file.)
 BEGIN;
 
 UPDATE public."Client"
 SET "configuration" = "configuration"::jsonb || '{"OWNER_BCC_EMAIL": ""}'::jsonb,
   "updatedDate" = CURRENT_TIMESTAMP
 WHERE NOT ("configuration"::jsonb ? 'OWNER_BCC_EMAIL');
-
--- Liberty Hall specifically (M5E5N7KAHZA7Q) keeps its real address --
--- this one line is the only client-specific part of this migration.
-UPDATE public."Client"
-SET "configuration" = "configuration"::jsonb || '{"OWNER_BCC_EMAIL": "lawrence.liberty.hall@gmail.com"}'::jsonb,
-  "updatedDate" = CURRENT_TIMESTAMP
-WHERE "clientID" = 'M5E5N7KAHZA7Q';
 
 UPDATE public."Client"
 SET "configuration" = jsonb_set(
