@@ -296,6 +296,22 @@ deploy_stack() {
 
   echo "=== Deploying $stack_name ($dir) ==="
 
+  # ---- STACK LAYER DEPENDENCIES ----
+  # A stack's layer/nodejs/ has only package.json + package-lock.json in git
+  # (node_modules is gitignored), and sam deploy uploads the folder as-is --
+  # so without this, a fresh clone deploys EMPTY layers ("Cannot find module
+  # 'pg'"). Install from the lockfile every time, prod deps only, with the
+  # same linux/x64/glibc flags and sharp pruning as build_layer_zip.
+  local layer_pkg="$SCRIPT_DIR/$dir/layer/nodejs"
+  if [ -f "$layer_pkg/package.json" ]; then
+    echo "Installing $dir layer dependencies (npm ci, prod only, linux/x64/glibc)..."
+    ( cd "$layer_pkg" && npm ci --omit=dev --os=linux --cpu=x64 --libc=glibc --no-audit --no-fund >/dev/null ) \
+      || { echo "npm ci failed in $layer_pkg -- not deploying $stack_name." >&2; exit 1; }
+    rm -rf "$layer_pkg/node_modules/@img/sharp-libvips-linuxmusl-x64" \
+           "$layer_pkg/node_modules/@img/sharp-linuxmusl-x64" \
+           "$layer_pkg/node_modules/@img/sharp-wasm32"
+  fi
+
   # SAM CLI's --parameter-overrides can't parse a key with an empty value
   # (confirmed directly: "StaticSiteDomain=" errors out as an invalid
   # format, not as an empty string) -- so any blank override has to be
@@ -582,10 +598,21 @@ with open(os.environ["PAYLOAD_FILE"], "w") as f:
   [ "$invoke_ok" = true ] || { echo "Client onboarding invoke failed." >&2; exit 1; }
   echo "Client onboarding invoke result:"
   cat "$SCRIPT_DIR/.bootstrap-client-invoke-result.json"
-  rm -f "$SCRIPT_DIR/.bootstrap-client-invoke-result.json"
   echo
-  echo "If this doesn't look like success, check CloudWatch logs for $fn_name"
-  echo "before continuing -- the rest of this summary assumes it worked."
+  # A crash inside the function (errorType) means the deploy itself is
+  # broken -- finish the static push and summary, then exit non-zero. A
+  # handled failure (e.g. "role already exists" on a re-run) is expected.
+  local onboarding_crashed=false
+  if python3 -c 'import json, sys; sys.exit(0 if "errorType" in json.load(open(sys.argv[1])) else 1)' \
+      "$SCRIPT_DIR/.bootstrap-client-invoke-result.json" 2>/dev/null; then
+    onboarding_crashed=true
+    echo "ERROR: $fn_name crashed during onboarding (see errorType above). The" >&2
+    echo "first client was NOT onboarded. Check CloudWatch logs for $fn_name." >&2
+  else
+    echo "If this doesn't look like success, check CloudWatch logs for $fn_name"
+    echo "before continuing -- the rest of this summary assumes it worked."
+  fi
+  rm -f "$SCRIPT_DIR/.bootstrap-client-invoke-result.json"
   echo
 
   # 7. Push static assets.
@@ -606,6 +633,10 @@ with open(os.environ["PAYLOAD_FILE"], "w") as f:
   fi
 
   print_summary
+  if [ "$onboarding_crashed" = true ]; then
+    echo "up finished, but onboarding crashed -- see the ERROR above." >&2
+    exit 1
+  fi
 }
 
 print_summary() {
