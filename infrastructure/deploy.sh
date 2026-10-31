@@ -26,6 +26,92 @@ source "$SCRIPT_DIR/lib/repo-config.sh"
 # shellcheck source=lib/build-helpers.sh
 source "$SCRIPT_DIR/lib/build-helpers.sh"
 
+usage() {
+  cat <<EOF
+indieTix deploy tool
+
+Usage: $(basename "$0") <command> [args]
+
+Targets PRODUCTION (deploy.config.sh: REGION, ACCOUNT_ID), except
+deploy-dev, which targets the sandbox (DEV_PROFILE, DEV_REGION).
+status, list-repos, lint, lint-static, build, diff and static-diff are
+read-only.
+
+  status                       All Lambda functions + layers, and flags any
+                                function not on its layer's latest version.
+  list-repos                   List every <repo> name this script accepts
+                                (they're folder names in this repo).
+
+  lint [repo]                  Syntax-check every JS/MJS file and verify
+                                every local import/require resolves within
+                                the build. Omit <repo> to lint everything
+                                (every function + the static site's local
+                                script/css references). Always runs
+                                automatically as part of build/deploy too --
+                                this is also here to run standalone, on
+                                everything, without building/deploying.
+
+  diff <repo>                  Show what would change if you deployed <repo>
+                                right now (builds locally, compares vs. live).
+  build <repo>                 Build the deploy zip for <repo> only -- no AWS
+                                calls, just shows you what would be in it.
+  deploy <repo> [--yes]        Build + upload code for <repo>. Shows the
+                                diff vs. live, then prompts for confirmation
+                                unless --yes is passed.
+  deploy-all [--yes]           Diff every repo, show what differs, then
+                                deploy whichever actually changed.
+
+  deploy-dev <repo>            Ship the current build to <repo>'s sandbox
+                                Lambda in the separate dev/test AWS account
+                                (see infrastructure/ repo) instead of
+                                production. Same FILES list, same lint, no
+                                confirmation prompt -- test freely, then
+                                merge your branch and run 'deploy' once
+                                you're satisfied.
+
+  deploy-layer <repo>          Rebuild (prod deps, linux/x64/glibc) + publish
+                                a new layer version for <repo>. Does NOT
+                                attach it -- see attach-layer.
+  attach-layer <repo>          Attach the latest published layer version to
+                                <repo>'s function, preserving any other
+                                attached layers (e.g. LambdaInsightsExtension).
+
+  static-diff                  Show which QRScanner/src/public files differ
+                                from what's actually live in S3.
+  lint-static                  Just the static-site piece of 'lint' on its
+                                own: verify every local script/css link in
+                                QRScanner/src/public/*.html actually exists.
+  static-push <filename>       Push one specific static file to S3 and
+                                invalidate its CloudFront cache. Works for
+                                any file under QRScanner/src/public/, not
+                                just html/js/css -- includes correct
+                                content-type for images (png/jpg/svg/gif/
+                                webp/ico), e.g. a logo replacement.
+  invalidate [path...] [--wait] Clear CloudFront's cache for one or more
+                                paths (e.g. /client.html), or everything if
+                                no path is given. Doesn't touch S3 -- just
+                                the cache. Add --wait to block until the
+                                invalidation actually completes.
+
+Known repos: $ALL_REPOS
+
+Examples:
+  $(basename "$0") status
+  $(basename "$0") diff QRScanner
+  $(basename "$0") deploy getSquareOrders
+  $(basename "$0") deploy-dev marketingEngine
+  $(basename "$0") deploy-layer QRScanner && $(basename "$0") attach-layer QRScanner
+  $(basename "$0") static-push header-loader.js
+  $(basename "$0") invalidate /client.html /insights.html
+  $(basename "$0") invalidate --wait
+
+More: CHEATSHEET.md (every command on one page), DEPLOY.md (details).
+EOF
+}
+
+# --help answers before any config is loaded (a fresh clone has none yet).
+case "${1:-}" in help|-h|--help) usage; exit 0 ;; esac
+
 CONFIG_FILE="$SCRIPT_DIR/deploy.config.sh"
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Missing $CONFIG_FILE." >&2
@@ -498,80 +584,6 @@ cmd_invalidate() {
   return 1
 }
 
-usage() {
-  cat <<EOF
-indieTix deploy tool
-
-Usage: $(basename "$0") <command> [args]
-
-  status                       All Lambda functions + layers, and flags any
-                                function not on its layer's latest version.
-  list-repos                   List every repo name this script knows about.
-
-  lint [repo]                  Syntax-check every JS/MJS file and verify
-                                every local import/require resolves within
-                                the build. Omit <repo> to lint everything
-                                (every function + the static site's local
-                                script/css references). Always runs
-                                automatically as part of build/deploy too --
-                                this is also here to run standalone, on
-                                everything, without building/deploying.
-
-  diff <repo>                  Show what would change if you deployed <repo>
-                                right now (builds locally, compares vs. live).
-  build <repo>                 Build the deploy zip for <repo> only -- no AWS
-                                calls, just shows you what would be in it.
-  deploy <repo> [--yes]        Build + upload code for <repo>. Shows the
-                                diff vs. live, then prompts for confirmation
-                                unless --yes is passed.
-  deploy-all [--yes]           Diff every repo, show what differs, then
-                                deploy whichever actually changed.
-
-  deploy-dev <repo>            Ship the current build to <repo>'s sandbox
-                                Lambda in the separate dev/test AWS account
-                                (see infrastructure/ repo) instead of
-                                production. Same FILES list, same lint, no
-                                confirmation prompt -- test freely, then
-                                merge your branch and run 'deploy' once
-                                you're satisfied.
-
-  deploy-layer <repo>          Rebuild (prod deps, linux/x64/glibc) + publish
-                                a new layer version for <repo>. Does NOT
-                                attach it -- see attach-layer.
-  attach-layer <repo>          Attach the latest published layer version to
-                                <repo>'s function, preserving any other
-                                attached layers (e.g. LambdaInsightsExtension).
-
-  static-diff                  Show which QRScanner/src/public files differ
-                                from what's actually live in S3.
-  lint-static                  Just the static-site piece of 'lint' on its
-                                own: verify every local script/css link in
-                                QRScanner/src/public/*.html actually exists.
-  static-push <filename>       Push one specific static file to S3 and
-                                invalidate its CloudFront cache. Works for
-                                any file under QRScanner/src/public/, not
-                                just html/js/css -- includes correct
-                                content-type for images (png/jpg/svg/gif/
-                                webp/ico), e.g. a logo replacement.
-  invalidate [path...] [--wait] Clear CloudFront's cache for one or more
-                                paths (e.g. /client.html), or everything if
-                                no path is given. Doesn't touch S3 -- just
-                                the cache. Add --wait to block until the
-                                invalidation actually completes.
-
-Known repos: $ALL_REPOS
-
-Examples:
-  $(basename "$0") status
-  $(basename "$0") diff QRScanner
-  $(basename "$0") deploy getSquareOrders
-  $(basename "$0") deploy-dev marketingEngine
-  $(basename "$0") deploy-layer QRScanner && $(basename "$0") attach-layer QRScanner
-  $(basename "$0") static-push header-loader.js
-  $(basename "$0") invalidate /client.html /insights.html
-  $(basename "$0") invalidate --wait
-EOF
-}
 
 case "${1:-}" in
   help|-h|--help) usage; exit 0 ;;

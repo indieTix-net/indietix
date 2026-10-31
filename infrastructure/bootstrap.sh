@@ -24,6 +24,52 @@ source "$SCRIPT_DIR/lib/repo-config.sh"
 # shellcheck source=lib/build-helpers.sh
 source "$SCRIPT_DIR/lib/build-helpers.sh"
 
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") <command> [--yes]
+
+  up [--yes]     Deploy all 12 stacks in dependency order and onboard the
+                  first client. Prompts for confirmation unless --yes is
+                  given. With SQUARE_WEBHOOK_AUTO="true", also creates or
+                  updates this environment's Square webhook subscription
+                  (payment.updated only) and uses its signature key; with
+                  FIRST_CLIENT_SETTINGS_FILE, applies that JSON file's
+                  Client Settings to the first client. Safe to re-run
+                  (CloudFormation only applies the diff; the webhook is
+                  left alone if already correct; onboarding fails cleanly
+                  once the client exists).
+  down [--yes]   Delete every stack for this EnvPrefix, in reverse order.
+                  Destructive and not reversible: never run it against
+                  production. Removes this environment's Square webhook
+                  subscription (only if it points at this environment),
+                  offboards every client (DB, secret, S3 buckets), empties
+                  buckets so stacks can delete, and removes the
+                  ticket-templates bucket and published shared layers.
+  block [--yes]  Reject every request to this environment (reserved
+                  concurrency 0 on each of its Lambdas) -- what the optional
+                  cost-guard breaker does when the daily budget is exceeded.
+  unblock        Reverse 'block' or a tripped breaker.
+  breaker-status Show each of this environment's Lambdas as open or BLOCKED.
+
+Config: bootstrap.config.sh in this directory (copy from
+bootstrap.config.sh.template). ENV_PREFIX namespaces everything, so
+multiple environments can coexist in the same AWS account/region.
+Check ENV_PREFIX, AWS_REGION and AWS_PROFILE there before 'up' or 'down'.
+
+Examples:
+  $(basename "$0") up
+  $(basename "$0") up --yes
+  $(basename "$0") down
+  $(basename "$0") breaker-status
+
+More: CHEATSHEET.md (every command on one page), README.md (setup),
+CLIENT_SETUP.md (adding venues).
+EOF
+}
+
+# --help answers before any config is loaded (a fresh clone has none yet).
+case "${1:-}" in help|-h|--help) usage; exit 0 ;; esac
+
 CONFIG_FILE="$SCRIPT_DIR/bootstrap.config.sh"
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Missing $CONFIG_FILE." >&2
@@ -846,36 +892,6 @@ cmd_breaker_status() {
 }
 # ---- END COST BREAKER CONTROLS ----
 
-usage() {
-  cat <<EOF
-Usage: $(basename "$0") <command> [--yes]
-
-  up [--yes]     Deploy all 12 stacks in dependency order and onboard the
-                  first client. Prompts for confirmation unless --yes is
-                  given. Safe to re-run (CloudFormation only applies the
-                  diff) -- except the client-onboarding invoke, which runs
-                  every time 'up' does.
-  down [--yes]   Delete every stack for this EnvPrefix, in reverse order.
-                  Destructive and not reversible. Also offboards every
-                  client in this environment (DB, secret, S3 buckets),
-                  empties buckets so stacks can delete, and removes the
-                  ticket-templates bucket and published shared layers.
-  block [--yes]  Reject every request to this environment (reserved
-                  concurrency 0 on each of its Lambdas) -- what the optional
-                  cost-guard breaker does when the daily budget is exceeded.
-  unblock        Reverse 'block' or a tripped breaker.
-  breaker-status Show each of this environment's Lambdas as open or BLOCKED.
-
-Config: bootstrap.config.sh in this directory (copy from
-bootstrap.config.sh.template). ENV_PREFIX namespaces everything, so
-multiple environments can coexist in the same AWS account/region.
-
-Examples:
-  $(basename "$0") up
-  $(basename "$0") up --yes
-  $(basename "$0") down
-EOF
-}
 
 case "${1:-}" in
   help|-h|--help) usage; exit 0 ;;
