@@ -26,7 +26,6 @@ A Square order only produces tickets if its line items have the `UseQRCode` cust
 ## Key files
 
 - `src/index.mjs` — the real entry point, SQS batch handler. Everything that actually runs in production lives here.
-- `src/getSquareOrders.mjs` — **not deployed, dead code.** An older, unmigrated copy of the QR/PDF generation logic. Don't build on it.
 - `src/databaseSetup.sql` — a reference copy of the schema this function reads/writes. The real source of truth is the `clientSetup-Teardown` repo's `createDatabaseObjects` function, not this file.
 
 ## Shared dependencies (Lambda layers)
