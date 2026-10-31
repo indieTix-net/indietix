@@ -87,6 +87,13 @@ read-only.
                                 just html/js/css -- includes correct
                                 content-type for images (png/jpg/svg/gif/
                                 webp/ico), e.g. a logo replacement.
+  static-push-legal [--yes]    Publish privacy.html and terms.html for
+                                LEGAL_CLIENT_ID (deploy.config.sh), rendered
+                                from that venue's Terms & Privacy Client
+                                Settings by the live QRScanner API. Shows a
+                                diff vs. live and asks. 'static-push' refuses
+                                those two files: the repo's copies are
+                                placeholders.
   invalidate [path...] [--wait] Clear CloudFront's cache for one or more
                                 paths (e.g. /client.html), or everything if
                                 no path is given. Doesn't touch S3 -- just
@@ -519,6 +526,15 @@ cmd_static_push() {
   local bucket="$STATIC_BUCKET"
   local local_path="$ROOT/QRScanner/src/public/$filename"
 
+  # The repo's terms.html / privacy.html are the "Your Venue" placeholder
+  # versions; pushing one would replace the live venue's real legal pages
+  # (which a 10DLC campaign registers). Those go through static-push-legal.
+  case "$filename" in
+    terms.html|privacy.html)
+      echo "Refusing to push the placeholder $filename -- use: $(basename "$0") static-push-legal" >&2
+      return 1 ;;
+  esac
+
   [ -f "$local_path" ] || { echo "File not found: $local_path" >&2; return 1; }
 
   local content_type="application/octet-stream"
@@ -541,6 +557,56 @@ cmd_static_push() {
   aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/$filename" \
     --query '{Id:Invalidation.Id,Status:Invalidation.Status}' --output table
 }
+
+# ---- LEGAL PAGES ----
+# static-push-legal [--yes] -- publishes privacy.html and terms.html for
+# LEGAL_CLIENT_ID (deploy.config.sh): fetches each page from the live
+# QRScanner API (GET /legal/<page>?client=<id>&links=static, rendered from
+# that venue's LEGAL_* Client Settings), diffs it against what's live in S3,
+# confirms, uploads and invalidates. Refuses a page that still shows the
+# "Your Venue" placeholders, so an unconfigured venue can't blank out real
+# legal pages. The API URL is read from QRScanner/src/public/config.js.
+cmd_static_push_legal() {
+  local yes_flag="${1:-}"
+  [ -n "${LEGAL_CLIENT_ID:-}" ] || { echo "Set LEGAL_CLIENT_ID in deploy.config.sh (the venue whose details the plain privacy.html/terms.html show)." >&2; return 1; }
+  local config_js="$ROOT/QRScanner/src/public/config.js" api
+  api="$(sed -n "s/^[[:space:]]*window\.INDIETIX_API_URL[[:space:]]*=[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" "$config_js" 2>/dev/null | head -1)"
+  api="${api%/}"
+  [ -n "$api" ] || { echo "Couldn't read window.INDIETIX_API_URL from $config_js." >&2; return 1; }
+
+  local page staged live changed=""
+  mkdir -p "$STAGING/legal"
+  for page in privacy terms; do
+    staged="$STAGING/legal/$page.html"; live="$STAGING/legal/$page.live.html"
+    curl -fsS "$api/legal/$page?client=$LEGAL_CLIENT_ID&links=static" -o "$staged" \
+      || { echo "Couldn't fetch $page from $api for client $LEGAL_CLIENT_ID (is the /legal route deployed?)." >&2; return 1; }
+    if grep -q 'Your Venue\|111 Your Address\|111-Your-Phone' "$staged"; then
+      echo "Refusing: $LEGAL_CLIENT_ID's $page page still shows placeholders -- fill in its Terms & Privacy fields in Client Settings first." >&2
+      return 1
+    fi
+    aws s3 cp "s3://$STATIC_BUCKET/$page.html" "$live" --only-show-errors 2>/dev/null || : > "$live"
+    echo "=== $page.html: live (left) vs. $LEGAL_CLIENT_ID's settings (right) ==="
+    if diff "$live" "$staged"; then
+      echo "(no change)"
+    else
+      changed="$changed $page"
+    fi
+    echo
+  done
+  [ -n "$changed" ] || { echo "Both pages already match. Nothing to push."; return 0; }
+  if [ "$yes_flag" != "--yes" ]; then
+    read -r -p "Push$changed to production (s3://$STATIC_BUCKET)? [y/N] " reply
+    [ "$reply" = "y" ] || [ "$reply" = "Y" ] || { echo "Aborted."; return 1; }
+  fi
+  local paths=()
+  for page in $changed; do
+    aws s3 cp "$STAGING/legal/$page.html" "s3://$STATIC_BUCKET/$page.html" --content-type "text/html" --only-show-errors
+    paths+=("/$page.html")
+  done
+  aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "${paths[@]}" \
+    --query '{Id:Invalidation.Id,Status:Invalidation.Status}' --output table
+}
+# ---- END LEGAL PAGES ----
 
 cmd_invalidate() {
   # cmd_invalidate [--wait] [path...] -- defaults to "/*" (everything) if no
@@ -601,5 +667,6 @@ case "${1:-}" in
   static-diff) cmd_static_diff ;;
   static-push) [ -n "${2:-}" ] || { usage; exit 1; }; cmd_static_push "$2" ;;
   invalidate) cmd_invalidate "${@:2}" ;;
+  static-push-legal) cmd_static_push_legal "${2:-}" ;;
   *) usage; exit 1 ;;
 esac

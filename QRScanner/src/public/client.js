@@ -3,6 +3,14 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
     
     const API_URL = window.INDIETIX_API_URL;
+
+    // Terms & Privacy page fields: [input id, Client.configuration key].
+    const LEGAL_FIELDS = [
+        ['legal_name', 'LEGAL_NAME'], ['legal_short_name', 'LEGAL_SHORT_NAME'],
+        ['legal_address', 'LEGAL_ADDRESS'], ['legal_phone', 'LEGAL_PHONE'],
+        ['legal_email', 'LEGAL_EMAIL'], ['legal_state', 'LEGAL_STATE'],
+        ['legal_court_county', 'LEGAL_COURT_COUNTY']
+    ];
     
     // Get form elements
     const clientForm = document.getElementById('client-form');
@@ -497,6 +505,8 @@ document.addEventListener('DOMContentLoaded', function() {
 	document.getElementById('sender_email').value = config.SENDER_EMAIL || '';
 	document.getElementById('owner_bcc_email').value = config.OWNER_BCC_EMAIL || '';
 	document.getElementById('one_per_email_items').value = config.ONE_PER_EMAIL_ITEMS || '';
+	// Terms & Privacy pages (LEGAL_*); blank fields show the pages' placeholders.
+	LEGAL_FIELDS.forEach(([id, key]) => { document.getElementById(id).value = config[key] || ''; });
         console.log('Form populated successfully');
     }
     
@@ -586,6 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
     	if (senderEmail) config.SENDER_EMAIL = senderEmail;
     	config.OWNER_BCC_EMAIL = document.getElementById('owner_bcc_email').value.trim();
     	config.ONE_PER_EMAIL_ITEMS = document.getElementById('one_per_email_items').value.trim();
+    	LEGAL_FIELDS.forEach(([id, key]) => { config[key] = document.getElementById(id).value.trim(); });
 
         return formData;
     }

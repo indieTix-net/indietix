@@ -9,3 +9,4 @@ STATIC_BUCKET="your-static-site-bucket" # S3 bucket backing that distribution
 
 DEV_PROFILE="your-sandbox-profile"      # AWS CLI profile name for your sandbox/dev account (see infrastructure/ SAM templates)
 DEV_REGION="us-west-1"                  # Region your sandbox stacks are deployed to
+LEGAL_CLIENT_ID=""                      # Optional: the client ID whose Terms & Privacy settings fill the plain privacy.html/terms.html (static-push-legal)

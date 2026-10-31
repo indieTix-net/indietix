@@ -623,6 +623,16 @@ with open(os.environ["PAYLOAD_FILE"], "w") as f:
     aws s3 sync "$SCRIPT_DIR/../QRScanner/src/public/" "s3://$bucket/" \
       --exclude "config.js" --exclude "*.template" \
       "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
+    # A re-run's new files sit behind CloudFront's cached copies until
+    # invalidated (found when a redeploy kept serving yesterday's pages).
+    local distribution_id
+    distribution_id="$(stack_output static-site DistributionId)"
+    if [ -n "$distribution_id" ] && [ "$distribution_id" != "None" ]; then
+      aws cloudfront create-invalidation --distribution-id "$distribution_id" --paths "/*" \
+        --query 'Invalidation.Id' --output text \
+        "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null \
+        && echo "CloudFront cache cleared for the static site."
+    fi
     echo
     echo "Remember: QRScanner/src/public/config.js is gitignored and per-"
     echo "deployment -- copy config.js.template, fill in this environment's"

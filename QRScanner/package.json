@@ -6,7 +6,8 @@
   "type": "module",
   "main": "src/app.mjs",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "render-legal": "node scripts/render-legal.mjs"
   },
   "engines": {
     "node": "22.x"

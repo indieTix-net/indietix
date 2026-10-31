@@ -22,6 +22,7 @@ import { initializeModelForClient as initializeClientModel } from './models/clie
 import { initializeModelForClient as initializeUserModel } from './models/user.mjs';
 import { encryptPasswordResetToken, decryptPasswordResetToken, isPasswordResetTokenValid } from './utils/crypto-utils.mjs';
 import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, eventContainsPattern } from './utils/data-filter-utils.mjs';
+import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
 // the "ticketPdfLib" Lambda layer at runtime, not this repo's own
@@ -2338,6 +2339,8 @@ const CLIENT_SETTINGS_KEYS = [
   'DIGEST_FOOTER_BOLD', 'DIGEST_FOOTER_IN_IMAGE', 'DIGEST_FOOTER_IN_CAPTION',
   'MARKETING_SES_CONFIGURATION_SET', 'SHARE_NUDGE_ENABLED', 'TICKET_ORIENTATION',
   'TICKET_FILENAME', 'SENDER_EMAIL', 'OWNER_BCC_EMAIL', 'ONE_PER_EMAIL_ITEMS',
+  'LEGAL_NAME', 'LEGAL_SHORT_NAME', 'LEGAL_ADDRESS', 'LEGAL_PHONE', 'LEGAL_EMAIL',
+  'LEGAL_STATE', 'LEGAL_COURT_COUNTY',
   'META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID', 'META_IG_BUSINESS_ID', 'TIKTOK_ACCESS_TOKEN',
   'TIKTOK_REFRESH_TOKEN', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_PRIVACY_LEVEL'
 ];
@@ -6539,6 +6542,46 @@ app.delete('/api/marketing/email-contacts/:id', requireAuth, requirePermission('
 });
 // ---- end ADMIN EMAIL CONTACT LIST ----
 // ---- end MARKETING ENGINE ROUTES ----
+
+// ---- LEGAL PAGES ----
+// GET /legal/terms?client=<id> and /legal/privacy?client=<id>: that venue's
+// Terms of Service / Privacy Policy, as finished HTML from the shared
+// templates (utils/legal.mjs) and the venue's LEGAL_* settings. Public and
+// read-only; nothing but those settings reaches the page. deploy.sh
+// static-push-legal fetches these with ?links=static (relative links and
+// stylesheet, as the static site needs) to publish the plain privacy.html /
+// terms.html a 10DLC campaign registers.
+app.get('/legal/:page', async (req, res) => {
+  const page = String(req.params.page || '').replace(/\.html$/, '');
+  if (!LEGAL_PAGES.includes(page)) {
+    return res.status(404).type('text/plain').send('Not found');
+  }
+  const clientId = String(req.query.client || '');
+  if (!/^[A-Za-z0-9]+$/.test(clientId)) {
+    return res.status(400).type('text/plain').send('Missing or invalid client');
+  }
+  let clientPool;
+  try {
+    clientPool = await createClientDbConnection(clientId);
+    const config = await getClientConfiguration(clientPool, clientId);
+    const query = `?client=${encodeURIComponent(clientId)}`;
+    const site = String(config.STATIC_WEBSITE_URL || '').replace(/\/+$/, '');
+    const html = req.query.links === 'static'
+      ? renderLegalPage(page, config)
+      : renderLegalPage(page, config, {
+          privacyLink: `privacy${query}`,
+          termsLink: `terms${query}`,
+          assetBase: site ? `${site}/` : ''
+        });
+    res.set('Cache-Control', 'public, max-age=300').type('html').send(html);
+  } catch (error) {
+    console.error(`Legal page ${page} for client ${clientId} failed:`, error.message);
+    res.status(404).type('text/plain').send('Unknown venue');
+  } finally {
+    if (clientPool) await clientPool.end().catch(() => {});
+  }
+});
+// ---- END LEGAL PAGES ----
 
 // ---- PUBLIC EMAIL SIGNUP / UNSUBSCRIBE ROUTES ----
 // Same shape as the existing /api/public/opt-in routes above: no JWT,
