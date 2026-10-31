@@ -1078,6 +1078,15 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       "SHARE_NUDGE_ENABLED": "false",                         // adds a share/bring-a-friend line to the ticket confirmation email
       "OWNER_BCC_EMAIL": "",                                  // optional: BCC'd (and added as an SES Destination) on every ticket confirmation email for this client, and used as the fallback recipient for a walk-up/cash sale with no captured buyer email. Unset by default -- per-client opt-in monitoring, not a shared/global address.
       "ONE_PER_EMAIL_ITEMS": "",                              // optional: Square item names (comma-separated) each email can get only one ticket for, e.g. a free sample; enforced by getSquareOrders
+      // Terms of Service / Privacy Policy details (QRScanner utils/legal.mjs);
+      // blank shows that page's "Your Venue" placeholder.
+      "LEGAL_NAME": "",                                       // formal name, e.g. "Example Cinema Inc."
+      "LEGAL_SHORT_NAME": "",                                 // how the pages refer to the venue; defaults to LEGAL_NAME
+      "LEGAL_ADDRESS": "",                                    // street, city, state, zip
+      "LEGAL_PHONE": "",
+      "LEGAL_EMAIL": "",                                      // blank = privacy@indietix.net
+      "LEGAL_STATE": "",                                      // governing law, e.g. "Kansas"
+      "LEGAL_COURT_COUNTY": "",                               // where disputes are heard, e.g. "Douglas County, Kansas"
       "META_PAGE_ACCESS_TOKEN": "",                           // populated once Meta app review + Page connection is complete
       "META_PAGE_ID": "",                                     // Facebook Page ID real sending posts to -- required alongside the token above
       "META_IG_BUSINESS_ID": "",
@@ -1174,6 +1183,13 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
         "SENDER_EMAIL",
         "OWNER_BCC_EMAIL",
         "ONE_PER_EMAIL_ITEMS",
+        "LEGAL_NAME",
+        "LEGAL_SHORT_NAME",
+        "LEGAL_ADDRESS",
+        "LEGAL_PHONE",
+        "LEGAL_EMAIL",
+        "LEGAL_STATE",
+        "LEGAL_COURT_COUNTY",
         "META_PAGE_ACCESS_TOKEN",
         "META_PAGE_ID",
         "META_IG_BUSINESS_ID",

@@ -316,6 +316,15 @@
             return;
         }
 
+        // This venue's own Terms / Privacy pages (server-rendered from its
+        // LEGAL_* settings) instead of the environment's plain ones.
+        if (API_URL) {
+            const base = API_URL.replace(/\/+$/, '');
+            const query = '?client=' + encodeURIComponent(clientId);
+            document.getElementById('privacy-link').href = base + '/legal/privacy' + query;
+            document.getElementById('terms-link').href = base + '/legal/terms' + query;
+        }
+
         let info;
         try {
             info = await fetchOrderInfo(token, clientId);

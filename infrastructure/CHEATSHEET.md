@@ -53,6 +53,7 @@ Usually run together: `./deploy.sh deploy-layer QRScanner && ./deploy.sh attach-
 | `./deploy.sh lint-static` | Checks every local script/css link in the pages exists. | read-only |
 | `./deploy.sh static-diff` | Which files in `QRScanner/src/public/` differ from what's live. | read-only |
 | `./deploy.sh static-push <file>` | Uploads one file (e.g. `client.js`, `logo.png`) and clears its cache. | **PROD** |
+| `./deploy.sh static-push-legal` | Publishes `privacy.html` and `terms.html` for `LEGAL_CLIENT_ID` (deploy.config.sh), filled from that venue's Terms & Privacy fields in Client Settings. Shows a diff vs. live and asks. Refuses if the venue's fields are still blank. (`static-push` refuses these two files: the repo copies are "Your Venue" placeholders.) | **PROD** |
 | `./deploy.sh invalidate [path...] [--wait]` | Clears CloudFront's cache for those paths, or everything. | **PROD** (cache only) |
 
 `QRScanner/src/public/config.js` is per-deployment and gitignored: it holds that environment's API URL. Push it with `static-push config.js` after an `up` creates a new API URL.
