@@ -1055,10 +1055,11 @@ cmd_add_client() {
   client="$(venue check "$file")" || exit 1
   mkdir -p "$STAGING"
 
-  local webhook_url signature_key="" location_id=""
+  local webhook_url signature_key="" location_id="" already=false
   webhook_url="$(forwarder_webhook_url)"
   if client_in_env "$client"; then
-    echo "Client $client already exists in '$ENV_PREFIX' -- re-checking its webhook only; onboarding will refuse."
+    already=true
+    echo "Client $client already exists in '$ENV_PREFIX' -- re-checking its webhook only."
   fi
 
   echo "=== Adding venue $client to '$ENV_PREFIX' ($AWS_REGION) ==="
@@ -1075,6 +1076,10 @@ cmd_add_client() {
     signature_key="$(printf %s "$webhook_json" | json_field signature_key)"
     location_id="$(printf %s "$webhook_json" | json_field location_id)"
     unset token webhook_json
+  fi
+  if [ "$already" = true ]; then
+    echo "Venue $client was already onboarded; nothing else to do. (To change its settings, use Client Settings.)"
+    return 0
   fi
 
   local payload_file static_website_url fn_name="${ENV_PREFIX}-client-setup-teardown"
