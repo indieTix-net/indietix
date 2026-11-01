@@ -778,7 +778,10 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
     // and silently counted cancelled tickets as full-price sales.
     //
     // Gross is tax-inclusive (the price the customer paid).
-    // Net is tax-exclusive (Gross / 1.093). Tax = Gross - Net.
+    // Net is tax-exclusive (Gross / (1 + SALES_TAX_RATE/100)). Tax = Gross - Net.
+    // SALES_TAX_RATE and SCREEN_NUMBERS are read from Client Settings each
+    // time the report runs (not baked in), so a change applies to the next
+    // report. Neither is required: blank tax = none, no screen match = 1.
     //
     // TheatreID and Theatre Name are baked into the function body as SQL
     // literals, so the ID must be digits and the name has its quotes
@@ -798,10 +801,14 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
               ${sqlTheaterId} AS "TheatreID",
               '${sqlTheaterName}'::text AS "Theatre Name",
               '${filmCodePrefix}'::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
-              CASE
-                  WHEN "ProductVenue"::text ILIKE '%little%' THEN '2'::text
-                  ELSE '1'::text
-              END AS "Screen",
+              coalesce((
+                  SELECT screen.value
+                  FROM jsonb_each_text(settings.screen_numbers) AS screen
+                  WHERE screen.key <> ''
+                    AND strpos(lower("ProductVenue"::text), lower(screen.key)) > 0
+                  ORDER BY length(screen.key) DESC, screen.key
+                  LIMIT 1
+              ), '1') AS "Screen",
               "ProductName" AS "Title",
               "Distributor",
               to_char("ProductDate", 'YYYYMMDDHH24MI') AS "Showtime",
@@ -812,11 +819,11 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
               END AS "Gross",
               CASE
                   WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
-                  ELSE round("ProductPrice" / 1.093, 2)
+                  ELSE round("ProductPrice" / settings.tax_divisor, 2)
               END AS "Net",
               CASE
                   WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
-                  ELSE round("ProductPrice", 2) - round("ProductPrice" / 1.093, 2)
+                  ELSE round("ProductPrice", 2) - round("ProductPrice" / settings.tax_divisor, 2)
               END AS "Tax",
               CASE
                   WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0
@@ -830,6 +837,20 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
               0 AS "Open",
               1 AS "Close"
           FROM "QRCodeProduct"
+          CROSS JOIN (
+              -- Read when the report runs, from this venue's Client Settings:
+              -- SALES_TAX_RATE, the percent included in ticket prices (blank
+              -- or not a number = no tax), and SCREEN_NUMBERS, {"text in the
+              -- ticket's venue": "screen"} (longest match wins; none = 1).
+              SELECT
+                  1 + CASE WHEN cfg.c->>'SALES_TAX_RATE' ~ '^[0-9]+([.][0-9]+)?$'
+                           THEN (cfg.c->>'SALES_TAX_RATE')::numeric / 100
+                           ELSE 0 END AS tax_divisor,
+                  CASE WHEN jsonb_typeof(cfg.c->'SCREEN_NUMBERS') = 'object'
+                       THEN cfg.c->'SCREEN_NUMBERS'
+                       ELSE '{}'::jsonb END AS screen_numbers
+              FROM (SELECT (SELECT "configuration"::jsonb FROM public."Client" LIMIT 1) AS c) AS cfg
+          ) AS settings
           WHERE "ProductType"::text = 'Movie'
             AND "ProductDate" IS NOT NULL
             AND "ProductDate"::date = p_report_date;
@@ -964,7 +985,9 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       "DISTRIBUTOR_NAME": "Distributor",
       "S3_BUCKET_PREFIX": clientData.s3_bucket_prefix || "indietix-",
       "EVENT_TYPE": "EventType",
-      "EVENT_LOCATIONS": ["Main Auditorium", "Little Theater", "Spacement"],
+      "EVENT_LOCATIONS": ["Main Auditorium"],
+      "SALES_TAX_RATE": "",                                   // optional: percent included in ticket prices, split out of Gross in box-office reports (blank = no tax)
+      "SCREEN_NUMBERS": {},                                   // optional: {"text in a ticket's venue": "screen number"} for box-office reports; no match = screen 1
       "EVENT_DESCRIPTORS": ["Closed Caption", "75mm", "All Ages", "21+", "18 and over"],
       "USERS_NAMES": [],
       "GOOGLE_SERVICE_ACCOUNT_KEY": "updateWithRealServiceAccountKey", 
@@ -1107,6 +1130,8 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
         "DISTRIBUTOR_NAME",
         "EVENT_TYPE",
         "EVENT_LOCATIONS",
+        "SALES_TAX_RATE",
+        "SCREEN_NUMBERS",
         "EVENT_DESCRIPTORS",
         "USERS_NAMES",
         "GOOGLE_SERVICE_ACCOUNT_KEY",

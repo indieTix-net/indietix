@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import { setupTestDatabase, teardownTestDatabase } from 'test-db-harness';
-import { createDatabaseObjects } from '../src/index.js';
+import { createDatabaseObjects, insertClientRecord } from '../src/index.js';
 
 const { Client } = pg;
 
@@ -19,6 +19,14 @@ before(async () => {
   await createDatabaseObjects(dbConfig, 'client_setup_teardown_test', THEATER_ID, THEATER_NAME, FILM_CODE_PREFIX);
   client = new Client(dbConfig);
   await client.connect();
+  // The report's tax rate and screen numbers come from the venue's Client
+  // Settings; this venue includes 9.3% tax and numbers its "little" room 2.
+  await insertClientRecord(dbConfig, 'client_setup_teardown_test', {
+    username: 'client_setup_teardown_test', clientSecret: 's', contactName: 'Test', clientEmail: 't@example.com',
+    square_access_token: 't', square_signature_key: 'k', sender_email: 'n@example.com',
+    theater_id: String(THEATER_ID), theater_name: THEATER_NAME, film_code_prefix: FILM_CODE_PREFIX, s3_bucket_prefix: 'indietix-'
+  });
+  await setReportSettings({ SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2' } });
 });
 
 after(async () => {
@@ -101,6 +109,10 @@ async function insertTicket(overrides = {}) {
   return row;
 }
 
+async function setReportSettings(settings) {
+  await client.query(`UPDATE "Client" SET configuration = (configuration::jsonb || $1::jsonb)::json`, [JSON.stringify(settings)]);
+}
+
 async function bdorFor(reportDate) {
   const result = await client.query(`SELECT * FROM bdor_for_date($1)`, [reportDate]);
   return result.rows;
@@ -111,7 +123,7 @@ test('bdor_for_date: a valid ticket reports full Gross/Net/Tax, Sold=1, Refunded
   const [report] = await bdorFor('2026-02-01');
 
   assert.equal(Number(report.Gross), 10.93);
-  // Net = Gross / 1.093, rounded to 2 decimals.
+  // Net = Gross / (1 + SALES_TAX_RATE/100) = 10.93 / 1.093, rounded to 2 decimals.
   assert.equal(Number(report.Net), 10.00);
   assert.equal(Number(report.Tax), 0.93);
   assert.equal(report.Sold, 1);
@@ -220,7 +232,7 @@ test('bdor_for_date: Film Code is the configured prefix + first 6 chars of md5(P
   assert.equal(report['Film Code'], FILM_CODE_PREFIX + expectedHash);
 });
 
-test('bdor_for_date: Screen is "2" when ProductVenue mentions "little" (case-insensitive), else "1"', async () => {
+test('bdor_for_date: Screen comes from SCREEN_NUMBERS ("little" -> 2, case-insensitive), else "1"', async () => {
   const reportDate = '2026-02-09';
   await insertTicket({ QRCode: 'MAIN-SCREEN', ProductDate: `${reportDate} 19:00:00`, ProductVenue: 'Main Theatre' });
   await insertTicket({ QRCode: 'LITTLE-SCREEN', ProductDate: `${reportDate} 19:00:00`, ProductVenue: 'The Little Theatre' });
@@ -307,4 +319,44 @@ test('OrderProductView: joins QRCodeProduct to its Order through the junction ta
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0].EmailAddress, 'test@example.com');
   assert.equal(result.rows[0].FirstName, 'Jane');
+});
+
+// ---- tax rate and screen numbers from Client Settings ----
+
+test('bdor_for_date: with no SALES_TAX_RATE, Net is the full Gross and Tax is 0', async () => {
+  await setReportSettings({ SALES_TAX_RATE: '' });
+  try {
+    await insertTicket({ QRCode: 'NO-TAX', ProductDate: '2026-04-21 19:00:00', ProductPrice: 10.93 });
+    const [report] = await bdorFor('2026-04-21');
+    assert.equal(Number(report.Gross), 10.93);
+    assert.equal(Number(report.Net), 10.93);
+    assert.equal(Number(report.Tax), 0);
+  } finally {
+    await setReportSettings({ SALES_TAX_RATE: '9.3' });
+  }
+});
+
+test('bdor_for_date: a malformed SALES_TAX_RATE counts as no tax instead of breaking the report', async () => {
+  await setReportSettings({ SALES_TAX_RATE: '9.3%' });
+  try {
+    await insertTicket({ QRCode: 'BAD-TAX', ProductDate: '2026-04-22 19:00:00', ProductPrice: 10.93 });
+    const [report] = await bdorFor('2026-04-22');
+    assert.equal(Number(report.Net), 10.93);
+  } finally {
+    await setReportSettings({ SALES_TAX_RATE: '9.3' });
+  }
+});
+
+test('bdor_for_date: a settings change applies on the next run, and the longest SCREEN_NUMBERS match wins', async () => {
+  await setReportSettings({ SALES_TAX_RATE: '5', SCREEN_NUMBERS: { room: '2', 'room b': '3' } });
+  try {
+    await insertTicket({ QRCode: 'ROOM-A', ProductDate: '2026-04-23 19:00:00', ProductPrice: 10.50, ProductVenue: 'Room A' });
+    await insertTicket({ QRCode: 'ROOM-B', ProductDate: '2026-04-23 19:00:00', ProductPrice: 10.50, ProductVenue: 'Room B' });
+    await insertTicket({ QRCode: 'LOBBY', ProductDate: '2026-04-23 19:00:00', ProductPrice: 10.50, ProductVenue: 'Lobby' });
+    const rows = await bdorFor('2026-04-23');
+    assert.deepEqual(rows.map(r => r.Screen).sort(), ['1', '2', '3']);
+    assert.equal(Number(rows[0].Net), 10.00);
+  } finally {
+    await setReportSettings({ SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2' } });
+  }
 });

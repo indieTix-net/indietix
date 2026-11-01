@@ -97,3 +97,51 @@ test('migrations.sql: a missing THEATER_ID stops with a clear error and leaves b
   assert.equal(await bdorDefinition(), before);
   await client.query(`UPDATE "Client" SET configuration = (configuration::jsonb || '{"THEATER_ID": "54321"}'::jsonb)::json`);
 });
+
+// ---- 2026-11-01: tax rate and screen numbers move into Client Settings ----
+
+async function insertMovieTicket(qrCode, venue, status, date) {
+  await client.query(`
+    INSERT INTO "QRCodeProduct" ("QRCode", "ProductName", "ProductDate", "ExpirationDate", "ProductLocation",
+                                 "ProductDetails", "ProductID", "ProductPrice", "ProductType", "Status", "ProductVenue")
+    VALUES ($1, 'Test Film', $2, $2::timestamp + interval '1 day', 'Main', 'details', 'PID1', 10.93, 'Movie', $3, $4)`,
+    [qrCode, `${date} 19:30:00`, status, venue]);
+}
+
+async function reportFigures(date) {
+  const { rows } = await client.query(`SELECT * FROM bdor_for_date($1)`, [date]);
+  return rows.map(r => JSON.stringify([r.Screen, String(r.Gross), String(r.Net), String(r.Tax), r.Sold, r.Refunded])).sort();
+}
+
+test('migrations.sql: a venue still on an old baked-in function keeps exactly the same report figures', async () => {
+  // Install a real pre-2026-11-01 function (the last one in the preserved
+  // Liberty Hall record: 9.3% tax, "little" = screen 2), on a venue that
+  // has neither setting yet.
+  const record = readFileSync(new URL('../migrations/liberty-hall.sql', import.meta.url), 'utf8');
+  const oldFunctions = record.match(/CREATE OR REPLACE FUNCTION public\.bdor_for_date\(p_report_date date\)[\s\S]*?\n\$\$;/g);
+  await client.query(oldFunctions[oldFunctions.length - 1]);
+  await client.query(`UPDATE "Client" SET configuration = (configuration::jsonb - 'SALES_TAX_RATE' - 'SCREEN_NUMBERS')::json`);
+
+  const date = '2026-11-02';
+  await insertMovieTicket('OLD-1', 'Little Theater', 'valid', date);
+  await insertMovieTicket('OLD-2', 'Main Auditorium', 'valid', date);
+  await insertMovieTicket('OLD-3', 'Little Theater', 'refunded', date);
+  await insertMovieTicket('OLD-4', 'Main Auditorium', 'cancelled', date);
+  const before = await reportFigures(date);
+
+  await client.query(MIGRATIONS);
+
+  const cfg = await config();
+  assert.equal(cfg.SALES_TAX_RATE, '9.3');
+  assert.deepEqual(cfg.SCREEN_NUMBERS, { little: '2' });
+  assert.match(await bdorDefinition(), /SALES_TAX_RATE/);
+  assert.deepEqual(await reportFigures(date), before);
+});
+
+test('migrations.sql: a venue that already has the settings keeps them, even blank', async () => {
+  await client.query(`UPDATE "Client" SET configuration = (configuration::jsonb || '{"SALES_TAX_RATE": "", "SCREEN_NUMBERS": {"studio": "4"}}'::jsonb)::json`);
+  await client.query(MIGRATIONS);
+  const cfg = await config();
+  assert.equal(cfg.SALES_TAX_RATE, '');
+  assert.deepEqual(cfg.SCREEN_NUMBERS, { studio: '4' });
+});

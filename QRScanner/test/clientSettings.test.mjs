@@ -162,11 +162,47 @@ test('PUT /api/client: every USER_DEFINABLE key from clientSetup-Teardown is acc
   const list = source.match(/"USER_DEFINABLE":\s*\[([\s\S]*?)\]/)[1];
   const keys = [...list.matchAll(/"([A-Z0-9_]+)"/g)].map((m) => m[1]);
   assert.ok(keys.length > 50, 'should have found the onboarding list');
-  const configuration = Object.fromEntries(keys.map((key) => [key, 'x']));
+  // Keys the save route validates get a well-formed value; the rest just 'x'.
+  const wellFormed = { SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2' } };
+  const configuration = Object.fromEntries(keys.map((key) => [key, wellFormed[key] ?? 'x']));
   const { status, json } = await ctx.request('PUT', '/api/client', {
     token: ctx.clientToken,
     body: { contactName: 'New Contact', clientEmail: 'new-contact@example.com', configuration }
   });
   assert.equal(status, 200);
   assert.equal(json.ignoredKeys, undefined, `not accepted: ${json.ignoredKeys}`);
+});
+
+// ---- box-office report settings: SALES_TAX_RATE and SCREEN_NUMBERS ----
+
+async function saveReportSettings(configuration) {
+  return ctx.request('PUT', '/api/client', {
+    token: ctx.clientToken,
+    body: { contactName: 'Test Contact', clientEmail: 'contact@example.com', configuration }
+  });
+}
+
+test('PUT /api/client: SALES_TAX_RATE and SCREEN_NUMBERS save when well-formed, including blank tax', async () => {
+  for (const configuration of [
+    { SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2', 'Room B': 3 } },
+    { SALES_TAX_RATE: '', SCREEN_NUMBERS: {} }
+  ]) {
+    const { status, json } = await saveReportSettings(configuration);
+    assert.equal(status, 200, JSON.stringify(json));
+    assert.deepEqual(json.ignoredKeys || [], []);
+  }
+});
+
+test('PUT /api/client: a malformed SALES_TAX_RATE or SCREEN_NUMBERS is rejected with 400', async () => {
+  for (const configuration of [
+    { SALES_TAX_RATE: '9.3%' },
+    { SALES_TAX_RATE: '150' },
+    { SALES_TAX_RATE: '-1' },
+    { SCREEN_NUMBERS: ['little', '2'] },
+    { SCREEN_NUMBERS: { little: 'two' } },
+    { SCREEN_NUMBERS: { ' ': '2' } }
+  ]) {
+    const { status } = await saveReportSettings(configuration);
+    assert.equal(status, 400, JSON.stringify(configuration));
+  }
 });
