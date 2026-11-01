@@ -480,7 +480,9 @@ cmd_lint_static() {
       case "$ref" in
         http://*|https://*|//*) continue ;;
       esac
-      if [ ! -f "$dir/$ref" ]; then
+      # A per-deployment, gitignored file (config.js) counts as present when
+      # its checked-in template is -- a fresh clone has only the template.
+      if [ ! -f "$dir/$ref" ] && [ ! -f "$dir/$ref.template" ]; then
         echo "MISSING: $base references '$ref' -- not found in $dir"
         had_error=1
       fi
