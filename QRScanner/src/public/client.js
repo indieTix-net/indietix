@@ -149,6 +149,40 @@ document.addEventListener('DOMContentLoaded', function() {
         `).join('');
     }
     
+    // SCREEN_NUMBERS management: rows of [venue text, screen number]
+    const screenNumbersList = document.getElementById('screen-numbers-list');
+    document.getElementById('add-screen-number-btn').addEventListener('click', () => addScreenNumberRow('', ''));
+
+    function addScreenNumberRow(text, screen) {
+        const row = document.createElement('div');
+        row.className = 'screen-number-row';
+        row.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 8px;';
+        row.innerHTML = `
+            <input type="text" class="form-control screen-text" placeholder="Location contains, e.g. Little" style="flex: 3;">
+            <input type="number" class="form-control screen-number" placeholder="Screen" min="1" max="999" step="1" style="flex: 1;">
+            <button type="button" class="btn btn-sm btn-danger">Remove</button>`;
+        row.querySelector('.screen-text').value = text;
+        row.querySelector('.screen-number').value = screen;
+        row.querySelector('button').addEventListener('click', () => row.remove());
+        screenNumbersList.appendChild(row);
+    }
+
+    function setScreenNumbers(screens) {
+        screenNumbersList.innerHTML = '';
+        Object.entries(screens && typeof screens === 'object' ? screens : {})
+            .forEach(([text, screen]) => addScreenNumberRow(text, screen));
+    }
+
+    function getScreenNumbers() {
+        const screens = {};
+        screenNumbersList.querySelectorAll('.screen-number-row').forEach(row => {
+            const text = row.querySelector('.screen-text').value.trim();
+            const screen = row.querySelector('.screen-number').value.trim();
+            if (text && screen) screens[text] = screen;
+        });
+        return screens;
+    }
+
     // EVENT_DESCRIPTORS management
     let eventDescriptors = [];
     const newDescriptorInput = document.getElementById('new-descriptor');
@@ -435,6 +469,8 @@ document.addEventListener('DOMContentLoaded', function() {
         webHeaderCompanyInput.value = config.WEB_HEADER_COMPANY || '';
         logoFileInput.value = config.LOGO_FILE || 'indieTixLogo.png';
         eborTheatreNoInput.value = config.EBOR_THEATRE_NO || '';
+        document.getElementById('sales-tax-rate').value = config.SALES_TAX_RATE || '';
+        setScreenNumbers(config.SCREEN_NUMBERS);
         ticketOrientationInput.value = config.TICKET_ORIENTATION || '';
         ticketFilenameInput.value = config.TICKET_FILENAME || '';
         modifierNameFilterInput.value = config.MODIFIER_NAME_FILTER || '';
@@ -484,7 +520,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tiktokPrivacyLevelInput.value = config.TIKTOK_PRIVACY_LEVEL || '';
 
         // Load EVENT_LOCATIONS
-        eventLocations = config.EVENT_LOCATIONS || ['Main Auditorium', 'Little Theater', 'Spacement'];
+        eventLocations = config.EVENT_LOCATIONS || ['Main Auditorium'];
         renderLocationsList();
         
         // Load EVENT_DESCRIPTORS
@@ -537,6 +573,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Default to indieTixLogo.png if field is empty
         config.LOGO_FILE = logoFileInput.value.trim() || 'indieTixLogo.png';
         config.EBOR_THEATRE_NO = eborTheatreNoInput.value.trim();
+        config.SALES_TAX_RATE = document.getElementById('sales-tax-rate').value.trim();
+        config.SCREEN_NUMBERS = getScreenNumbers();
         config.TICKET_ORIENTATION = ticketOrientationInput.value.trim();
         config.TICKET_FILENAME = ticketFilenameInput.value.trim();
         config.MODIFIER_NAME_FILTER = modifierNameFilterInput.value.trim();

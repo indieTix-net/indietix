@@ -224,6 +224,20 @@
                                 <div class="form-text">comScore theatre number for EBOR reporting</div>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sales-tax-rate" class="form-label">Sales Tax Rate (%)</label>
+                                <input type="number" class="form-control" id="sales-tax-rate" name="sales_tax_rate" min="0" max="100" step="0.001" autocomplete="off" placeholder="e.g. 9.3">
+                                <div class="form-text">Box-office reports only: the sales tax included in your movie ticket prices, split out of Gross into Net and Tax. Leave blank if your prices don't include tax.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Screen Numbers</label>
+                        <div class="form-text mb-2">Box-office reports only: which screen number a showing gets, by the text in its location (e.g. "Little" &rarr; 2). The longest matching text wins; anything else is screen 1.</div>
+                        <div id="screen-numbers-list"></div>
+                        <button type="button" id="add-screen-number-btn" class="btn btn-success btn-sm">+ Add Screen</button>
                     </div>
                 </div>
 

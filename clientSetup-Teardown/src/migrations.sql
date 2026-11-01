@@ -956,76 +956,9 @@ COMMIT;
 -- Run per-client database.
 -- ============================================================
 
-DO $migration$
-DECLARE
-  cfg jsonb;
-  theatre_id text;
-  theatre_name text;
-  film_code_prefix text;
-BEGIN
-  SELECT "configuration"::jsonb INTO cfg FROM public."Client" LIMIT 1;
-  theatre_id := cfg->>'THEATER_ID';
-  theatre_name := cfg->>'THEATER_NAME';
-  film_code_prefix := cfg->>'FILM_CODE_PREFIX';
-  IF theatre_id IS NULL OR theatre_id !~ '^[0-9]+$' THEN
-    RAISE EXCEPTION 'bdor_for_date: THEATER_ID must be digits, got %', coalesce(theatre_id, '(missing)');
-  END IF;
-  IF coalesce(theatre_name, '') = '' THEN
-    RAISE EXCEPTION 'bdor_for_date: THEATER_NAME is missing';
-  END IF;
-  IF film_code_prefix IS NULL OR film_code_prefix !~ '^[A-Z0-9]{2,4}$' THEN
-    RAISE EXCEPTION 'bdor_for_date: FILM_CODE_PREFIX must be 2-4 uppercase letters/digits, got %', coalesce(film_code_prefix, '(missing)');
-  END IF;
-
-  EXECUTE format($sql$
-CREATE OR REPLACE FUNCTION public.bdor_for_date(p_report_date date)
- RETURNS TABLE("TheatreID" integer, "Theatre Name" text, "Film Code" text, "Screen" text, "Title" character varying, "Distributor" character varying, "Showtime" text, "Ticket Type" character varying, "Gross" numeric, "Net" numeric, "Tax" numeric, "Sold" integer, "Refunded" integer, "Open" integer, "Close" integer)
- LANGUAGE sql
- STABLE
-AS $fn$
-    SELECT
-        %s AS "TheatreID",
-        %L::text AS "Theatre Name",
-        %L::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
-        CASE
-            WHEN "ProductVenue"::text ILIKE '%%little%%' THEN '2'::text
-            ELSE '1'::text
-        END AS "Screen",
-        "ProductName" AS "Title",
-        "Distributor",
-        to_char("ProductDate", 'YYYYMMDDHH24MI') AS "Showtime",
-        "ProductSeatCode" AS "Ticket Type",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred') THEN 0::numeric
-            ELSE round("ProductPrice", 2)
-        END AS "Gross",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred') THEN 0::numeric
-            ELSE round("ProductPrice" / 1.093, 2)
-        END AS "Net",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred') THEN 0::numeric
-            ELSE round("ProductPrice", 2) - round("ProductPrice" / 1.093, 2)
-        END AS "Tax",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred') THEN 0
-            WHEN "ProductPrice" > 0::numeric THEN 1
-            ELSE 0
-        END AS "Sold",
-        CASE
-            WHEN "Status"::text = 'refunded' THEN 1
-            ELSE 0
-        END AS "Refunded",
-        0 AS "Open",
-        1 AS "Close"
-    FROM "QRCodeProduct"
-    WHERE "ProductType"::text = 'Movie'
-      AND "ProductDate" IS NOT NULL
-      AND "ProductDate"::date = p_report_date;
-$fn$;
-$sql$, theatre_id::integer, theatre_name, film_code_prefix);
-END
-$migration$;
+-- Superseded by the 2026-11-01 step at the end of this file, which
+-- recreates bdor_for_date with this fix included (and reads the tax rate
+-- and screen numbers from the venue's settings). Nothing to run here.
 
 
 -- ============================================================
@@ -1054,76 +987,9 @@ $migration$;
 -- Run per-client database.
 -- ============================================================
 
-DO $migration$
-DECLARE
-  cfg jsonb;
-  theatre_id text;
-  theatre_name text;
-  film_code_prefix text;
-BEGIN
-  SELECT "configuration"::jsonb INTO cfg FROM public."Client" LIMIT 1;
-  theatre_id := cfg->>'THEATER_ID';
-  theatre_name := cfg->>'THEATER_NAME';
-  film_code_prefix := cfg->>'FILM_CODE_PREFIX';
-  IF theatre_id IS NULL OR theatre_id !~ '^[0-9]+$' THEN
-    RAISE EXCEPTION 'bdor_for_date: THEATER_ID must be digits, got %', coalesce(theatre_id, '(missing)');
-  END IF;
-  IF coalesce(theatre_name, '') = '' THEN
-    RAISE EXCEPTION 'bdor_for_date: THEATER_NAME is missing';
-  END IF;
-  IF film_code_prefix IS NULL OR film_code_prefix !~ '^[A-Z0-9]{2,4}$' THEN
-    RAISE EXCEPTION 'bdor_for_date: FILM_CODE_PREFIX must be 2-4 uppercase letters/digits, got %', coalesce(film_code_prefix, '(missing)');
-  END IF;
-
-  EXECUTE format($sql$
-CREATE OR REPLACE FUNCTION public.bdor_for_date(p_report_date date)
- RETURNS TABLE("TheatreID" integer, "Theatre Name" text, "Film Code" text, "Screen" text, "Title" character varying, "Distributor" character varying, "Showtime" text, "Ticket Type" character varying, "Gross" numeric, "Net" numeric, "Tax" numeric, "Sold" integer, "Refunded" integer, "Open" integer, "Close" integer)
- LANGUAGE sql
- STABLE
-AS $fn$
-    SELECT
-        %s AS "TheatreID",
-        %L::text AS "Theatre Name",
-        %L::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
-        CASE
-            WHEN "ProductVenue"::text ILIKE '%%little%%' THEN '2'::text
-            ELSE '1'::text
-        END AS "Screen",
-        "ProductName" AS "Title",
-        "Distributor",
-        to_char("ProductDate", 'YYYYMMDDHH24MI') AS "Showtime",
-        "ProductSeatCode" AS "Ticket Type",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
-            ELSE round("ProductPrice", 2)
-        END AS "Gross",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
-            ELSE round("ProductPrice" / 1.093, 2)
-        END AS "Net",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
-            ELSE round("ProductPrice", 2) - round("ProductPrice" / 1.093, 2)
-        END AS "Tax",
-        CASE
-            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0
-            WHEN "ProductPrice" > 0::numeric THEN 1
-            ELSE 0
-        END AS "Sold",
-        CASE
-            WHEN "Status"::text = 'refunded' THEN 1
-            ELSE 0
-        END AS "Refunded",
-        0 AS "Open",
-        1 AS "Close"
-    FROM "QRCodeProduct"
-    WHERE "ProductType"::text = 'Movie'
-      AND "ProductDate" IS NOT NULL
-      AND "ProductDate"::date = p_report_date;
-$fn$;
-$sql$, theatre_id::integer, theatre_name, film_code_prefix);
-END
-$migration$;
+-- Superseded by the 2026-11-01 step at the end of this file, which
+-- recreates bdor_for_date with this fix included (and reads the tax rate
+-- and screen numbers from the venue's settings). Nothing to run here.
 
 
 -- ============================================================
@@ -1276,3 +1142,136 @@ CREATE TABLE IF NOT EXISTS public."ApiIdempotency" (
 );
 
 COMMIT;
+
+
+-- ============================================================
+-- 2026-11-01: bdor_for_date reads SALES_TAX_RATE and SCREEN_NUMBERS
+-- ============================================================
+-- bdor_for_date used to bake one venue's sales tax (Net = Gross / 1.093)
+-- and screen rule (a venue containing "little" = screen 2) into its body.
+-- Both are now Client Settings read when the report runs:
+--   SALES_TAX_RATE  percent included in ticket prices; blank = no tax
+--   SCREEN_NUMBERS  {"text in a ticket's venue": "screen"}; no match = 1
+-- Neither is required (most non-cinema venues never run this report).
+--
+-- For a venue that doesn't have these settings yet, this first records
+-- exactly what its current function has baked in, read out of the
+-- function's own definition, so its reports come out the same. Then it
+-- recreates the function (reading THEATER_ID / THEATER_NAME /
+-- FILM_CODE_PREFIX from config, as the 2026-10-24 step did), including
+-- the transferred/cancelled handling from 2026-10-24/25. Stops with an
+-- error, changing nothing, if any of those three is missing or malformed.
+--
+-- Idempotent: safe to re-run.
+-- Run per-client database.
+-- ============================================================
+
+DO $migration$
+DECLARE
+  cfg jsonb;
+  old_def text;
+  divisor numeric;
+  screens jsonb;
+  theatre_id text;
+  theatre_name text;
+  film_code_prefix text;
+BEGIN
+  SELECT "configuration"::jsonb INTO cfg FROM public."Client" LIMIT 1;
+  old_def := pg_get_functiondef(to_regprocedure('public.bdor_for_date(date)'));
+
+  IF cfg IS NOT NULL AND NOT (cfg ? 'SALES_TAX_RATE') THEN
+    divisor := substring(old_def FROM '"ProductPrice" / ([0-9]+[.][0-9]+), 2\)')::numeric;
+    UPDATE public."Client"
+    SET "configuration" = "configuration"::jsonb || jsonb_build_object('SALES_TAX_RATE',
+          CASE WHEN divisor IS NULL THEN '' ELSE trim_scale((divisor - 1) * 100)::text END),
+      "updatedDate" = CURRENT_TIMESTAMP;
+  END IF;
+
+  IF cfg IS NOT NULL AND NOT (cfg ? 'SCREEN_NUMBERS') THEN
+    SELECT coalesce(jsonb_object_agg(m[1], m[2]), '{}'::jsonb) INTO screens
+    FROM regexp_matches(coalesce(old_def, ''), 'ILIKE ''%([^%'']+)%'' THEN ''([0-9]+)''', 'g') AS m;
+    UPDATE public."Client"
+    SET "configuration" = "configuration"::jsonb || jsonb_build_object('SCREEN_NUMBERS', screens),
+      "updatedDate" = CURRENT_TIMESTAMP;
+  END IF;
+
+  theatre_id := cfg->>'THEATER_ID';
+  theatre_name := cfg->>'THEATER_NAME';
+  film_code_prefix := cfg->>'FILM_CODE_PREFIX';
+  IF theatre_id IS NULL OR theatre_id !~ '^[0-9]+$' THEN
+    RAISE EXCEPTION 'bdor_for_date: THEATER_ID must be digits, got %', coalesce(theatre_id, '(missing)');
+  END IF;
+  IF coalesce(theatre_name, '') = '' THEN
+    RAISE EXCEPTION 'bdor_for_date: THEATER_NAME is missing';
+  END IF;
+  IF film_code_prefix IS NULL OR film_code_prefix !~ '^[A-Z0-9]{2,4}$' THEN
+    RAISE EXCEPTION 'bdor_for_date: FILM_CODE_PREFIX must be 2-4 uppercase letters/digits, got %', coalesce(film_code_prefix, '(missing)');
+  END IF;
+
+  EXECUTE format($sql$
+CREATE OR REPLACE FUNCTION public.bdor_for_date(p_report_date date)
+ RETURNS TABLE("TheatreID" integer, "Theatre Name" text, "Film Code" text, "Screen" text, "Title" character varying, "Distributor" character varying, "Showtime" text, "Ticket Type" character varying, "Gross" numeric, "Net" numeric, "Tax" numeric, "Sold" integer, "Refunded" integer, "Open" integer, "Close" integer)
+ LANGUAGE sql
+ STABLE
+AS $fn$
+    SELECT
+        %s AS "TheatreID",
+        %L::text AS "Theatre Name",
+        %L::text || substring(md5("ProductName"::text), 1, 6) AS "Film Code",
+        coalesce((
+            SELECT screen.value
+            FROM jsonb_each_text(settings.screen_numbers) AS screen
+            WHERE screen.key <> ''
+              AND strpos(lower("ProductVenue"::text), lower(screen.key)) > 0
+            ORDER BY length(screen.key) DESC, screen.key
+            LIMIT 1
+        ), '1') AS "Screen",
+        "ProductName" AS "Title",
+        "Distributor",
+        to_char("ProductDate", 'YYYYMMDDHH24MI') AS "Showtime",
+        "ProductSeatCode" AS "Ticket Type",
+        CASE
+            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
+            ELSE round("ProductPrice", 2)
+        END AS "Gross",
+        CASE
+            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
+            ELSE round("ProductPrice" / settings.tax_divisor, 2)
+        END AS "Net",
+        CASE
+            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0::numeric
+            ELSE round("ProductPrice", 2) - round("ProductPrice" / settings.tax_divisor, 2)
+        END AS "Tax",
+        CASE
+            WHEN "Status"::text IN ('refunded', 'transferred', 'cancelled') THEN 0
+            WHEN "ProductPrice" > 0::numeric THEN 1
+            ELSE 0
+        END AS "Sold",
+        CASE
+            WHEN "Status"::text = 'refunded' THEN 1
+            ELSE 0
+        END AS "Refunded",
+        0 AS "Open",
+        1 AS "Close"
+    FROM "QRCodeProduct"
+    CROSS JOIN (
+        -- Read when the report runs, from this venue's Client Settings:
+        -- SALES_TAX_RATE, the percent included in ticket prices (blank
+        -- or not a number = no tax), and SCREEN_NUMBERS, {"text in the
+        -- ticket's venue": "screen"} (longest match wins; none = 1).
+        SELECT
+            1 + CASE WHEN cfg.c->>'SALES_TAX_RATE' ~ '^[0-9]+([.][0-9]+)?$'
+                     THEN (cfg.c->>'SALES_TAX_RATE')::numeric / 100
+                     ELSE 0 END AS tax_divisor,
+            CASE WHEN jsonb_typeof(cfg.c->'SCREEN_NUMBERS') = 'object'
+                 THEN cfg.c->'SCREEN_NUMBERS'
+                 ELSE '{}'::jsonb END AS screen_numbers
+        FROM (SELECT (SELECT "configuration"::jsonb FROM public."Client" LIMIT 1) AS c) AS cfg
+    ) AS settings
+    WHERE "ProductType"::text = 'Movie'
+      AND "ProductDate" IS NOT NULL
+      AND "ProductDate"::date = p_report_date;
+$fn$;
+$sql$, theatre_id::integer, theatre_name, film_code_prefix);
+END
+$migration$;

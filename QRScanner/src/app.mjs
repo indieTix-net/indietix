@@ -2340,7 +2340,7 @@ const CLIENT_SETTINGS_KEYS = [
   'MARKETING_SES_CONFIGURATION_SET', 'SHARE_NUDGE_ENABLED', 'TICKET_ORIENTATION',
   'TICKET_FILENAME', 'SENDER_EMAIL', 'OWNER_BCC_EMAIL', 'ONE_PER_EMAIL_ITEMS',
   'LEGAL_NAME', 'LEGAL_SHORT_NAME', 'LEGAL_ADDRESS', 'LEGAL_PHONE', 'LEGAL_EMAIL',
-  'LEGAL_STATE', 'LEGAL_COURT_COUNTY',
+  'LEGAL_STATE', 'LEGAL_COURT_COUNTY', 'SALES_TAX_RATE', 'SCREEN_NUMBERS',
   'META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID', 'META_IG_BUSINESS_ID', 'TIKTOK_ACCESS_TOKEN',
   'TIKTOK_REFRESH_TOKEN', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_PRIVACY_LEVEL'
 ];
@@ -2348,6 +2348,30 @@ const CLIENT_SETTINGS_KEYS = [
 function allowedClientSettingKeys(currentConfig) {
   const stored = Array.isArray(currentConfig.USER_DEFINABLE) ? currentConfig.USER_DEFINABLE : [];
   return new Set([...CLIENT_SETTINGS_KEYS, ...stored]);
+}
+// The box-office report (bdor_for_date) reads these two at run time, so a
+// malformed value would quietly skew a distributor report. Returns an
+// error message, or null if they're fine (or not being saved).
+function validateReportSettings(configuration) {
+  if (!configuration || typeof configuration !== 'object') return null;
+  const rate = configuration.SALES_TAX_RATE;
+  if (rate !== undefined && rate !== null && String(rate).trim() !== '') {
+    const text = String(rate).trim();
+    if (!/^[0-9]+(\.[0-9]+)?$/.test(text) || Number(text) > 100) {
+      return 'Sales tax rate must be a percent from 0 to 100, like 9.3 (or blank for none)';
+    }
+  }
+  const screens = configuration.SCREEN_NUMBERS;
+  if (screens !== undefined && screens !== null) {
+    if (typeof screens !== 'object' || Array.isArray(screens)) {
+      return 'Screen numbers must be a list of venue text and screen number pairs';
+    }
+    for (const [text, screen] of Object.entries(screens)) {
+      if (!text.trim() || text.length > 100) return 'Each screen number needs the venue text it matches (up to 100 characters)';
+      if (!/^[0-9]{1,3}$/.test(String(screen))) return `Screen number for "${text}" must be a whole number`;
+    }
+  }
+  return null;
 }
 // ---- END CLIENT SETTINGS ALLOWLIST ----
 
@@ -2378,6 +2402,15 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
       });
     }
     
+    const reportSettingsError = validateReportSettings(configuration);
+    if (reportSettingsError) {
+      return res.status(400).json({
+        success: false,
+        returnStatus: 'failed_validation',
+        message: reportSettingsError
+      });
+    }
+
     // Only the client login itself may change the client secret (the
     // master login's password). The route is already client-only via
     // requireClientAuth; this is a second guard in case that ever loosens,
