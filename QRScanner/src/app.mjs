@@ -199,6 +199,25 @@ const app = express();
 app.use(bodyParser.json({ limit: '6mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '6mb' }));
 
+// ---- API EDGE ----
+// Behind the CloudFront + WAF edge (bootstrap.sh API_EDGE="true"),
+// CloudFront adds X-IndieTix-Edge to every request it forwards. With
+// EDGE_ORIGIN_SECRET set, anything without it was sent straight to the
+// Function URL, around the firewall, and is refused. Unset (self-hosted
+// installs, Liberty Hall today): no check.
+function hasEdgeHeader(req) {
+  const expected = process.env.EDGE_ORIGIN_SECRET;
+  if (!expected) return true;
+  const got = Buffer.from(String(req.headers['x-indietix-edge'] || ''));
+  const want = Buffer.from(expected);
+  return got.length === want.length && crypto.timingSafeEqual(got, want);
+}
+app.use((req, res, next) => {
+  if (hasEdgeHeader(req)) return next();
+  return res.status(403).json({ success: false, message: 'Use this site\'s API address' });
+});
+// ---- END API EDGE ----
+
 // For local development, serve static files
 if (globalConfig.ENV_TYPE === 'development') {
   // Public routes that don't need authentication
@@ -2798,7 +2817,8 @@ app.get('/square/oauth/callback', async (req, res) => {
 // Off unless HOSTED_SIGNUP_ENABLED="true", Connect Square is set up, and
 // CLIENT_SETUP_FUNCTION, HOSTED_STATIC_SITE_URL and HOSTED_SENDER_EMAIL are
 // set (bootstrap.sh, HOSTED_SIGNUP="true"). Optional: VENUE_BUCKET_PREFIX,
-// HOSTED_TERMS_URL, HOSTED_PRIVACY_URL. Self-hosted installs leave it off.
+// HOSTED_TERMS_URL, HOSTED_PRIVACY_URL, HOSTED_SUPPORT_EMAIL (shown on
+// support.html and the signup page). Self-hosted installs leave it off.
 // The in-memory rate limit is per Lambda instance; the WAF in front of the
 // API (Marketplace plan phase 7) is the real limit.
 const lambdaClient = new LambdaClient({ region: process.env.AWS_REGION });
@@ -2875,7 +2895,9 @@ app.get('/api/public/signup/config', (req, res) => {
     enabled: !!settings,
     sandbox: SQUARE_API_BASE.includes('squareupsandbox'),
     termsUrl: settings ? settings.termsUrl : null,
-    privacyUrl: settings ? settings.privacyUrl : null
+    privacyUrl: settings ? settings.privacyUrl : null,
+    // support.html shows this whether or not signup is open.
+    supportEmail: process.env.HOSTED_SUPPORT_EMAIL || null
   });
 });
 
