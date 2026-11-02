@@ -2285,10 +2285,16 @@ app.get('/api/client', requireAuth, requireClientAuth, async (req, res) => {
       hasBeenSetup: client.hasBeenSetup,
       status: client.status,
       // Only what Client Settings can edit (see CLIENT SETTINGS ALLOWLIST) --
-      // internals like JWT_SECRET never need to reach the browser.
+      // internals like JWT_SECRET never need to reach the browser. Secrets
+      // are write-only: just their names, in savedSecrets, when set.
       configuration: Object.fromEntries(
-        Object.entries(client.configuration || {}).filter(([key]) => allowedClientSettingKeys(client.configuration || {}).has(key))
-      )
+        Object.entries(client.configuration || {}).filter(([key]) =>
+          allowedClientSettingKeys(client.configuration || {}).has(key) && !CLIENT_SETTINGS_SECRET_KEYS.has(key))
+      ),
+      savedSecrets: Object.entries(client.configuration || {})
+        .filter(([key, value]) => CLIENT_SETTINGS_SECRET_KEYS.has(key) && !isBlankSetting(value))
+        .map(([key]) => key)
+        .sort()
     };
     
     res.json({
@@ -2349,6 +2355,22 @@ function allowedClientSettingKeys(currentConfig) {
   const stored = Array.isArray(currentConfig.USER_DEFINABLE) ? currentConfig.USER_DEFINABLE : [];
   return new Set([...CLIENT_SETTINGS_KEYS, ...stored]);
 }
+// Write-only settings: GET /api/client never sends their values (only which
+// ones are saved, as savedSecrets), and PUT treats a blank value as "keep
+// the current one"; clearing one takes an explicit clearSecrets entry.
+// Found 2026-11-02: the page used to load every secret into its form and
+// save every box back, so when a password manager (LastPass) filled the
+// venue's login password into the FTP1 password box, Save quietly replaced
+// the FTP1 password and that night's EBOR upload failed.
+const CLIENT_SETTINGS_SECRET_KEYS = new Set([
+  'SQUARE_ACCESS_TOKEN', 'SQUARE_SIGNATURE_KEY', 'GOOGLE_SERVICE_ACCOUNT_KEY',
+  'ANTHROPIC_API_KEY', 'OMDB_API_KEY', 'FTP1_PASSWORD', 'FTP2_PASSWORD', 'FTP3_PASSWORD',
+  'PASSWORD_RESET_SECRET', 'META_PAGE_ACCESS_TOKEN', 'TIKTOK_CLIENT_SECRET',
+  'TIKTOK_ACCESS_TOKEN', 'TIKTOK_REFRESH_TOKEN'
+]);
+function isBlankSetting(value) {
+  return value === undefined || value === null || String(value).trim() === '';
+}
 // The box-office report (bdor_for_date) reads these two at run time, so a
 // malformed value would quietly skew a distributor report. Returns an
 // error message, or null if they're fine (or not being saved).
@@ -2381,7 +2403,8 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
       clientSecret, 
       contactName, 
       clientEmail,
-      configuration 
+      configuration,
+      clearSecrets
     } = req.body;
     
     // Validate required fields
@@ -2468,8 +2491,16 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
       const allowed = allowedClientSettingKeys(currentConfig);
       const accepted = {};
       for (const [key, value] of Object.entries(configuration)) {
-        if (allowed.has(key)) accepted[key] = value;
-        else ignoredKeys.push(key);
+        if (!allowed.has(key)) ignoredKeys.push(key);
+        // A blank secret keeps the saved one (see CLIENT_SETTINGS_SECRET_KEYS).
+        else if (CLIENT_SETTINGS_SECRET_KEYS.has(key) && isBlankSetting(value)) continue;
+        else accepted[key] = value;
+      }
+      if (Array.isArray(clearSecrets)) {
+        for (const key of clearSecrets) {
+          if (CLIENT_SETTINGS_SECRET_KEYS.has(key) && allowed.has(key)) accepted[key] = '';
+          else ignoredKeys.push(key);
+        }
       }
       if (ignoredKeys.length) {
         console.warn(`Client settings save ignored non-user-definable keys: ${ignoredKeys.join(', ')}`);

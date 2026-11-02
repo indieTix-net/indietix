@@ -11,7 +11,66 @@ document.addEventListener('DOMContentLoaded', function() {
         ['legal_email', 'LEGAL_EMAIL'], ['legal_state', 'LEGAL_STATE'],
         ['legal_court_county', 'LEGAL_COURT_COUNTY']
     ];
-    
+
+    // ---- SECRET SETTINGS (write-only) ----
+    // GET /api/client never sends these values, only savedSecrets (which
+    // ones are set). Each box stays empty and read-only until "Change" is
+    // clicked, so a password manager can't fill it (LastPass put the
+    // venue's login into FTP1's password box on 2026-11-01, and Save stored
+    // it), and Save sends only the secrets someone chose to change or
+    // remove. PUT /api/client also treats a blank secret as "keep".
+    const SECRET_FIELDS = [
+        ['square-access-token', 'SQUARE_ACCESS_TOKEN'], ['square-signature-key', 'SQUARE_SIGNATURE_KEY'],
+        ['google_service_account_key', 'GOOGLE_SERVICE_ACCOUNT_KEY'], ['anthropic_api_key', 'ANTHROPIC_API_KEY'],
+        ['omdb_api_key', 'OMDB_API_KEY'], ['ftp1-password', 'FTP1_PASSWORD'],
+        ['ftp2-password', 'FTP2_PASSWORD'], ['ftp3-password', 'FTP3_PASSWORD'],
+        ['meta-page-access-token', 'META_PAGE_ACCESS_TOKEN'], ['tiktok-client-secret', 'TIKTOK_CLIENT_SECRET'],
+        ['tiktok-access-token', 'TIKTOK_ACCESS_TOKEN'], ['tiktok-refresh-token', 'TIKTOK_REFRESH_TOKEN']
+    ];
+    const secretFields = SECRET_FIELDS.map(([id, key]) => {
+        const input = document.getElementById(id);
+        const field = { key, input, hint: input.placeholder, saved: false, mode: 'keep' };
+        const bar = document.createElement('div');
+        bar.className = 'd-flex flex-wrap gap-2 mt-1';
+        field.changeBtn = document.createElement('button');
+        field.removeBtn = document.createElement('button');
+        for (const btn of [field.changeBtn, field.removeBtn]) {
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-secondary';
+            bar.appendChild(btn);
+        }
+        field.removeBtn.textContent = 'Remove saved value';
+        input.after(bar);
+        field.changeBtn.addEventListener('click', () => {
+            if (field.mode !== 'keep') return resetSecretField(field, field.saved);
+            field.mode = 'change';
+            input.readOnly = false;
+            input.placeholder = field.saved ? 'New value (leave blank to keep the saved one)' : (field.hint || 'Enter a value');
+            field.changeBtn.textContent = 'Cancel';
+            field.removeBtn.hidden = true;
+            input.focus();
+        });
+        field.removeBtn.addEventListener('click', () => {
+            field.mode = 'remove';
+            input.value = '';
+            input.readOnly = true;
+            input.placeholder = 'Will be removed when you save';
+            field.changeBtn.textContent = 'Cancel';
+            field.removeBtn.hidden = true;
+        });
+        return field;
+    });
+    function resetSecretField(field, saved) {
+        field.saved = saved;
+        field.mode = 'keep';
+        field.input.value = '';
+        field.input.readOnly = true;
+        field.input.placeholder = saved ? 'Saved (hidden). Click Change to replace it.' : 'Not set. Click Change to enter one.';
+        field.changeBtn.textContent = 'Change';
+        field.removeBtn.hidden = !saved;
+    }
+    // ---- END SECRET SETTINGS ----
+
     // Get form elements
     const clientForm = document.getElementById('client-form');
     const loadingIndicator = document.getElementById('loading');
@@ -457,9 +516,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Populate configuration fields
         const config = clientData.configuration || {};
-        
-        squareAccessTokenInput.value = config.SQUARE_ACCESS_TOKEN || '';
-        squareSignatureKeyInput.value = config.SQUARE_SIGNATURE_KEY || '';
+        const savedSecrets = clientData.savedSecrets || [];
+        secretFields.forEach((field) => resetSecretField(field, savedSecrets.includes(field.key)));
+
         squareWebhookUrlInput.value = config.SQUARE_WEBHOOK_URL || '';
         squareLocationIdInput.value = config.SQUARE_LOCATION_ID || '';
         distributorNameInput.value = config.DISTRIBUTOR_NAME || '';
@@ -493,30 +552,23 @@ document.addEventListener('DOMContentLoaded', function() {
         ftp1TypeInput.value = config.FTP1_TYPE || 'ftp';
         ftp1RemotePathInput.value = config.FTP1_REMOTE_PATH || '';
         ftp1UserInput.value = config.FTP1_USER || '';
-        ftp1PasswordInput.value = config.FTP1_PASSWORD || '';
         
         ftp2HostInput.value = config.FTP2_HOST || '';
         ftp2PortInput.value = config.FTP2_PORT || '';
         ftp2TypeInput.value = config.FTP2_TYPE || 'ftp';
         ftp2RemotePathInput.value = config.FTP2_REMOTE_PATH || '';
         ftp2UserInput.value = config.FTP2_USER || '';
-        ftp2PasswordInput.value = config.FTP2_PASSWORD || '';
 
         ftp3HostInput.value = config.FTP3_HOST || '';
         ftp3PortInput.value = config.FTP3_PORT || '';
         ftp3TypeInput.value = config.FTP3_TYPE || 'ftp';
         ftp3RemotePathInput.value = config.FTP3_REMOTE_PATH || '';
         ftp3UserInput.value = config.FTP3_USER || '';
-        ftp3PasswordInput.value = config.FTP3_PASSWORD || '';
 
         // Marquee Engine: social media fields
-        metaPageAccessTokenInput.value = config.META_PAGE_ACCESS_TOKEN || '';
         metaPageIdInput.value = config.META_PAGE_ID || '';
         metaIgBusinessIdInput.value = config.META_IG_BUSINESS_ID || '';
         tiktokClientKeyInput.value = config.TIKTOK_CLIENT_KEY || '';
-        tiktokClientSecretInput.value = config.TIKTOK_CLIENT_SECRET || '';
-        tiktokAccessTokenInput.value = config.TIKTOK_ACCESS_TOKEN || '';
-        tiktokRefreshTokenInput.value = config.TIKTOK_REFRESH_TOKEN || '';
         tiktokPrivacyLevelInput.value = config.TIKTOK_PRIVACY_LEVEL || '';
 
         // Load EVENT_LOCATIONS
@@ -532,11 +584,8 @@ document.addEventListener('DOMContentLoaded', function() {
         renderUserNamesList();
         
 	// Load API configuration
-	document.getElementById('google_service_account_key').value = config.GOOGLE_SERVICE_ACCOUNT_KEY || '';
 	document.getElementById('cinema_calendar_id').value = config.CINEMA_CALENDAR_ID || '';
 	document.getElementById('event_calendar_id').value = config.EVENT_CALENDAR_ID || '';
-	document.getElementById('anthropic_api_key').value = config.ANTHROPIC_API_KEY || '';
-	document.getElementById('omdb_api_key').value = config.OMDB_API_KEY || '';
 	document.getElementById('ecommerce_site_url').value = config.ECOMMERCE_SITE_URL || '';
 	document.getElementById('sender_email').value = config.SENDER_EMAIL || '';
 	document.getElementById('owner_bcc_email').value = config.OWNER_BCC_EMAIL || '';
@@ -561,8 +610,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Collect configuration data (USER_DEFINABLE fields)
         const config = formData.configuration;
         
-        config.SQUARE_ACCESS_TOKEN = squareAccessTokenInput.value.trim();
-        config.SQUARE_SIGNATURE_KEY = squareSignatureKeyInput.value.trim();
         config.SQUARE_WEBHOOK_URL = squareWebhookUrlInput.value.trim();
         config.SQUARE_LOCATION_ID = squareLocationIdInput.value.trim();
         config.DISTRIBUTOR_NAME = distributorNameInput.value.trim();
@@ -588,30 +635,23 @@ document.addEventListener('DOMContentLoaded', function() {
         config.FTP1_TYPE = ftp1TypeInput.value.trim();
         config.FTP1_REMOTE_PATH = ftp1RemotePathInput.value.trim();
         config.FTP1_USER = ftp1UserInput.value.trim();
-        config.FTP1_PASSWORD = ftp1PasswordInput.value.trim();
         
         config.FTP2_HOST = ftp2HostInput.value.trim();
         config.FTP2_PORT = ftp2PortInput.value.trim();
         config.FTP2_TYPE = ftp2TypeInput.value.trim();
         config.FTP2_REMOTE_PATH = ftp2RemotePathInput.value.trim();
         config.FTP2_USER = ftp2UserInput.value.trim();
-        config.FTP2_PASSWORD = ftp2PasswordInput.value.trim();
 
         config.FTP3_HOST = ftp3HostInput.value.trim();
         config.FTP3_PORT = ftp3PortInput.value.trim();
         config.FTP3_TYPE = ftp3TypeInput.value.trim();
         config.FTP3_REMOTE_PATH = ftp3RemotePathInput.value.trim();
         config.FTP3_USER = ftp3UserInput.value.trim();
-        config.FTP3_PASSWORD = ftp3PasswordInput.value.trim();
 
         // Marquee Engine: social media fields
-        config.META_PAGE_ACCESS_TOKEN = metaPageAccessTokenInput.value.trim();
         config.META_PAGE_ID = metaPageIdInput.value.trim();
         config.META_IG_BUSINESS_ID = metaIgBusinessIdInput.value.trim();
         config.TIKTOK_CLIENT_KEY = tiktokClientKeyInput.value.trim();
-        config.TIKTOK_CLIENT_SECRET = tiktokClientSecretInput.value.trim();
-        config.TIKTOK_ACCESS_TOKEN = tiktokAccessTokenInput.value.trim();
-        config.TIKTOK_REFRESH_TOKEN = tiktokRefreshTokenInput.value.trim();
         config.TIKTOK_PRIVACY_LEVEL = tiktokPrivacyLevelInput.value.trim();
 
         // Save EVENT_LOCATIONS array
@@ -623,11 +663,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Save USERS_NAMES array
         config.USERS_NAMES = userNames;
         
-	config.GOOGLE_SERVICE_ACCOUNT_KEY = document.getElementById('google_service_account_key').value.trim();
     	config.CINEMA_CALENDAR_ID = document.getElementById('cinema_calendar_id').value.trim();
     	config.EVENT_CALENDAR_ID = document.getElementById('event_calendar_id').value.trim();
-    	config.ANTHROPIC_API_KEY = document.getElementById('anthropic_api_key').value.trim();
-    	config.OMDB_API_KEY = document.getElementById('omdb_api_key').value.trim();
     	config.ECOMMERCE_SITE_URL = document.getElementById('ecommerce_site_url').value.trim();
     	// A blank sender would stop every email, so blank keeps the current one.
     	const senderEmail = document.getElementById('sender_email').value.trim();
@@ -635,6 +672,15 @@ document.addEventListener('DOMContentLoaded', function() {
     	config.OWNER_BCC_EMAIL = document.getElementById('owner_bcc_email').value.trim();
     	config.ONE_PER_EMAIL_ITEMS = document.getElementById('one_per_email_items').value.trim();
     	LEGAL_FIELDS.forEach(([id, key]) => { config[key] = document.getElementById(id).value.trim(); });
+
+        // Secrets: only the ones changed or removed (see SECRET SETTINGS).
+        const clearSecrets = [];
+        secretFields.forEach((field) => {
+            const value = field.input.value.trim();
+            if (field.mode === 'change' && value) config[field.key] = value;
+            else if (field.mode === 'remove') clearSecrets.push(field.key);
+        });
+        if (clearSecrets.length) formData.clearSecrets = clearSecrets;
 
         return formData;
     }
@@ -694,7 +740,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const formData = collectFormData();
-        console.log('Collected form data:', { ...formData, clientSecret: formData.clientSecret ? '[HIDDEN]' : undefined });
+        console.log('Collected form data:', { ...formData, clientSecret: formData.clientSecret ? '[HIDDEN]' : undefined, configuration: Object.keys(formData.configuration) });
         
         // Set loading state
         saveButton.classList.add('loading');
