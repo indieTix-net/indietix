@@ -297,3 +297,22 @@ test('handler: a line item whose modifier string fails to parse as a date still 
   assert.equal(tickets.rows.length, 1, 'a paid order must never silently lose its ticket just because the showtime string was unparseable');
   assert.ok(tickets.rows[0].ProductDate, 'falls back to a "now" timestamp rather than a null ProductDate');
 });
+
+test('handler: logs the venue config\'s key names, never its values (tokens, passwords)', async () => {
+  installCatalogFixture();
+  const lines = [];
+  const originals = {};
+  for (const level of ['log', 'info', 'warn', 'error']) {
+    originals[level] = console[level];
+    console[level] = (...args) => { lines.push(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')); };
+  }
+  try {
+    const result = await handler(buildSqsEvent([buildSqsRecord(webhookPayload({ orderId: 'ORDER-LOGS', paymentId: 'PAYMENT-LOGS' }))]));
+    assert.equal(result.statusCode, 200);
+  } finally {
+    Object.assign(console, originals);
+  }
+  const output = lines.join('\n');
+  assert.match(output, /Loaded client configuration for .* keys: .*SQUARE_ACCESS_TOKEN/);
+  assert.doesNotMatch(output, /test-square-access-token/);
+});
