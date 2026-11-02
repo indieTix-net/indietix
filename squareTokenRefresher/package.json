@@ -1,0 +1,24 @@
+{
+  "name": "square-token-refresher",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Keeps Connect Square (OAuth) venues' Square access tokens fresh. Daily schedule.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.873.0",
+    "@aws-sdk/client-ses": "^3.873.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "aws-sdk-client-mock": "^4.0.0",
+    "test-db-harness": "file:../test-db-harness"
+  }
+}

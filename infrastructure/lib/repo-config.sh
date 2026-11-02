@@ -81,6 +81,16 @@ load_config() {
       LAYER_PKG_DIR=""
       DEV_FN="indietix-sandbox-sms-inbound"
       ;;
+    squareTokenRefresher)
+      # Bootstrap-only for now: no production function exists, so it's
+      # deliberately NOT in ALL_REPOS (deploy-all/status would look for one).
+      AWS_FN="squareTokenRefresher"
+      SRC_DIR="$ROOT/squareTokenRefresher/src"
+      FILES=$'index.mjs'
+      LAYER_NAME=""
+      LAYER_PKG_DIR=""
+      DEV_FN="indietix-sandbox-square-token-refresher"
+      ;;
     square-queue-forwarder)
       AWS_FN="square-queue-forwarder"
       SRC_DIR="$ROOT/square-queue-forwarder/src"
