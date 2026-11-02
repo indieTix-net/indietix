@@ -96,3 +96,24 @@ test('insertClientRecord: explicit Square values win over the same keys in setti
   // No explicit location was passed, so the settings file's value is used.
   assert.equal(config.SQUARE_LOCATION_ID, 'LOCFROMSETTINGS');
 });
+
+// Hosted signup (QRScanner) creates Connect Square venues with square_oauth.
+test('insertClientRecord: square_oauth puts the venue in Connect Square (OAuth) mode', async () => {
+  await insertClientRecord(dbConfig, DB_NAME, clientData({
+    username: 'CLIENTOAUTH',
+    square_oauth: { merchant_id: 'CLIENTOAUTH', expires_at: '2026-12-02T12:00:00Z' }
+  }));
+  const config = await configFor('CLIENTOAUTH');
+  assert.equal(config.SQUARE_AUTH_MODE, 'oauth');
+  assert.equal(config.SQUARE_MERCHANT_ID, 'CLIENTOAUTH');
+  assert.equal(config.SQUARE_TOKEN_EXPIRES_AT, '2026-12-02T12:00:00Z');
+  assert.equal(config.SIGNUP_SOURCE, 'hosted');
+  assert.equal(config.SQUARE_ACCESS_TOKEN, 'square-token');
+});
+
+test('insertClientRecord: without square_oauth the venue stays on a personal token', async () => {
+  await insertClientRecord(dbConfig, DB_NAME, clientData({ username: 'CLIENTPERSONAL' }));
+  const config = await configFor('CLIENTPERSONAL');
+  assert.equal(config.SQUARE_AUTH_MODE, undefined);
+  assert.equal(config.SIGNUP_SOURCE, undefined);
+});

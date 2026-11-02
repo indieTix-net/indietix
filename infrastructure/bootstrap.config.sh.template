@@ -98,6 +98,17 @@ SQUARE_APP_ID=""       # Application ID (sandbox ones start with sandbox-sq0idb-
 SQUARE_APP_SECRET=""   # Application Secret. Secret: this file only, never commit or share it
 OPERATOR_ALERT_EMAIL="" # Copied on the daily Square token refresher's failure emails. Blank uses BUDGET_ALERT_EMAIL
 
+# ---- Hosted signup (optional; needs Connect Square above) ----
+# "true" opens <static site>/signup.html: any Square seller can create a
+# venue here by connecting Square, with no one running add-client. Needs
+# SQUARE_APP_ID/SQUARE_APP_SECRET, SQUARE_WEBHOOK_AUTO="true" (new venues
+# share this environment's webhook subscription) and HOSTED_SENDER_EMAIL.
+# Leave "false" for a self-hosted install.
+HOSTED_SIGNUP="false"
+HOSTED_SENDER_EMAIL=""  # From address for new venues' email (SES-verified), e.g. hello@yourdomain
+HOSTED_TERMS_URL=""     # Optional: your hosted service's Terms of Service, linked on the signup page
+HOSTED_PRIVACY_URL=""   # Optional: its Privacy Policy
+
 # ---- First client's other Client Settings (optional) ----
 # Path to a JSON file of initial Client Settings for the first client --
 # OMDB, Google Calendar, FTP reporting, API keys, social media, and so on.

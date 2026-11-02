@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import AWS from 'aws-sdk';
 import { SecretsManagerClient, GetSecretValueCommand, PutSecretValueCommand, CreateSecretCommand } from '@aws-sdk/client-secrets-manager';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import mailcomposer from 'mailcomposer';
 import { calendar } from '@googleapis/calendar';
 import { GoogleAuth } from 'google-auth-library';
@@ -20,7 +21,7 @@ import { QRCodeProduct, initializeModelForClient, sequelize, Sequelize } from '.
 import { initializeModelForClient as initializeModelForClientOrder } from './models/order.mjs';
 import { initializeModelForClient as initializeClientModel } from './models/client.mjs';
 import { initializeModelForClient as initializeUserModel } from './models/user.mjs';
-import { encryptPasswordResetToken, decryptPasswordResetToken, isPasswordResetTokenValid } from './utils/crypto-utils.mjs';
+import { encryptPasswordResetToken, decryptPasswordResetToken, isPasswordResetTokenValid, sealToken, openToken } from './utils/crypto-utils.mjs';
 import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, eventContainsPattern } from './utils/data-filter-utils.mjs';
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
@@ -2671,6 +2672,11 @@ app.get('/square/oauth/callback', async (req, res) => {
   const settings = squareOAuthSettings();
   const { code, state, error } = req.query;
 
+  // Hosted signup's state is a sealed token, not a venue's JWT.
+  if (typeof state === 'string' && state && !jwt.decode(state)) {
+    return handleSignupCallback(req, res);
+  }
+
   // Which venue: from state, verified below with that venue's own secret.
   const unverified = typeof state === 'string' ? jwt.decode(state) : null;
   const clientId = unverified && typeof unverified.clientId === 'string' ? unverified.clientId : null;
@@ -2770,6 +2776,327 @@ app.get('/square/oauth/callback', async (req, res) => {
   }
 });
 // ---- END SQUARE OAUTH ----
+
+// ---- HOSTED SIGNUP ----
+// Self-serve signup for hosted IndieTix (Marketplace plan phase 6): a venue
+// goes from the public signup page, through Square's sign-in, to a working
+// box office with nobody running bootstrap.sh.
+//   1. POST /api/public/signup/start: venue name, contact, Terms accepted ->
+//      Square's sign-in URL. The details ride in `state` as a sealed token
+//      (encrypted, 30 minutes), so nothing readable passes through Square.
+//   2. The Square callback (handleSignupCallback): swaps the code, saves the
+//      refresh token, and starts the onboarding Lambda in the background
+//      (it takes ~20s, longer if Aurora is waking, past this Lambda's
+//      timeout). The venue ID is the Square merchant ID. Then the browser
+//      goes to signup.html?status=<sealed token>.
+//   3. GET /api/public/signup/status: the page polls until the venue exists,
+//      then the welcome email goes out exactly once, with a link to
+//   4. POST /api/public/signup/set-password: sets the venue's main login
+//      password, once (the link is good for 7 days).
+// Signing up again with a Square account that already has a venue just
+// re-sends the set-password email if the password was never set.
+// Off unless HOSTED_SIGNUP_ENABLED="true", Connect Square is set up, and
+// CLIENT_SETUP_FUNCTION, HOSTED_STATIC_SITE_URL and HOSTED_SENDER_EMAIL are
+// set (bootstrap.sh, HOSTED_SIGNUP="true"). Optional: VENUE_BUCKET_PREFIX,
+// HOSTED_TERMS_URL, HOSTED_PRIVACY_URL. Self-hosted installs leave it off.
+// The in-memory rate limit is per Lambda instance; the WAF in front of the
+// API (Marketplace plan phase 7) is the real limit.
+const lambdaClient = new LambdaClient({ region: process.env.AWS_REGION });
+const SIGNUP_STATE_TTL = 30 * 60 * 1000;
+const SIGNUP_STATUS_TTL = 2 * 60 * 60 * 1000;
+const SET_PASSWORD_TTL = 7 * 24 * 60 * 60 * 1000;
+
+function hostedSignupSettings() {
+  const oauth = squareOAuthSettings();
+  const site = (process.env.HOSTED_STATIC_SITE_URL || '').replace(/\/+$/, '');
+  const setupFunction = process.env.CLIENT_SETUP_FUNCTION;
+  const sender = process.env.HOSTED_SENDER_EMAIL;
+  if (process.env.HOSTED_SIGNUP_ENABLED !== 'true' || !oauth || !site || !setupFunction || !sender) return null;
+  return {
+    oauth, site, setupFunction, sender,
+    bucketPrefix: process.env.VENUE_BUCKET_PREFIX || 'indietix-',
+    termsUrl: process.env.HOSTED_TERMS_URL || null,
+    privacyUrl: process.env.HOSTED_PRIVACY_URL || null
+  };
+}
+
+async function readSquareAppSecret(secretId) {
+  const response = await secretsClient.send(new GetSecretValueCommand({ SecretId: secretId }));
+  const secret = JSON.parse(response.SecretString);
+  if (!secret.client_secret) throw new Error('Square app secret has no client_secret');
+  return secret;
+}
+
+// Signup tokens are sealed with a key derived from the Square app secret:
+// nothing new to configure, and rotating the app secret voids old links.
+function signupKey(appSecret) {
+  return crypto.createHash('sha256').update(`indietix-hosted-signup:${appSecret.client_secret}`).digest();
+}
+
+const signupAttempts = new Map();
+function signupRateLimited(req, limit = 10) {
+  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+  const now = Date.now();
+  const recent = (signupAttempts.get(ip) || []).filter(t => now - t < 60 * 60 * 1000);
+  recent.push(now);
+  signupAttempts.set(ip, recent);
+  return recent.length > limit;
+}
+
+function cleanSignupText(value, max) {
+  const text = String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.length >= 2 && text.length <= max ? text : null;
+}
+
+async function sendSignupWelcome({ clientId, contactName, contactEmail, sender, site, key }) {
+  const setLink = `${site}/signup.html?set=${sealToken({ p: 'set-password', clientId }, key, SET_PASSWORD_TTL)}`;
+  const body = [
+    `Hello ${contactName},`,
+    '',
+    'Your IndieTix box office is ready, connected to your Square account.',
+    '',
+    'Set your password here (the link works once, for 7 days):',
+    setLink,
+    '',
+    `Then log in at ${site}/login.html?client=${clientId}`,
+    `Your Client ID and username are both: ${clientId}`,
+    '',
+    'Next steps: in Client Settings, check your theater details, then add your first showtime.',
+    '',
+    'IndieTix'
+  ].join('\n');
+  await sendEmailWithMultipleAttachments(sender, contactEmail, 'Your IndieTix box office is ready', body, []);
+}
+
+app.get('/api/public/signup/config', (req, res) => {
+  const settings = hostedSignupSettings();
+  res.json({
+    success: true,
+    enabled: !!settings,
+    sandbox: SQUARE_API_BASE.includes('squareupsandbox'),
+    termsUrl: settings ? settings.termsUrl : null,
+    privacyUrl: settings ? settings.privacyUrl : null
+  });
+});
+
+app.post('/api/public/signup/start', async (req, res) => {
+  const settings = hostedSignupSettings();
+  if (!settings) return res.status(404).json({ success: false, message: 'Signup is not open on this site' });
+  if (signupRateLimited(req)) return res.status(429).json({ success: false, message: 'Too many signups from here. Try again in an hour.' });
+
+  const venueName = cleanSignupText(req.body.venueName, 100);
+  const contactName = cleanSignupText(req.body.contactName, 100);
+  const contactEmail = String(req.body.contactEmail || '').trim();
+  if (!venueName || !contactName) {
+    return res.status(400).json({ success: false, message: 'Venue name and contact name are required (2 to 100 characters)' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail) || contactEmail.length > 254) {
+    return res.status(400).json({ success: false, message: 'A valid contact email is required' });
+  }
+  if (req.body.acceptTerms !== true) {
+    return res.status(400).json({ success: false, message: 'Please accept the Terms of Service and Privacy Policy' });
+  }
+  try {
+    const appSecret = await readSquareAppSecret(settings.oauth.secretId);
+    const state = sealToken(
+      { p: 'signup', venueName, contactName, contactEmail, termsAcceptedAt: new Date().toISOString() },
+      signupKey(appSecret),
+      SIGNUP_STATE_TTL
+    );
+    const url = new URL(`${SQUARE_API_BASE}/oauth2/authorize`);
+    url.searchParams.set('client_id', settings.oauth.appId);
+    url.searchParams.set('scope', SQUARE_OAUTH_SCOPES.join(' '));
+    url.searchParams.set('session', 'false');
+    url.searchParams.set('state', state);
+    url.searchParams.set('redirect_uri', settings.oauth.redirectUrl);
+    res.json({ success: true, url: url.toString() });
+  } catch (error) {
+    console.error('Hosted signup start failed:', error.message);
+    res.status(500).json({ success: false, message: 'Could not start signup' });
+  }
+});
+
+async function handleSignupCallback(req, res) {
+  const settings = hostedSignupSettings();
+  if (!settings) return res.status(400).type('text/plain').send('Signup is not open on this site.');
+  const back = (params) => res.redirect(302, `${settings.site}/signup.html?${new URLSearchParams(params)}`);
+  const { code, state, error } = req.query;
+
+  let appSecret, key, signup;
+  try {
+    appSecret = await readSquareAppSecret(settings.oauth.secretId);
+    key = signupKey(appSecret);
+    signup = openToken(state, key, 'signup');
+  } catch (secretError) {
+    console.error('Hosted signup callback: app secret unavailable:', secretError.message);
+    return back({ result: 'failed' });
+  }
+  if (!signup) return back({ result: 'expired' });
+  if (error || typeof code !== 'string' || !code) return back({ result: 'denied' });
+
+  try {
+    const tokenResponse = await fetch(`${SQUARE_API_BASE}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: settings.oauth.appId,
+        client_secret: appSecret.client_secret,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: settings.oauth.redirectUrl
+      })
+    });
+    const tokens = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokens.access_token || !tokens.refresh_token || !/^[A-Za-z0-9]+$/.test(tokens.merchant_id || '')) {
+      console.error(`Hosted signup token exchange failed: HTTP ${tokenResponse.status} ${(tokens.errors || []).map(e => e.code).join(',')}`);
+      return back({ result: 'failed' });
+    }
+    const clientId = tokens.merchant_id;
+
+    // A venue for this Square account already exists: don't create another.
+    let existing = null;
+    try {
+      existing = await loadClientConfigFresh(clientId);
+    } catch {
+      existing = null;
+    }
+    if (existing) {
+      if (existing.SIGNUP_SOURCE === 'hosted' && !existing.SIGNUP_PASSWORD_SET_AT) {
+        await sendSignupWelcome({ clientId, contactName: signup.contactName, contactEmail: signup.contactEmail, sender: existing.SENDER_EMAIL || settings.sender, site: settings.site, key });
+      }
+      console.log(`Hosted signup: ${clientId} already has a venue`);
+      return back({ result: 'exists', client: clientId });
+    }
+
+    if (!appSecret.webhook_signature_key || !appSecret.webhook_url) {
+      console.error('Hosted signup: the app secret has no webhook_signature_key/webhook_url (bootstrap.sh SQUARE_WEBHOOK_AUTO)');
+      return back({ result: 'failed' });
+    }
+
+    let locationId = '';
+    try {
+      const locationsResponse = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
+        headers: { 'Authorization': `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' }
+      });
+      const active = ((await locationsResponse.json()).locations || []).filter(l => l.status === 'ACTIVE');
+      if (active.length === 1) locationId = active[0].id;
+    } catch (locationError) {
+      console.warn(`Hosted signup ${clientId}: locations lookup failed (${locationError.message})`);
+    }
+
+    await saveSquareRefreshToken(clientId, tokens.refresh_token);
+    await lambdaClient.send(new InvokeCommand({
+      FunctionName: settings.setupFunction,
+      InvocationType: 'Event',
+      Payload: Buffer.from(JSON.stringify({
+        username: clientId,
+        // The main login's password is set from the welcome email; this
+        // one is never shown to anyone.
+        clientSecret: crypto.randomBytes(24).toString('base64url'),
+        contactName: signup.contactName,
+        clientEmail: signup.contactEmail,
+        theater_name: signup.venueName,
+        sender_email: settings.sender,
+        s3_bucket_prefix: settings.bucketPrefix,
+        square_access_token: tokens.access_token,
+        square_signature_key: appSecret.webhook_signature_key,
+        square_webhook_url: appSecret.webhook_url,
+        square_location_id: locationId,
+        square_oauth: { merchant_id: clientId, expires_at: tokens.expires_at || null },
+        settings: {
+          STATIC_WEBSITE_URL: settings.site,
+          WEB_HEADER_COMPANY: signup.venueName,
+          SENDER_EMAIL: settings.sender
+        }
+      }))
+    }));
+    console.log(`Hosted signup: creating venue ${clientId} (Terms accepted ${signup.termsAcceptedAt})`);
+    return back({ status: sealToken({ p: 'signup-status', clientId }, key, SIGNUP_STATUS_TTL) });
+  } catch (signupError) {
+    console.error('Hosted signup callback failed:', signupError.message);
+    return back({ result: 'failed' });
+  }
+}
+
+app.get('/api/public/signup/status', async (req, res) => {
+  const settings = hostedSignupSettings();
+  if (!settings) return res.status(404).json({ success: false, message: 'Signup is not open on this site' });
+  let key, status;
+  try {
+    key = signupKey(await readSquareAppSecret(settings.oauth.secretId));
+    status = openToken(req.query.token, key, 'signup-status');
+  } catch (error) {
+    console.error('Hosted signup status: app secret unavailable:', error.message);
+    return res.status(500).json({ success: false, message: 'Could not check signup' });
+  }
+  if (!status) return res.status(400).json({ success: false, message: 'This signup link has expired' });
+
+  let pool;
+  try {
+    pool = await createClientDbConnection(status.clientId);
+    // The first poll that finds the venue sends the welcome email; the
+    // conditional update makes sure only one ever does.
+    const claimed = await pool.query(
+      `UPDATE "Client" SET "configuration" = "configuration"::jsonb || $1::jsonb, "updatedDate" = CURRENT_TIMESTAMP
+       WHERE "clientID" = $2 AND NOT ("configuration"::jsonb ? 'SIGNUP_WELCOME_SENT_AT')
+       RETURNING "contactName", "clientEmail", "configuration"`,
+      [JSON.stringify({ SIGNUP_WELCOME_SENT_AT: new Date().toISOString() }), status.clientId]
+    );
+    if (claimed.rows.length) {
+      const row = claimed.rows[0];
+      const config = typeof row.configuration === 'string' ? JSON.parse(row.configuration) : row.configuration;
+      await sendSignupWelcome({ clientId: status.clientId, contactName: row.contactName, contactEmail: row.clientEmail, sender: config.SENDER_EMAIL || settings.sender, site: settings.site, key });
+      console.log(`Hosted signup: ${status.clientId} is ready; welcome email sent`);
+    }
+    return res.json({ success: true, ready: true, clientId: status.clientId });
+  } catch {
+    // No credentials or database yet: onboarding is still running.
+    return res.json({ success: true, ready: false });
+  } finally {
+    if (pool) await pool.end().catch(() => {});
+  }
+});
+
+app.post('/api/public/signup/set-password', async (req, res) => {
+  const settings = hostedSignupSettings();
+  if (!settings) return res.status(404).json({ success: false, message: 'Signup is not open on this site' });
+  if (signupRateLimited(req, 20)) return res.status(429).json({ success: false, message: 'Too many attempts. Try again in an hour.' });
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+  if (password.length < 10 || password.length > 200) {
+    return res.status(400).json({ success: false, message: 'Use a password of at least 10 characters' });
+  }
+  let target;
+  try {
+    target = openToken(req.body.token, signupKey(await readSquareAppSecret(settings.oauth.secretId)), 'set-password');
+  } catch (error) {
+    console.error('Hosted signup set-password: app secret unavailable:', error.message);
+    return res.status(500).json({ success: false, message: 'Could not set the password' });
+  }
+  if (!target) return res.status(400).json({ success: false, message: 'This link has expired. Sign up again with the same Square account to get a new one.' });
+
+  let pool;
+  try {
+    pool = await createClientDbConnection(target.clientId);
+    const hashed = await bcrypt.hash(password, 10);
+    const updated = await pool.query(
+      `UPDATE "Client" SET "clientSecret" = $1, "configuration" = "configuration"::jsonb || $2::jsonb, "updatedDate" = CURRENT_TIMESTAMP
+       WHERE "clientID" = $3 AND NOT ("configuration"::jsonb ? 'SIGNUP_PASSWORD_SET_AT')
+       RETURNING "clientID"`,
+      [hashed, JSON.stringify({ SIGNUP_PASSWORD_SET_AT: new Date().toISOString() }), target.clientId]
+    );
+    if (!updated.rows.length) {
+      return res.status(409).json({ success: false, message: 'The password was already set. Log in, or use Forgot password.' });
+    }
+    console.log(`Hosted signup: ${target.clientId} set its password`);
+    return res.json({ success: true, clientId: target.clientId, loginUrl: `${settings.site}/login.html?client=${target.clientId}` });
+  } catch (error) {
+    console.error('Hosted signup set-password failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Could not set the password' });
+  } finally {
+    if (pool) await pool.end().catch(() => {});
+  }
+});
+// ---- END HOSTED SIGNUP ----
 
 // ---- CLIENT UI CONFIG ----
 // The handful of non-sensitive Client.configuration keys that operator pages
