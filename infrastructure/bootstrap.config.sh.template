@@ -98,6 +98,15 @@ SQUARE_APP_ID=""       # Application ID (sandbox ones start with sandbox-sq0idb-
 SQUARE_APP_SECRET=""   # Application Secret. Secret: this file only, never commit or share it
 OPERATOR_ALERT_EMAIL="" # Copied on the daily Square token refresher's failure emails. Blank uses BUDGET_ALERT_EMAIL
 
+# ---- API firewall (optional, recommended for hosted) ----
+# "true" puts the QRScanner API behind CloudFront + a WAF (rate limits on
+# login/signup/password routes, AWS managed rule sets), about $10/month.
+# The firewall lives in us-east-1 whatever AWS_REGION is. `up` prints the
+# new API address: put it in config.js (INDIETIX_API_URL), and it becomes
+# the Square OAuth redirect URL, so register that in Square too. After it's
+# on, direct calls to the Function URL are refused.
+API_EDGE="false"
+
 # ---- Hosted signup (optional; needs Connect Square above) ----
 # "true" opens <static site>/signup.html: any Square seller can create a
 # venue here by connecting Square, with no one running add-client. Needs
@@ -108,6 +117,7 @@ HOSTED_SIGNUP="false"
 HOSTED_SENDER_EMAIL=""  # From address for new venues' email (SES-verified), e.g. hello@yourdomain
 HOSTED_TERMS_URL=""     # Optional: your hosted service's Terms of Service, linked on the signup page
 HOSTED_PRIVACY_URL=""   # Optional: its Privacy Policy
+HOSTED_SUPPORT_EMAIL="" # Shown on support.html, e.g. support@yourdomain (must reach a person)
 
 # ---- First client's other Client Settings (optional) ----
 # Path to a JSON file of initial Client Settings for the first client --

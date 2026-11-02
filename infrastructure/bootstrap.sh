@@ -130,9 +130,12 @@ fi
 # Hosted signup (QRScanner's HOSTED SIGNUP section): public self-serve
 # venue creation through Connect Square.
 HOSTED_SIGNUP="${HOSTED_SIGNUP:-false}"
+# API edge: CloudFront + WAF in front of the QRScanner API (set_api_edge).
+API_EDGE="${API_EDGE:-false}"
 HOSTED_SENDER_EMAIL="${HOSTED_SENDER_EMAIL:-}"
 HOSTED_TERMS_URL="${HOSTED_TERMS_URL:-}"
 HOSTED_PRIVACY_URL="${HOSTED_PRIVACY_URL:-}"
+HOSTED_SUPPORT_EMAIL="${HOSTED_SUPPORT_EMAIL:-}"
 if [ "$HOSTED_SIGNUP" = "true" ]; then
   [ -z "$SQUARE_APP_ID" ] && { echo "HOSTED_SIGNUP=true needs Connect Square (SQUARE_APP_ID/SQUARE_APP_SECRET)" >&2; exit 1; }
   [ -z "$HOSTED_SENDER_EMAIL" ] && { echo "HOSTED_SIGNUP=true needs HOSTED_SENDER_EMAIL (an SES-verified From address)" >&2; exit 1; }
@@ -220,7 +223,7 @@ square_webhook_for() {
 # variables in <set-json> (a JSON object) and removes the listed keys on one
 # Lambda, keeping every other variable. Not in the SAM templates, because
 # CloudFormation would wipe anything set outside them (TICKET_SIGNER_*).
-# The variables go through a 0600 temp file, never argv.
+# The values go through the environment and a 0600 temp file, never argv.
 merge_lambda_env() {
   local fn="$1" set_json="$2" env_file result
   shift 2
@@ -228,10 +231,10 @@ merge_lambda_env() {
   result=$(aws lambda get-function-configuration --function-name "$fn" \
       "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
       --query 'Environment.Variables' --output json \
-    | python3 -c '
-import json, sys
+    | MERGE_SET_JSON="$set_json" python3 -c '
+import json, os, sys
 current = json.load(sys.stdin) or {}
-out, sets, removes = sys.argv[1], json.loads(sys.argv[2]), sys.argv[3:]
+out, sets, removes = sys.argv[1], json.loads(os.environ["MERGE_SET_JSON"]), sys.argv[2:]
 wanted = {k: v for k, v in current.items() if k not in removes}
 wanted.update(sets)
 if wanted == current:
@@ -240,7 +243,7 @@ else:
     with open(out, "w") as f:
         json.dump({"Variables": wanted}, f)
     print("changed")
-' "$env_file" "$set_json" "$@")
+' "$env_file" "$@")
   if [ "$result" = "changed" ]; then
     aws lambda update-function-configuration --function-name "$fn" \
       --environment "file://$env_file" \
@@ -307,8 +310,7 @@ json.dump(secret, open(sys.argv[1], "w"))
       "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null
   fi
   rm -f "$secret_file"
-  redirect_url="$(stack_output qrscanner FunctionUrl)"
-  redirect_url="${redirect_url%/}/square/oauth/callback"
+  redirect_url="$(api_url)/square/oauth/callback"
   merge_lambda_env "$fn" "$(python3 -c 'import json, sys; print(json.dumps({"SQUARE_APP_ID": sys.argv[1], "SQUARE_APP_SECRET_ID": sys.argv[2], "SQUARE_OAUTH_REDIRECT_URL": sys.argv[3]}))' \
     "$SQUARE_APP_ID" "$secret_name" "$redirect_url")" >/dev/null
   # The daily token refresher: the same app, plus who to copy on its
@@ -317,15 +319,15 @@ json.dump(secret, open(sys.argv[1], "w"))
     "$SQUARE_APP_ID" "$secret_name" "${OPERATOR_ALERT_EMAIL:-$BUDGET_ALERT_EMAIL}")" >/dev/null
   # Hosted signup: on with HOSTED_SIGNUP="true", otherwise its variables
   # are removed, which turns it off.
-  local signup_vars="HOSTED_SIGNUP_ENABLED CLIENT_SETUP_FUNCTION HOSTED_STATIC_SITE_URL HOSTED_SENDER_EMAIL VENUE_BUCKET_PREFIX HOSTED_TERMS_URL HOSTED_PRIVACY_URL"
+  local signup_vars="HOSTED_SIGNUP_ENABLED CLIENT_SETUP_FUNCTION HOSTED_STATIC_SITE_URL HOSTED_SENDER_EMAIL VENUE_BUCKET_PREFIX HOSTED_TERMS_URL HOSTED_PRIVACY_URL HOSTED_SUPPORT_EMAIL"
   if [ "$HOSTED_SIGNUP" = "true" ]; then
     local site_url="https://${STATIC_SITE_DOMAIN:-$(stack_output static-site DistributionDomainName)}"
     # shellcheck disable=SC2086
     merge_lambda_env "$fn" "$(python3 -c '
 import json, sys
-names = ["HOSTED_SIGNUP_ENABLED", "CLIENT_SETUP_FUNCTION", "HOSTED_STATIC_SITE_URL", "HOSTED_SENDER_EMAIL", "VENUE_BUCKET_PREFIX", "HOSTED_TERMS_URL", "HOSTED_PRIVACY_URL"]
+names = ["HOSTED_SIGNUP_ENABLED", "CLIENT_SETUP_FUNCTION", "HOSTED_STATIC_SITE_URL", "HOSTED_SENDER_EMAIL", "VENUE_BUCKET_PREFIX", "HOSTED_TERMS_URL", "HOSTED_PRIVACY_URL", "HOSTED_SUPPORT_EMAIL"]
 print(json.dumps({k: v for k, v in zip(names, sys.argv[1:]) if v}))
-' "true" "${ENV_PREFIX}-client-setup-teardown" "$site_url" "$HOSTED_SENDER_EMAIL" "${ENV_PREFIX}-" "$HOSTED_TERMS_URL" "$HOSTED_PRIVACY_URL")" $signup_vars >/dev/null
+' "true" "${ENV_PREFIX}-client-setup-teardown" "$site_url" "$HOSTED_SENDER_EMAIL" "${ENV_PREFIX}-" "$HOSTED_TERMS_URL" "$HOSTED_PRIVACY_URL" "$HOSTED_SUPPORT_EMAIL")" $signup_vars >/dev/null
     echo "  Hosted signup is open: ${site_url}/signup.html"
   else
     # shellcheck disable=SC2086
@@ -334,6 +336,55 @@ print(json.dumps({k: v for k, v in zip(names, sys.argv[1:]) if v}))
   echo "  Connect Square is on. Register this OAuth redirect URL in the Square"
   echo "  Developer Dashboard (app > OAuth, $SQUARE_ENVIRONMENT):"
   echo "    $redirect_url"
+}
+
+# api_url -- this environment's API address, no trailing slash: the API
+# edge's CloudFront URL with API_EDGE="true", else QRScanner's Function URL.
+api_url() {
+  local url
+  if [ "$API_EDGE" = "true" ]; then
+    url="$(AWS_REGION=us-east-1 stack_output api-edge ApiUrl)"
+  else
+    url="$(stack_output qrscanner FunctionUrl)"
+  fi
+  echo "${url%/}"
+}
+
+# set_api_edge -- API_EDGE="true": CloudFront + WAF in front of QRScanner
+# (api-edge stack, always us-east-1: CloudFront web ACLs only exist there).
+# The shared X-IndieTix-Edge secret lives in Secrets Manager in us-east-1
+# (indieTix/edge/<ENV_PREFIX>, kept across runs); the template reads it by
+# dynamic reference and QRScanner gets it as EDGE_ORIGIN_SECRET, after the
+# edge exists, so the API is never locked out. API_EDGE="false": QRScanner
+# stops requiring the header (the stack is left for `down` to remove).
+set_api_edge() {
+  local fn="${ENV_PREFIX}-qrscanner" secret_name="indieTix/edge/${ENV_PREFIX}" secret_file origin secret_value
+  if [ "$API_EDGE" != "true" ]; then
+    [ "$(merge_lambda_env "$fn" '{}' EDGE_ORIGIN_SECRET)" = "changed" ] \
+      && echo "  API edge off: QRScanner no longer requires the edge header"
+    return 0
+  fi
+  echo "=== API edge (CloudFront + WAF, us-east-1) ==="
+  if ! aws secretsmanager describe-secret --secret-id "$secret_name" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1 >/dev/null 2>&1; then
+    secret_file="$(umask 077; mktemp "$STAGING/edge-secret.XXXXXX")"
+    python3 -c 'import json, secrets, sys; json.dump({"secret": secrets.token_urlsafe(32)}, open(sys.argv[1], "w"))' "$secret_file"
+    aws secretsmanager create-secret --name "$secret_name" --secret-string "file://$secret_file" \
+      --description "IndieTix API edge header for $ENV_PREFIX" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1 >/dev/null
+    rm -f "$secret_file"
+  fi
+  origin="$(stack_output qrscanner FunctionUrl)"
+  origin="${origin#https://}"; origin="${origin%%/*}"
+  ( AWS_REGION=us-east-1
+    SAM_ARGS=("${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1)
+    deploy_stack "api-edge" "api-edge" "ApiOriginDomain=${origin}" ) || exit 1
+  secret_value="$(aws secretsmanager get-secret-value --secret-id "$secret_name" \
+    "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1 --query SecretString --output text)"
+  merge_lambda_env "$fn" "$(EDGE_SECRET_JSON="$secret_value" python3 -c 'import json, os; print(json.dumps({"EDGE_ORIGIN_SECRET": json.loads(os.environ["EDGE_SECRET_JSON"])["secret"]}))')" >/dev/null
+  unset secret_value
+  echo "  API address (put this in config.js): $(api_url)"
+  echo
 }
 
 # json_field <key> -- prints one top-level field of the JSON object on stdin.
@@ -654,6 +705,7 @@ cmd_up() {
   # 5a. Which Square the Lambdas call (SQUARE_ENVIRONMENT).
   echo "Square API for this environment: $SQUARE_API_BASE"
   set_square_api_base
+  set_api_edge
   set_square_oauth "$webhook_url"
   echo
 
@@ -813,6 +865,7 @@ print_summary() {
   echo " Environment '$ENV_PREFIX' is up. Live resources:"
   echo "============================================================"
   echo "  QRScanner Function URL:  $(stack_output qrscanner FunctionUrl)"
+  [ "$API_EDGE" = "true" ] && echo "  API address (edge):      $(api_url)  <- use this in config.js"
   echo "  Static site domain:      $(stack_output static-site DistributionDomainName)"
   echo "  Static site bucket:      $(stack_output static-site BucketName)"
   echo "  Webhook endpoint:        $(stack_output square-queue-forwarder ApiEndpoint)"
@@ -1043,6 +1096,13 @@ cmd_down() {
   # 4. Reverse dependency order. cost-guard first, so its breaker can't
   # fire mid-teardown.
   delete_stack "cost-guard"
+  # The API edge lives in us-east-1 whatever the environment's region.
+  if AWS_REGION=us-east-1 stack_output api-edge ApiUrl | grep -q .; then
+    ( AWS_REGION=us-east-1; SAM_ARGS=("${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1); delete_stack "api-edge" )
+  fi
+  aws secretsmanager delete-secret --secret-id "indieTix/edge/${ENV_PREFIX}" --force-delete-without-recovery \
+    "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1 >/dev/null 2>&1 \
+    && echo "Deleted the API edge secret (indieTix/edge/${ENV_PREFIX})."
   delete_stack "sms-inbound"
   delete_stack "marketing-engine"
   delete_stack "square-token-refresher"

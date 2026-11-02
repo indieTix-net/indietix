@@ -24,7 +24,8 @@ const ENV = {
   HOSTED_STATIC_SITE_URL: `${SITE}/`,
   HOSTED_SENDER_EMAIL: 'hello@indietix.example',
   VENUE_BUCKET_PREFIX: 'indietix-test-',
-  HOSTED_TERMS_URL: 'https://indietix.example/terms'
+  HOSTED_TERMS_URL: 'https://indietix.example/terms',
+  HOSTED_SUPPORT_EMAIL: 'support@indietix.example'
 };
 
 const lambdaMock = mockClient(LambdaClient);
@@ -102,6 +103,7 @@ test('config: open only when hosted signup is fully configured', async () => {
   let { json } = await ctx.request('GET', '/api/public/signup/config');
   assert.equal(json.enabled, true);
   assert.equal(json.termsUrl, 'https://indietix.example/terms');
+  assert.equal(json.supportEmail, 'support@indietix.example');
   delete process.env.HOSTED_SIGNUP_ENABLED;
   ({ json } = await ctx.request('GET', '/api/public/signup/config'));
   assert.equal(json.enabled, false);
