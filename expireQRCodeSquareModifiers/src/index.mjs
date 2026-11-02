@@ -5,8 +5,14 @@ import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-sec
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
 
 // Square API URLs
-const SQUARE_CATALOG_SEARCH_API_URL = "https://connect.squareup.com/v2/catalog/search";
-const SQUARE_CATALOG_OBJECT_API_URL = "https://connect.squareup.com/v2/catalog/object";
+// ---- SQUARE API BASE ----
+// Square's production API unless SQUARE_API_BASE says otherwise: an
+// environment pointed at Square's sandbox sets it to
+// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
+const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
+// ---- END SQUARE API BASE ----
+const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
+const SQUARE_CATALOG_OBJECT_API_URL = `${SQUARE_API_BASE}/v2/catalog/object`;
 
 // Global variable to store current client configuration
 let currentClientConfig = {};
