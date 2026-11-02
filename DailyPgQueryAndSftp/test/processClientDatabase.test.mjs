@@ -207,6 +207,9 @@ test('processClientDatabase: an FTP upload failure is captured per-server, not f
   assert.equal(result.ftpResults[0].server, 'FTP1');
   assert.match(result.ftpResults[0].error, /Connection refused/);
   assert.equal(s3Mock.commandCalls(PutObjectCommand).length, 2, 'S3 uploads proceed regardless of FTP outcome');
+  // ...and named in deliveryFailures, which the handler emails to the venue.
+  assert.equal(result.deliveryFailures.length, 1);
+  assert.match(result.deliveryFailures[0], /^FTP1 \(EBOR\) FRG_69938_202604300000\.xml: Connection refused/);
 
   // Restore for subsequent tests.
   SftpClient.prototype.connect = async function (opts) { sftpCalls.push({ method: 'connect', opts }); this.sftp = true; };
@@ -242,4 +245,5 @@ test('processClientDatabase: a database-level failure (e.g. invalid client ID) i
   );
   assert.equal(result.success, false);
   assert.ok(result.error);
+  assert.match(result.deliveryFailures[0], /^No reports were sent: /);
 });

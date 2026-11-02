@@ -59,3 +59,8 @@ Resources:
               Resource:
                 - !Sub "arn:aws:s3:::${EnvPrefix}-*"
                 - !Sub "arn:aws:s3:::${EnvPrefix}-*/*"
+            # Delivery-failure alerts to the venue (SENDER_EMAIL -> contact email).
+            - Effect: Allow
+              Action:
+                - ses:SendRawEmail
+              Resource: "*"

@@ -3,6 +3,7 @@ const SftpClient = require('ssh2-sftp-client');
 const { Client: FtpClient } = require('basic-ftp');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+const { SESClient, SendRawEmailCommand } = require('@aws-sdk/client-ses');
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
@@ -10,6 +11,7 @@ const os = require('os');
 // Initialize AWS clients
 const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-2' });
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
+const sesClient = new SESClient({ region: process.env.AWS_REGION || 'us-east-2' });
 
 /**
  * Returns today's date in America/Chicago as a YYYY-MM-DD string.
@@ -118,7 +120,7 @@ async function getClientConfiguration(databaseName, baseDbConfig) {
     }
 
     const configQuery = `
-      SELECT "configuration"
+      SELECT "configuration", "clientEmail"
       FROM "Client"
       WHERE "configuration" IS NOT NULL
       LIMIT 1
@@ -136,7 +138,8 @@ async function getClientConfiguration(databaseName, baseDbConfig) {
 
     return {
       clientId: databaseName,
-      configuration: configuration
+      configuration: configuration,
+      contactEmail: result.rows[0].clientEmail || null
     };
 
   } catch (error) {
@@ -377,6 +380,8 @@ async function processClientDatabase(clientData, baseDbConfig, reportDate) {
         s3Location: eborS3Location
       } : null,
       ftpResults: ftpResults,
+      // Uploads that failed; the handler emails the venue about these.
+      deliveryFailures: ftpResults.filter(r => r.error).map(r => `${r.server} (${r.purpose}) ${r.file}: ${r.error}`),
       s3Bucket: s3Bucket
     };
 
@@ -395,10 +400,85 @@ async function processClientDatabase(clientData, baseDbConfig, reportDate) {
     return {
       clientId: clientId,
       success: false,
-      error: error.message
+      error: error.message,
+      deliveryFailures: [`No reports were sent: ${error.message}`]
     };
   }
 }
+
+// ---- DELIVERY ALERTS ----
+// A failed FTP upload used to show only as an ERROR line in CloudWatch:
+// the run still counted the venue as successful, so on 2026-11-01 FTP1's
+// EBOR upload failed ("530 Login incorrect", a password manager had
+// overwritten FTP1_PASSWORD) and nobody knew until the next morning.
+// Now any failed delivery, or a venue whose report couldn't run at all,
+// emails the venue's contact email (and OWNER_BCC_EMAIL if set) from its
+// SENDER_EMAIL. Sending an alert never throws: a failed alert is logged,
+// and the run itself must not error (the scheduler would retry it and
+// re-send the reports that did go out).
+function cleanHeader(value) {
+  return String(value || '').replace(/[\r\n]+/g, ' ').trim();
+}
+
+function buildDeliveryAlert(clientData, result, reportDate, { test = false } = {}) {
+  const { clientId, configuration = {}, contactEmail } = clientData;
+  const failures = test ? ['This is a test alert. No reports failed.'] : (result && result.deliveryFailures) || [];
+  if (!failures.length) return null;
+  const from = cleanHeader(configuration.SENDER_EMAIL);
+  const to = [...new Set([contactEmail, configuration.OWNER_BCC_EMAIL].map(cleanHeader).filter(e => e.includes('@')))];
+  if (!from || !to.length) return { clientId, skipped: `no ${!from ? 'SENDER_EMAIL' : 'contact email'} to send the alert` };
+  const venue = cleanHeader(configuration.THEATER_NAME || configuration.WEB_HEADER_COMPANY || clientId);
+  const subject = test
+    ? `IndieTix test alert: box-office report delivery for ${venue}`
+    : `IndieTix: box-office report delivery failed for ${venue} (${reportDate})`;
+  const text = [
+    test
+      ? `This is a test of the box-office report delivery alert for ${venue}.`
+      : `Some of ${venue}'s box-office reports for ${reportDate} were not delivered:`,
+    '',
+    ...failures.map(f => `  - ${f}`),
+    '',
+    test ? 'Nothing needs doing.' : [
+      'To fix: check the FTP settings in Client Settings (a saved password may',
+      'have changed), then re-run the report for this date. Files that did go',
+      'out are also saved in the venue\'s report bucket in S3.'
+    ].join('\n'),
+    '',
+    `Venue ID: ${clientId}`
+  ].join('\n');
+  return { clientId, from, to, subject, text };
+}
+
+async function sendDeliveryAlert(alert) {
+  if (!alert) return null;
+  if (alert.skipped) {
+    console.error(`DELIVERY ALERT not sent for ${alert.clientId}: ${alert.skipped}`);
+    return { clientId: alert.clientId, sent: false, reason: alert.skipped };
+  }
+  const raw = [
+    `From: ${alert.from}`,
+    `To: ${alert.to.join(', ')}`,
+    `Subject: ${alert.subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    alert.text
+  ].join('\r\n');
+  try {
+    await sesClient.send(new SendRawEmailCommand({
+      Source: alert.from,
+      Destinations: alert.to,
+      RawMessage: { Data: Buffer.from(raw, 'utf8') }
+    }));
+    console.log(`DELIVERY ALERT sent for ${alert.clientId} to ${alert.to.length} recipient(s)`);
+    return { clientId: alert.clientId, sent: true };
+  } catch (error) {
+    console.error(`DELIVERY ALERT failed to send for ${alert.clientId}:`, error);
+    return { clientId: alert.clientId, sent: false, reason: error.message };
+  }
+}
+// ---- END DELIVERY ALERTS ----
 
 /**
  * Build the comScore EBOR (Nightly Box Office) XML string.
@@ -458,6 +538,8 @@ exports.processClientDatabase = processClientDatabase;
 exports.buildEborXml = buildEborXml;
 exports.convertToCSV = convertToCSV;
 exports.escapeCSVField = escapeCSVField;
+exports.buildDeliveryAlert = buildDeliveryAlert;
+exports.sendDeliveryAlert = sendDeliveryAlert;
 
 exports.handler = async (event, context) => {
   console.log('Starting multi-client database export process...');
@@ -501,6 +583,19 @@ exports.handler = async (event, context) => {
     console.log('Starting database discovery process...');
     const clients = await getAllClientsWithConfigurations(baseDbConfig);
 
+    // {"testAlert": true}: send each venue a test delivery alert and stop,
+    // without running or sending any reports.
+    if (event && event.testAlert === true) {
+      const alerts = [];
+      for (const client of clients) {
+        alerts.push(await sendDeliveryAlert(buildDeliveryAlert(client, null, reportDate, { test: true })));
+      }
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: 'Test alerts only; no reports were run', alerts, timestamp: new Date().toISOString() })
+      };
+    }
+
     if (clients.length === 0) {
       console.log('No clients found with configurations.');
       return {
@@ -516,9 +611,14 @@ exports.handler = async (event, context) => {
     console.log(`Processing ${clients.length} clients for report date ${reportDate}...`);
 
     const results = [];
+    const alerts = [];
     for (const client of clients) {
       const result = await processClientDatabase(client, baseDbConfig, reportDate);
       results.push(result);
+      if (result.deliveryFailures && result.deliveryFailures.length) {
+        console.error(`DELIVERY FAILED for ${client.clientId} (${reportDate}): ${result.deliveryFailures.length} problem(s)`);
+        alerts.push(await sendDeliveryAlert(buildDeliveryAlert(client, result, reportDate)));
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
@@ -531,6 +631,9 @@ exports.handler = async (event, context) => {
     console.log(`Successful: ${successfulClients.length}`);
     console.log(`Failed: ${failedClients.length}`);
 
+    const deliveryFailures = results.reduce((sum, r) => sum + (r.success ? (r.deliveryFailures || []).length : 0), 0);
+    console.log(`Failed deliveries (venue ran, an upload failed): ${deliveryFailures}`);
+
     if (failedClients.length > 0) {
       console.log('Failed clients:', failedClients.map(f => f.clientId).join(', '));
     }
@@ -538,7 +641,8 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       body: JSON.stringify({
-        message: `Successfully processed ${successfulClients.length} of ${results.length} clients`,
+        message: `Successfully processed ${successfulClients.length} of ${results.length} clients` +
+          (deliveryFailures ? `; ${deliveryFailures} upload(s) failed` : ''),
         reportDate: reportDate,
         summary: {
           totalClients: results.length,
@@ -546,9 +650,11 @@ exports.handler = async (event, context) => {
           failed: failedClients.length,
           totalTdiRows: successfulClients.reduce((sum, r) => sum + (r.tdi?.rowCount || 0), 0),
           totalEborRows: successfulClients.reduce((sum, r) => sum + (r.ebor?.rowCount || 0), 0),
-          eborClients: successfulClients.filter(r => r.ebor).length
+          eborClients: successfulClients.filter(r => r.ebor).length,
+          deliveryFailures: deliveryFailures
         },
         results: results,
+        alerts: alerts,
         timestamp: new Date().toISOString()
       })
     };
