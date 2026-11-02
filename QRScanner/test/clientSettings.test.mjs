@@ -20,7 +20,14 @@ test('GET /api/client: returns client profile + the user-definable configuration
   assert.equal(status, 200);
   assert.equal(json.client.clientID, ctx.clientId);
   assert.equal(json.client.configuration.WEB_HEADER_COMPANY, 'Liberty Hall');
-  assert.equal(json.client.configuration.SQUARE_ACCESS_TOKEN, 'super-secret-square-token');
+});
+
+// Secrets are write-only: the page learns which are saved, never their values.
+test('GET /api/client: secret settings are named in savedSecrets, their values are not sent', async () => {
+  const { json } = await ctx.request('GET', '/api/client', { token: ctx.clientToken });
+  assert.equal(json.client.configuration.SQUARE_ACCESS_TOKEN, undefined);
+  assert.ok(json.client.savedSecrets.includes('SQUARE_ACCESS_TOKEN'));
+  assert.ok(!JSON.stringify(json).includes('super-secret-square-token'));
 });
 
 test('GET /api/client: internal keys like JWT_SECRET are not sent to the browser', async () => {
@@ -30,9 +37,9 @@ test('GET /api/client: internal keys like JWT_SECRET are not sent to the browser
   }
 });
 
-// GET /api/client still includes Client Settings' own secrets (like
-// SQUARE_ACCESS_TOKEN, which the page edits) -- requireClientAuth is the
-// gate that keeps a sub-user token, even a checkIn-only one, from reading it.
+// GET /api/client still includes most of the configuration (and which
+// secrets are saved) -- requireClientAuth is the gate that keeps a sub-user
+// token, even a checkIn-only one, from reading it.
 test('GET /api/client: a sub-user token (even checkIn-only) is denied with 403, not given the configuration', async () => {
   const { token } = await ctx.insertUser({
     username: 'doorstaff',
@@ -78,7 +85,7 @@ test('PUT /api/client: client token updates contact info and merges configuratio
   assert.equal(check.json.client.contactName, 'New Contact');
   assert.equal(check.json.client.configuration.WEB_HEADER_COMPANY, 'Updated Name');
   // Unrelated existing config keys survive the merge
-  assert.equal(check.json.client.configuration.SQUARE_ACCESS_TOKEN, 'super-secret-square-token');
+  assert.equal((await storedConfig()).SQUARE_ACCESS_TOKEN, 'super-secret-square-token');
 });
 
 test('PUT /api/client: missing contactName/clientEmail rejected with 400', async () => {
@@ -108,8 +115,63 @@ test('PUT /api/client: a sub-user token (even checkIn-only) is denied with 403, 
   });
   assert.equal(status, 403);
   assert.equal(json.success, false);
-  const check = await ctx.request('GET', '/api/client', { token: ctx.clientToken });
-  assert.equal(check.json.client.configuration.SQUARE_ACCESS_TOKEN, 'super-secret-square-token');
+  assert.equal((await storedConfig()).SQUARE_ACCESS_TOKEN, 'super-secret-square-token');
+});
+
+// ---- secret settings are write-only ----
+
+test('PUT /api/client: a blank secret keeps the saved one; a new value replaces it', async () => {
+  await ctx.request('PUT', '/api/client', {
+    token: ctx.clientToken,
+    body: { contactName: 'C', clientEmail: 'c@example.com', configuration: { FTP1_PASSWORD: 'ftp-original' } }
+  });
+  for (const blank of ['', '   ', null]) {
+    const { status } = await ctx.request('PUT', '/api/client', {
+      token: ctx.clientToken,
+      body: { contactName: 'C', clientEmail: 'c@example.com', configuration: { FTP1_PASSWORD: blank, WEB_HEADER_COMPANY: 'Liberty Hall' } }
+    });
+    assert.equal(status, 200);
+    assert.equal((await storedConfig()).FTP1_PASSWORD, 'ftp-original', `blank ${JSON.stringify(blank)} should keep it`);
+  }
+  await ctx.request('PUT', '/api/client', {
+    token: ctx.clientToken,
+    body: { contactName: 'C', clientEmail: 'c@example.com', configuration: { FTP1_PASSWORD: 'ftp-new' } }
+  });
+  assert.equal((await storedConfig()).FTP1_PASSWORD, 'ftp-new');
+});
+
+test('PUT /api/client: clearSecrets removes a saved secret; non-secret or unknown keys there are ignored and named', async () => {
+  const { status, json } = await ctx.request('PUT', '/api/client', {
+    token: ctx.clientToken,
+    body: { contactName: 'C', clientEmail: 'c@example.com', configuration: {}, clearSecrets: ['FTP1_PASSWORD', 'WEB_HEADER_COMPANY', 'JWT_SECRET'] }
+  });
+  assert.equal(status, 200);
+  assert.deepEqual(json.ignoredKeys.sort(), ['JWT_SECRET', 'WEB_HEADER_COMPANY']);
+  const after = await storedConfig();
+  assert.equal(after.FTP1_PASSWORD, '');
+  assert.equal(after.WEB_HEADER_COMPANY, 'Liberty Hall');
+  assert.ok(after.JWT_SECRET);
+  const { json: got } = await ctx.request('GET', '/api/client', { token: ctx.clientToken });
+  assert.ok(!got.client.savedSecrets.includes('FTP1_PASSWORD'));
+});
+
+// The page's write-only boxes must cover every secret the server withholds,
+// or that secret could no longer be edited from Client Settings.
+test('client.js SECRET_FIELDS and client.html cover every secret the page edits', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const js = await readFile(new URL('../src/public/client.js', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../src/public/client.html', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../src/app.mjs', import.meta.url), 'utf8');
+  const serverKeys = [...app.match(/CLIENT_SETTINGS_SECRET_KEYS = new Set\(\[([\s\S]*?)\]\)/)[1].matchAll(/'([A-Z0-9_]+)'/g)].map((m) => m[1]);
+  const pairs = [...js.match(/const SECRET_FIELDS = \[([\s\S]*?)\];/)[1].matchAll(/\['([\w-]+)', '([A-Z0-9_]+)'\]/g)];
+  const pageKeys = pairs.map((m) => m[2]);
+  // PASSWORD_RESET_SECRET isn't on the page at all; every other secret is.
+  assert.deepEqual(pageKeys.sort(), serverKeys.filter((k) => k !== 'PASSWORD_RESET_SECRET').sort());
+  for (const [, id] of pairs) {
+    assert.match(html, new RegExp(`id="${id}" data-secret-setting data-lpignore="true"`), `${id} should be marked for password managers to skip`);
+  }
+  // And no leftover code still loads a secret value into a box.
+  for (const key of pageKeys) assert.doesNotMatch(js, new RegExp(`config\\.${key}\\b`), `${key} still read/written directly`);
 });
 
 // ---- USER_DEFINABLE enforcement on save ----
