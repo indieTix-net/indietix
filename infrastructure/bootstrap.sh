@@ -186,6 +186,7 @@ SAM_ARGS=("${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION")
 # (signature_key, location_id, subscription_id) on stdout for the caller to
 # capture -- never echo it.
 square_webhook() {
+  SQUARE_OAUTH_EVENTS="$([ -n "$SQUARE_APP_ID" ] && echo true || echo false)" \
   square_webhook_for "$1" "$2" "$FIRST_CLIENT_SQUARE_ACCESS_TOKEN" "$SQUARE_EXPECTED_MERCHANT_ID" \
     "$SQUARE_WEBHOOK_NAME" "$FIRST_CLIENT_SQUARE_LOCATION_ID"
 }
@@ -200,6 +201,7 @@ square_webhook_for() {
   SQUARE_LOCATION_ID="$6" \
   WEBHOOK_URL="$2" \
   SQUARE_API_BASE="$SQUARE_API_BASE" \
+  SQUARE_OAUTH_EVENTS="${SQUARE_OAUTH_EVENTS:-false}" \
     python3 "$SCRIPT_DIR/lib/square-webhook.py" "$1"
 }
 
@@ -256,13 +258,17 @@ set_square_api_base() {
   return 0
 }
 
-# set_square_oauth -- Connect Square (QRScanner's SQUARE OAUTH section).
-# With SQUARE_APP_ID set: stores SQUARE_APP_SECRET in Secrets Manager as
-# indieTix/square/app/<ENV_PREFIX> ({"client_secret": ...}, via a 0600
-# temp file) and gives the QRScanner Lambda the app ID, that secret's name
-# and its callback URL. Without it: removes those, which turns the
-# feature off. Venues' own tokens are never touched here.
+# set_square_oauth <webhook-url> -- Connect Square (QRScanner's SQUARE
+# OAUTH section). With SQUARE_APP_ID set: stores, via a 0600 temp file, the
+# Secrets Manager secret indieTix/square/app/<ENV_PREFIX> = {"client_secret":
+# SQUARE_APP_SECRET, "webhook_signature_key": this environment's
+# subscription key, "webhook_url": <webhook-url>} (each connected venue
+# gets the last two, to verify that subscription's events), and gives the
+# QRScanner Lambda the app ID, that secret's name and its callback URL.
+# Without it: removes those, which turns the feature off. Venues' own
+# tokens are never touched here.
 set_square_oauth() {
+  local webhook_url="$1"
   local fn="${ENV_PREFIX}-qrscanner" refresher="${ENV_PREFIX}-square-token-refresher"
   local secret_name="indieTix/square/app/${ENV_PREFIX}" secret_file redirect_url
   if [ -z "$SQUARE_APP_ID" ]; then
@@ -272,9 +278,13 @@ set_square_oauth() {
     return 0
   fi
   secret_file="$(umask 077; mktemp "$STAGING/square-app-secret.XXXXXX")"
-  SQUARE_APP_SECRET="$SQUARE_APP_SECRET" python3 -c '
+  SQUARE_APP_SECRET="$SQUARE_APP_SECRET" WEBHOOK_KEY="$FIRST_CLIENT_SQUARE_SIGNATURE_KEY" WEBHOOK_URL="$webhook_url" python3 -c '
 import json, os, sys
-json.dump({"client_secret": os.environ["SQUARE_APP_SECRET"]}, open(sys.argv[1], "w"))
+secret = {"client_secret": os.environ["SQUARE_APP_SECRET"]}
+if os.environ["WEBHOOK_KEY"] and os.environ["WEBHOOK_URL"]:
+    secret["webhook_signature_key"] = os.environ["WEBHOOK_KEY"]
+    secret["webhook_url"] = os.environ["WEBHOOK_URL"]
+json.dump(secret, open(sys.argv[1], "w"))
 ' "$secret_file"
   if aws secretsmanager describe-secret --secret-id "$secret_name" \
       "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
@@ -617,7 +627,7 @@ cmd_up() {
   # 5a. Which Square the Lambdas call (SQUARE_ENVIRONMENT).
   echo "Square API for this environment: $SQUARE_API_BASE"
   set_square_api_base
-  set_square_oauth
+  set_square_oauth "$webhook_url"
   echo
 
   # 5b. Optional cost guard: budgets that email BUDGET_ALERT_EMAIL, plus
@@ -952,6 +962,15 @@ cmd_down() {
       square_webhook remove "$webhook_url" || echo "  (couldn't remove it -- delete it in the Square Developer Dashboard)"
       echo
     fi
+  fi
+
+  # 0a. Connect Square's app secret for this environment, if any. Venues'
+  # own refresh-token secrets go with each venue's teardown below.
+  if aws secretsmanager describe-secret --secret-id "indieTix/square/app/${ENV_PREFIX}" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
+    aws secretsmanager delete-secret --secret-id "indieTix/square/app/${ENV_PREFIX}" --force-delete-without-recovery \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null \
+      && echo "Deleted the Connect Square app secret (indieTix/square/app/${ENV_PREFIX})."
   fi
 
   # 1. Find every client that lives in THIS environment.

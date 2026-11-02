@@ -33,9 +33,15 @@ import uuid
 # SQUARE_ENVIRONMENT.
 SQUARE_API = os.environ.get("SQUARE_API_BASE", "https://connect.squareup.com").rstrip("/") + "/v2"
 SQUARE_VERSION = "2025-08-20"
-# The only event IndieTix's pipeline consumes. payment.created fires before a
-# payment completes and must never be subscribed (it double-processes orders).
+# The only payment event IndieTix's pipeline consumes. payment.created fires
+# before a payment completes and must never be subscribed (it
+# double-processes orders). With Connect Square on (SQUARE_OAUTH_EVENTS=true,
+# set by bootstrap.sh when SQUARE_APP_ID is), the environment's subscription
+# also gets oauth.authorization.revoked, so getSquareOrders learns when a
+# connected venue removes IndieTix's access.
 EVENT_TYPES = ["payment.updated"]
+if os.environ.get("SQUARE_OAUTH_EVENTS") == "true":
+    EVENT_TYPES.append("oauth.authorization.revoked")
 
 
 def log(message):

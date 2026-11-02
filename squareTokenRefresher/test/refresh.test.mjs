@@ -138,7 +138,15 @@ test('refresh: Square refusing (revoked access) fails without touching the token
   assert.equal(result.status, 'failed');
   assert.equal(result.revoked, true);
   assert.match(result.error, /HTTP 401, UNAUTHORIZED/);
-  assert.equal((await storedConfig()).SQUARE_ACCESS_TOKEN, 'old-access-token');
+  const config = await storedConfig();
+  assert.equal(config.SQUARE_ACCESS_TOKEN, 'old-access-token');
+  // Flagged, so tomorrow's run skips it instead of emailing again.
+  assert.equal(config.SQUARE_OAUTH_REVOKED_AT, new Date(NOW).toISOString());
+  squareCalls = [];
+  const next = await run();
+  assert.equal(next.status, 'skipped');
+  assert.match(next.reason, /Reconnect Square/);
+  assert.equal(squareCalls.length, 0);
 });
 
 test('refresh: a network error or a missing refresh-token secret is a failure, never a throw', async () => {

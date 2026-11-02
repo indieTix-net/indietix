@@ -44,7 +44,11 @@ before(async () => {
     return harnessFetch(url, opts);
   };
   secretsMock.on(GetSecretValueCommand, { SecretId: APP_SECRET_ID })
-    .resolves({ SecretString: JSON.stringify({ client_secret: 'test-app-client-secret' }) });
+    .resolves({ SecretString: JSON.stringify({
+      client_secret: 'test-app-client-secret',
+      webhook_signature_key: 'app-subscription-key',
+      webhook_url: 'https://hooks.example.com/webhook/square'
+    }) });
 });
 
 after(async () => {
@@ -73,7 +77,7 @@ beforeEach(async () => {
   secretsMock.on(CreateSecretCommand).resolves({});
   secretsMock.resetHistory();
   await ctx.pgClient.query(
-    `UPDATE "Client" SET configuration = (configuration::jsonb - 'SQUARE_AUTH_MODE' - 'SQUARE_MERCHANT_ID' - 'SQUARE_TOKEN_EXPIRES_AT' - 'SQUARE_LOCATION_ID'
+    `UPDATE "Client" SET configuration = (configuration::jsonb - 'SQUARE_AUTH_MODE' - 'SQUARE_MERCHANT_ID' - 'SQUARE_TOKEN_EXPIRES_AT' - 'SQUARE_LOCATION_ID' - 'SQUARE_OAUTH_REVOKED_AT' - 'SQUARE_SIGNATURE_KEY' - 'SQUARE_WEBHOOK_URL'
        || '{"SQUARE_ACCESS_TOKEN": "personal-token"}'::jsonb)::json WHERE "clientID" = $1`,
     [ctx.clientId]
   );
@@ -232,4 +236,22 @@ test('Client Settings: typing a personal token switches the venue back to person
   const config = await storedConfig();
   assert.equal(config.SQUARE_ACCESS_TOKEN, 'new-personal-token');
   assert.equal(config.SQUARE_AUTH_MODE, 'personal');
+});
+
+test("callback: the venue gets the environment's app-wide webhook key and URL, and a reconnect clears a revoked flag", async () => {
+  await ctx.pgClient.query(
+    `UPDATE "Client" SET configuration = (configuration::jsonb || '{"SQUARE_AUTH_MODE": "oauth", "SQUARE_OAUTH_REVOKED_AT": "2026-11-01T00:00:00Z"}'::jsonb)::json WHERE "clientID" = $1`,
+    [ctx.clientId]
+  );
+  let { json } = await ctx.request('GET', '/api/square/oauth/status', { token: ctx.clientToken });
+  assert.equal(json.revokedAt, '2026-11-01T00:00:00Z');
+
+  const res = await callback({ code: 'auth-code', state: stateFor() });
+  assert.equal(res.location, 'https://example.com/client.html?square=connected');
+  const config = await storedConfig();
+  assert.equal(config.SQUARE_SIGNATURE_KEY, 'app-subscription-key');
+  assert.equal(config.SQUARE_WEBHOOK_URL, 'https://hooks.example.com/webhook/square');
+  assert.equal(config.SQUARE_OAUTH_REVOKED_AT, null);
+  ({ json } = await ctx.request('GET', '/api/square/oauth/status', { token: ctx.clientToken }));
+  assert.equal(json.revokedAt, null);
 });

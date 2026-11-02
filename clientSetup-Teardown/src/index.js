@@ -197,6 +197,25 @@ async function deleteClientSecret(clientUsername) {
 }
 
 /**
+ * Deletes the venue's Connect Square refresh-token secret
+ * (indieTix/square/clients/<id>, written by QRScanner's SQUARE OAUTH
+ * callback), if it has one. A personal-token venue has none, which is fine.
+ * @returns {Promise<'deleted'|'none'|false>}
+ */
+async function deleteSquareRefreshSecret(clientUsername) {
+  const secretName = `indieTix/square/clients/${clientUsername}`;
+  try {
+    await secretsClient.send(new DeleteSecretCommand({ SecretId: secretName, ForceDeleteWithoutRecovery: true }));
+    console.log(`Square refresh-token secret deleted: ${secretName}`);
+    return 'deleted';
+  } catch (error) {
+    if (error.name === 'ResourceNotFoundException') return 'none';
+    console.error(`Error deleting Square refresh-token secret ${secretName}:`, error);
+    return false;
+  }
+}
+
+/**
  * Creates a new PostgreSQL user for the client
  * @param {Object} dbConfig - Database configuration
  * @param {string} clientUsername - Client username
@@ -1633,6 +1652,7 @@ async function deleteClient(dbConfig, clientUsername) {
     postgresUserDeleted: false,
     databaseDeleted: false,
     secretDeleted: false,
+    squareSecretDeleted: false,
     s3BucketsHandled: []
   };
   
@@ -1640,6 +1660,8 @@ async function deleteClient(dbConfig, clientUsername) {
     // 1. Delete AWS Secrets Manager secret
     const secretDeleted = await deleteClientSecret(clientUsername);
     results.secretDeleted = secretDeleted;
+    // 1a. Its Connect Square refresh token, if any ('none' for personal-token venues).
+    results.squareSecretDeleted = await deleteSquareRefreshSecret(clientUsername);
 
     // 1b. Look up the bucket prefix this client was actually created with,
     // from its own database -- must happen before the database is dropped
@@ -1963,4 +1985,5 @@ exports.handler = async (event, context) => {
 // Does NOT change exports.handler's own behavior.
 exports.createDatabaseObjects = createDatabaseObjects;
 exports.createS3Buckets = createS3Buckets;
+exports.deleteSquareRefreshSecret = deleteSquareRefreshSecret;
 exports.insertClientRecord = insertClientRecord;
