@@ -1358,7 +1358,9 @@ async function processWebhook(event) {
     
     // 5. Get client configuration from the database
     clientConfig = await getClientConfiguration(clientPool, clientId);
-    console.log(`Loaded client configuration for ${clientId}:`, JSON.stringify(clientConfig));
+    // Key names only: the values include the Square token, FTP and social
+    // passwords, etc., and this ran on every order (found 2026-11-01).
+    console.log(`Loaded client configuration for ${clientId} (${Object.keys(clientConfig || {}).length} keys: ${Object.keys(clientConfig || {}).sort().join(', ')})`);
     
     // Set up configuration values
     const BUCKET_NAME = clientConfig.S3_BUCKET_PREFIX+clientId.toLowerCase();
