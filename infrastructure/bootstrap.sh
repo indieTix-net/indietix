@@ -116,6 +116,15 @@ SQUARE_WEBHOOK_AUTO="${SQUARE_WEBHOOK_AUTO:-false}"
 ENV_IS_PRODUCTION="${ENV_IS_PRODUCTION:-false}"
 SQUARE_EXPECTED_MERCHANT_ID="${SQUARE_EXPECTED_MERCHANT_ID:-}"
 SQUARE_WEBHOOK_NAME="${SQUARE_WEBHOOK_NAME:-$ENV_PREFIX}"
+# Which Square this environment talks to: "production" (default) or
+# "sandbox" (Square's test environment, fake sellers and money). Sets
+# SQUARE_API_BASE for the Square-calling Lambdas and square-webhook.py.
+SQUARE_ENVIRONMENT="${SQUARE_ENVIRONMENT:-production}"
+case "$SQUARE_ENVIRONMENT" in
+  production) SQUARE_API_BASE="https://connect.squareup.com" ;;
+  sandbox) SQUARE_API_BASE="https://connect.squareupsandbox.com" ;;
+  *) echo "SQUARE_ENVIRONMENT must be \"production\" or \"sandbox\" (got \"$SQUARE_ENVIRONMENT\")" >&2; exit 1 ;;
+esac
 # Optional JSON file of initial Client Settings for the first client (OMDB,
 # Google Calendar, FTP, API keys...) -- see first-client-settings.json.template.
 # A relative path is relative to this directory. Checked here, before
@@ -183,7 +192,50 @@ square_webhook_for() {
   SQUARE_WEBHOOK_NAME="$5" \
   SQUARE_LOCATION_ID="$6" \
   WEBHOOK_URL="$2" \
+  SQUARE_API_BASE="$SQUARE_API_BASE" \
     python3 "$SCRIPT_DIR/lib/square-webhook.py" "$1"
+}
+
+# set_square_api_base -- points each Square-calling Lambda at this
+# environment's Square (SQUARE_ENVIRONMENT): sets SQUARE_API_BASE for
+# "sandbox", removes it for "production" (the code's default). Merges into
+# the function's existing variables instead of owning them in the SAM
+# templates, because CloudFormation would wipe anything set outside them
+# (TICKET_SIGNER_*). The variables go through a 0600 temp file, never argv.
+set_square_api_base() {
+  local suffix fn env_file result
+  for suffix in get-square-orders qrscanner expire-modifiers marketing-engine; do
+    fn="${ENV_PREFIX}-${suffix}"
+    env_file="$(umask 077; mktemp "$STAGING/lambda-env.XXXXXX")"
+    result=$(aws lambda get-function-configuration --function-name "$fn" \
+        "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
+        --query 'Environment.Variables' --output json \
+      | python3 -c '
+import json, sys
+current = json.load(sys.stdin) or {}
+mode, base, out = sys.argv[1], sys.argv[2], sys.argv[3]
+wanted = dict(current)
+if mode == "sandbox":
+    wanted["SQUARE_API_BASE"] = base
+else:
+    wanted.pop("SQUARE_API_BASE", None)
+if wanted == current:
+    print("unchanged")
+else:
+    with open(out, "w") as f:
+        json.dump({"Variables": wanted}, f)
+    print("changed")
+' "$SQUARE_ENVIRONMENT" "$SQUARE_API_BASE" "$env_file")
+    if [ "$result" = "changed" ]; then
+      aws lambda update-function-configuration --function-name "$fn" \
+        --environment "file://$env_file" \
+        "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null
+      aws lambda wait function-updated --function-name "$fn" \
+        "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
+      echo "  $fn: Square API set to $SQUARE_API_BASE"
+    fi
+    rm -f "$env_file"
+  done
 }
 
 # json_field <key> -- prints one top-level field of the JSON object on stdin.
@@ -497,6 +549,11 @@ cmd_up() {
   sync_stack_source "sms-inbound" "smsOptInOptOut"
   deploy_stack "sms-inbound" "sms-inbound" \
     "SmsUtilsLayerArn=${sms_utils_layer_arn}"
+
+  # 5a. Which Square the Lambdas call (SQUARE_ENVIRONMENT).
+  echo "Square API for this environment: $SQUARE_API_BASE"
+  set_square_api_base
+  echo
 
   # 5b. Optional cost guard: budgets that email BUDGET_ALERT_EMAIL, plus
   # (BUDGET_BREAKER=true) a breaker that blocks every Lambda here when the

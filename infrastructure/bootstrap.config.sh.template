@@ -81,6 +81,13 @@ SQUARE_WEBHOOK_AUTO="false"
 SQUARE_EXPECTED_MERCHANT_ID=""  # The merchant that token belongs to (Square Dashboard > Account & Settings > Business information, or GET /v2/merchants/me)
 SQUARE_WEBHOOK_NAME=""          # Subscription name to manage. Blank defaults to ENV_PREFIX
 
+# ---- Which Square ----
+# "production" (default): real sellers and real money.
+# "sandbox": Square's test environment (connect.squareupsandbox.com), with
+# a sandbox app's token and a test seller from the Square Developer
+# Dashboard. Use it for building and testing the OAuth app safely.
+SQUARE_ENVIRONMENT="production"
+
 # ---- First client's other Client Settings (optional) ----
 # Path to a JSON file of initial Client Settings for the first client --
 # OMDB, Google Calendar, FTP reporting, API keys, social media, and so on.

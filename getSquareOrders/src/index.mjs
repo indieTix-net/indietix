@@ -158,10 +158,17 @@ const transporter = nodemailer.createTransport({
 // a hardcoded Liberty Hall personal address shared across every client;
 // see clientSetup-Teardown's 2026-10-25 OWNER_BCC_EMAIL migration.
 
+// ---- SQUARE API BASE ----
+// Square's production API unless SQUARE_API_BASE says otherwise: an
+// environment pointed at Square's sandbox sets it to
+// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
+const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
+// ---- END SQUARE API BASE ----
+
 // Square API URLs
-const SQUARE_API_URL = "https://connect.squareup.com/v2/orders/";
-const SQUARE_CATALOG_API_URL = "https://connect.squareup.com/v2/catalog/batch-retrieve";
-const SQUARE_CUSTOMER_API_URL = "https://connect.squareup.com/v2/customers/";
+const SQUARE_API_URL = `${SQUARE_API_BASE}/v2/orders/`;
+const SQUARE_CATALOG_API_URL = `${SQUARE_API_BASE}/v2/catalog/batch-retrieve`;
+const SQUARE_CUSTOMER_API_URL = `${SQUARE_API_BASE}/v2/customers/`;
 
 /**
  * Generates a presigned URL for S3 object download
@@ -357,7 +364,7 @@ async function fetchSelectionValue(definitionId, selectionId) {
     console.log(`Fetching selection value for definitionId: ${definitionId}, selectionId: ${selectionId}`);
     
     // Direct API call to get the definition
-    const url = `https://connect.squareup.com/v2/catalog/object/${definitionId}`;
+    const url = `${SQUARE_API_BASE}/v2/catalog/object/${definitionId}`;
     
     console.log(`Making API call to: ${url}`);
     
@@ -1473,7 +1480,7 @@ async function processWebhook(event) {
     console.log('BigTimeQ2:', JSON.stringify(webhookData));
 
     const paymentId = webhookData.data.object.payment.id;
-    const SQUARE_PAYMENT_API_URL = "https://connect.squareup.com/v2/payments/";
+    const SQUARE_PAYMENT_API_URL = `${SQUARE_API_BASE}/v2/payments/`;
 // Make a fresh API call to get complete payment data
 const paymentResponse = await fetch(`${SQUARE_PAYMENT_API_URL}${paymentId}`, {
   method: "GET",

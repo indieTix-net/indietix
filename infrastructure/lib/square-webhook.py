@@ -28,7 +28,10 @@ import urllib.error
 import urllib.request
 import uuid
 
-SQUARE_API = "https://connect.squareup.com/v2"
+# Square's production API unless SQUARE_API_BASE points at its sandbox
+# (https://connect.squareupsandbox.com); bootstrap.sh sets it from
+# SQUARE_ENVIRONMENT.
+SQUARE_API = os.environ.get("SQUARE_API_BASE", "https://connect.squareup.com").rstrip("/") + "/v2"
 SQUARE_VERSION = "2025-08-20"
 # The only event IndieTix's pipeline consumes. payment.created fires before a
 # payment completes and must never be subscribed (it double-processes orders).

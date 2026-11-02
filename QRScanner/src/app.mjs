@@ -33,13 +33,22 @@ import { generateQRCode, renderTicketPdf } from 'ticket-pdf-lib';
 
 const ses = new AWS.SES();
 const { Pool } = pkg;
-const SQUARE_CATALOG_SEARCH_API_URL = "https://connect.squareup.com/v2/catalog/search";
-const SQUARE_CATALOG_OBJECT_API_URL = "https://connect.squareup.com/v2/catalog/object";
-const SQUARE_CATALOG_LIST_API_URL = "https://connect.squareup.com/v2/catalog/list";
-const SQUARE_INVENTORY_BATCH_CREATE = "https://connect.squareup.com/v2/inventory/changes/batch-create";
-const SQUARE_ITEM_LIBRARY_URL = "https://squareup.com/dashboard/items/library"
-const SQUARE_IMAGE_UPLOAD_URL = "connect.squareup.com";
-const SQUARE_REFUND_API_URL = "https://connect.squareup.com/v2/refunds";
+// ---- SQUARE API BASE ----
+// Square's production API unless SQUARE_API_BASE says otherwise: an
+// environment pointed at Square's sandbox sets it to
+// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
+const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
+// ---- END SQUARE API BASE ----
+const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
+const SQUARE_CATALOG_OBJECT_API_URL = `${SQUARE_API_BASE}/v2/catalog/object`;
+const SQUARE_CATALOG_LIST_API_URL = `${SQUARE_API_BASE}/v2/catalog/list`;
+const SQUARE_INVENTORY_BATCH_CREATE = `${SQUARE_API_BASE}/v2/inventory/changes/batch-create`;
+// The seller dashboard lives on squareupsandbox.com for a sandbox account.
+const SQUARE_ITEM_LIBRARY_URL = SQUARE_API_BASE.includes('squareupsandbox')
+  ? 'https://squareupsandbox.com/dashboard/items/library'
+  : 'https://squareup.com/dashboard/items/library';
+const SQUARE_IMAGE_UPLOAD_URL = new URL(SQUARE_API_BASE).host;
+const SQUARE_REFUND_API_URL = `${SQUARE_API_BASE}/v2/refunds`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Global configuration that gets populated from client config.
@@ -3533,7 +3542,7 @@ app.post('/api/orders/:orderId/refund', requireAuth, requirePermission(...PERMS_
       console.log('Fetching original payment from Square to validate refund amount...');
       
       // Fetch the actual payment from Square to verify amount and check for existing refunds
-      const paymentResponse = await fetch(`https://connect.squareup.com/v2/payments/${paymentId}`, {
+      const paymentResponse = await fetch(`${SQUARE_API_BASE}/v2/payments/${paymentId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
