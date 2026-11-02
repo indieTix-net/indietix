@@ -150,7 +150,7 @@ cd indieTix/infrastructure
 
 ### Infrastructure
 
-The whole platform is defined as 12 AWS SAM (CloudFormation) stacks in this repo, and `bootstrap.sh` deploys all of them in dependency order into a fresh AWS account/region. This has been proven end-to-end against a clean sandbox account.
+The whole platform is defined as 13 AWS SAM (CloudFormation) stacks in this repo (plus two optional ones: the cost guard and the API firewall), and `bootstrap.sh` deploys all of them in dependency order into a fresh AWS account/region. This has been proven end-to-end against a clean sandbox account.
 
 **Bring an environment up:**
 
@@ -161,7 +161,17 @@ cp bootstrap.config.sh.template bootstrap.config.sh   # gitignored, holds your r
 ./bootstrap.sh up
 ```
 
-`up` deploys the networking and Aurora cluster, then storage and the CloudFront static site, the Square webhook queue, the shared layers (built fresh from source and published into *your* account), all nine Lambdas (each synced from its real source repo right before it deploys, so nothing stale gets shipped), and the inbound-SMS topic. It also seeds a ticket-template bucket with generic placeholder tickets, onboards your first venue, and pushes the web app's static files. With `SQUARE_WEBHOOK_AUTO="true"` it also creates the Square webhook subscription for you (see [Connecting Square](#connecting-square)). At the end it prints your live URLs plus the short list of things that need a human on the other end: SES sender verification, registering the webhook in Square if you didn't let `up` do it, and optionally Google/social/SMS accounts.
+`up` deploys the networking and Aurora cluster, then storage and the CloudFront static site, the Square webhook queue, the shared layers (built fresh from source and published into *your* account), all ten Lambdas (each synced from its real source repo right before it deploys, so nothing stale gets shipped), and the inbound-SMS topic. It also seeds a ticket-template bucket with generic placeholder tickets, onboards your first venue, and pushes the web app's static files. With `SQUARE_WEBHOOK_AUTO="true"` it also creates the Square webhook subscription for you (see [Connecting Square](#connecting-square)). At the end it prints your live URLs plus the short list of things that need a human on the other end: SES sender verification, registering the webhook in Square if you didn't let `up` do it, and optionally Google/social/SMS accounts.
+
+Optional features, each switched on in `bootstrap.config.sh` and applied by `up` (see [Connecting Square](#connecting-square) and [API firewall](#api-firewall-optional)):
+
+| Setting | What it turns on |
+|---|---|
+| `SQUARE_ENVIRONMENT="sandbox"` | Points every Square call at Square's sandbox (fake sellers and money), for testing. Default `"production"` |
+| `SQUARE_APP_ID`, `SQUARE_APP_SECRET` | **Connect Square**: venues connect with Square's sign-in instead of pasting a token, and a daily job keeps their access fresh |
+| `HOSTED_SIGNUP="true"` (+ `HOSTED_SENDER_EMAIL`, optional `HOSTED_TERMS_URL`, `HOSTED_PRIVACY_URL`, `HOSTED_SUPPORT_EMAIL`) | **Self-serve signup** at `<site>/signup.html`: any Square seller can create a venue, with no one running `add-client` |
+| `API_EDGE="true"` | **API firewall**: CloudFront + WAF in front of the QRScanner API |
+| `OPERATOR_ALERT_EMAIL` | Who's copied on Connect Square renewal failures (default: `BUDGET_ALERT_EMAIL`) |
 
 It's safe to re-run. CloudFormation only applies what changed, and a stack left behind by a failed earlier attempt gets cleaned up and retried automatically. With `SQUARE_WEBHOOK_AUTO="true"`, one run is enough. Without it, the usual flow for a first-timer is: run `up` once, take the webhook URL it prints over to Square to get a signature key, add that key to the config, and run `up` again.
 
@@ -172,11 +182,11 @@ It's safe to re-run. CloudFormation only applies what changed, and a stack left 
 ```
 
 `down` removes the whole environment. It asks for confirmation first, and it can't be undone. In order, it:
-0. with `SQUARE_WEBHOOK_AUTO="true"`, deletes this environment's Square webhook subscription (only if it still points at this environment), so Square stops sending events to an endpoint that's about to disappear
+0. with `SQUARE_WEBHOOK_AUTO="true"`, deletes this environment's Square webhook subscription (only if it still points at this environment), so Square stops sending events to an endpoint that's about to disappear. It also deletes the Connect Square app secret, if there is one
 1. finds every venue in the environment, by checking which client secrets point at this environment's database cluster
-2. offboards each venue: drops its database, deletes its secret, and removes its S3 buckets
+2. offboards each venue: drops its database, deletes its secrets (including a Connect Square refresh token), and removes its S3 buckets
 3. empties the remaining buckets so CloudFormation can delete them
-4. deletes all 12 stacks (plus the optional cost guard) in reverse dependency order, the Aurora cluster included. Before the Aurora stack, it waits for AWS to release the network interfaces the deleted Lambdas leave behind, which otherwise block the database's subnets from deleting.
+4. deletes all 13 stacks (plus the optional cost guard and API firewall, the latter in us-east-1) in reverse dependency order, the Aurora cluster included. Before the Aurora stack, it waits for AWS to release the network interfaces the deleted Lambdas leave behind, which otherwise block the database's subnets from deleting.
 5. removes what bootstrap created outside CloudFormation: the ticket-template bucket, the published shared layers, and the environment's Lambda log groups
 
 Only resources belonging to that `ENV_PREFIX` are touched. Other environments in the same account are left alone.
@@ -192,7 +202,10 @@ Only resources belonging to that `ENV_PREFIX` are touched. Other environments in
 
 ### Connecting Square
 
-IndieTix reads orders and catalog items from Square via API access + webhooks — there's no Square OAuth flow built in; you connect your own Square account directly.
+IndieTix reads orders and catalog items from Square via API access + webhooks. There are two ways for a venue to connect:
+
+- **A personal access token** (below): the venue's own Square application token, pasted into Client Settings. Simplest for a single self-hosted venue; it's how Liberty Hall runs.
+- **Connect Square (OAuth)**: one IndieTix Square application per environment, and each venue signs in with Square to connect. Needed for self-serve signup and the Square App Marketplace. See [Connect Square and self-serve signup](#connect-square-and-self-serve-signup) after these steps.
 
 1. **Create a Square application.** In the Square Developer Dashboard, create a new application and generate an access token. Note your **Location ID** too.
 2. **Set up the webhook.** The subscription has to point at your deployed `square-queue-forwarder` endpoint and be subscribed to **`payment.updated` only**. Don't add `payment.created`; IndieTix only acts on completed payments, which arrive as `payment.updated`.
@@ -209,6 +222,33 @@ IndieTix reads orders and catalog items from Square via API access + webhooks �
    - A **Selection** attribute for **Distributor**, with your venue's own list of distributors (`DISTRIBUTOR_NAME`)
    - A **Selection** attribute for **Event Type**, with whatever categories fit your venue (`EVENT_TYPE`)
 5. **Create your first movie or event through IndieTix's own Add Movie / Add Event pages** — they build the Square item, attributes, and showtimes for you. No need to hand-build items in the Square dashboard.
+
+#### Connect Square and self-serve signup
+
+1. **In the Square Developer Dashboard,** create one IndieTix application. It has separate sandbox and production credentials; use the ones matching `SQUARE_ENVIRONMENT`.
+2. **In `bootstrap.config.sh`:** `SQUARE_APP_ID` (the Application ID) and `SQUARE_APP_SECRET` (the Application Secret; this file only, never commit it). Keep `SQUARE_WEBHOOK_AUTO="true"`, with that application's own access token as `FIRST_CLIENT_SQUARE_ACCESS_TOKEN`: every connected venue's events arrive on this environment's one subscription, which then also listens for `oauth.authorization.revoked`.
+3. **Run `./bootstrap.sh up`.** It stores the app secret in Secrets Manager (`indieTix/square/app/<ENV_PREFIX>`), switches Connect Square on in QRScanner and the daily `square-token-refresher`, and prints an **OAuth redirect URL**.
+4. **Register that redirect URL** in the Developer Dashboard, under your app's OAuth settings.
+
+Venues then see **Connect Square** in Client Settings. What happens behind it:
+- The access token goes where a pasted token would. The refresh token stays only in Secrets Manager (`indieTix/square/clients/<venue>`).
+- `square-token-refresher` renews each token about weekly; Square's expire after 30 days. If it fails, it emails the venue and `OPERATOR_ALERT_EMAIL`.
+- If a venue removes IndieTix in Square, it's flagged, emailed once, and shown **Reconnect Square**.
+
+**Self-serve signup:** add `HOSTED_SIGNUP="true"` and `HOSTED_SENDER_EMAIL` (an SES-verified From address). Optionally add `HOSTED_TERMS_URL` and `HOSTED_PRIVACY_URL` for your hosted service's own Terms and Privacy Policy, and `HOSTED_SUPPORT_EMAIL` (shown on `support.html`). Then:
+1. `<site>/signup.html` asks for a venue name, contact and Terms acceptance, then sends the person through Square's sign-in.
+2. The venue is created in the background, exactly as onboarding does, with the Square merchant ID as its ID.
+3. The contact gets a welcome email with a one-time link to set the main login's password.
+
+`up` refuses `HOSTED_SIGNUP` without Connect Square and `SQUARE_WEBHOOK_AUTO`. Leave it off for a self-hosted install.
+
+### API firewall (optional)
+
+`API_EDGE="true"` puts the QRScanner API (logins, signup, password resets, the Square sign-in) behind **CloudFront and an AWS WAF**. A Lambda Function URL can't take a WAF directly. The firewall:
+- blocks more than 100 requests per 5 minutes from one address to login, signup, password and Square sign-in routes, and more than 3,000 per 5 minutes overall
+- applies AWS's IP reputation, common-exploit and known-bad-input rule sets
+
+It costs about $10 a month, and always deploys in us-east-1 (stack `<ENV_PREFIX>-api-edge`), where CloudFront firewalls live. CloudFront adds a secret header (kept in Secrets Manager, `indieTix/edge/<ENV_PREFIX>`, us-east-1), and QRScanner refuses requests without it, so nothing can go around the firewall to the Function URL. `up` prints the new **API address**: put it in `config.js` (`INDIETIX_API_URL`). With Connect Square on, it's also the OAuth redirect URL's base, so register the new redirect URL with Square.
 
 ### Connecting Google Calendar
 

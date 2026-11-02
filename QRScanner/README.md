@@ -26,6 +26,7 @@ One HTML/JS/CSS trio per page, all loaded with `config.js` as the first script t
 | `client.html` | Client Settings — the whole `Client.configuration` control panel, admin-only |
 | `user-management.html` | Staff accounts + permissions + per-user data filters |
 | `opt-in.html`, `email-signup.html`, `email-unsubscribe.html`, `privacy.html`, `terms.html` | Public, unauthenticated customer-facing pages |
+| `signup.html`, `support.html` | Public: self-serve signup for hosted IndieTix (off unless configured), and the support page |
 
 ## Auth model
 
@@ -76,6 +77,12 @@ Two layers, and it's worth being precise about which is which — this app has a
 |---|---|
 | `AWS_REGION` | Region for Secrets Manager / S3 / SES clients — also force-re-pinned over whatever `Client.configuration` might (incorrectly) carry for this key, see the comment on `getClientConfiguration()` in `app.mjs` for why |
 | `TICKET_SIGNER_ACCESS_KEY` / `TICKET_SIGNER_SECRET_KEY` | Shared IAM credentials for short presigned ticket-PDF URLs — the one deliberate exception to per-client isolation (see the root project's architecture doc for why) |
+| `SQUARE_API_BASE` | Optional. Square's API address; unset means production. `https://connect.squareupsandbox.com` for Square's sandbox |
+| `SQUARE_APP_ID`, `SQUARE_APP_SECRET_ID`, `SQUARE_OAUTH_REDIRECT_URL` | Optional. Turn on **Connect Square** (OAuth): the app's ID, the Secrets Manager secret holding its secret (plus the environment's webhook key and URL), and this API's `/square/oauth/callback` |
+| `HOSTED_SIGNUP_ENABLED`, `CLIENT_SETUP_FUNCTION`, `HOSTED_STATIC_SITE_URL`, `HOSTED_SENDER_EMAIL`, `VENUE_BUCKET_PREFIX`, `HOSTED_TERMS_URL`, `HOSTED_PRIVACY_URL`, `HOSTED_SUPPORT_EMAIL` | Optional. Turn on **self-serve signup** (`signup.html`) and fill in `support.html` |
+| `EDGE_ORIGIN_SECRET` | Optional. Set when the API sits behind the CloudFront + WAF edge: requests without the matching `X-IndieTix-Edge` header are refused |
+
+`bootstrap.sh` sets all the optional ones from `bootstrap.config.sh`. They're merged into the function's environment, never put in the SAM template, so variables set by hand (like `TICKET_SIGNER_*`) survive.
 
 **3. `src/public/config.js`** — gitignored, per-deployment, frontend-only. Sets `window.INDIETIX_API_URL` (this Lambda's own Function URL) and `window.INDIETIX_PRINT_AGENT_URL` (optional — the local print agent's LAN address, see the `printer` repo). Copy `config.js.template` and fill in your own values; every page's first `<script>` tag loads this before anything else runs.
 
@@ -103,6 +110,8 @@ Runs `node --test test/*.test.mjs` — 15 files covering auth, orders, listing r
 - **Two upload patterns, deliberately different:** a presigned S3 URL (`POST /api/presigned-upload`) for large files that don't need server-side processing (e.g. a custom poster upload in `getMovieInfo.js`) — bypasses this Lambda's request body entirely; base64 in the JSON body only when the server needs to actually process the image (e.g. marketing post image edits, run through `normalizePosterImage`/`uploadPosterToS3` for resizing). `body-parser`'s limit is raised to `6mb` for the latter, and client-side uploads are capped at 4MB raw to stay under the Lambda Function URL's hard 6MB request payload ceiling after base64 inflation.
 - `normalizePosterImage()` / `uploadPosterToS3()` is the shared image pipeline (sharp-based): square mode letterboxes to 600×600; non-square mode caps height at 1000px with `withoutEnlargement`; both set 72dpi output metadata and convert to JPEG.
 - `sendEmailWithMultipleAttachments(sender, recipient, subject, body, attachments, html)` is the one real email-sending function (AWS SES v2 + mailcomposer) — reused for ticket confirmations, password resets, and real marketing email sends.
+- **Client Settings never sends secrets to the browser.** Passwords, tokens and API keys are write-only: `GET /api/client` lists which are saved (`savedSecrets`), a blank value on save keeps the saved one, and the page's secret boxes stay read-only until **Change** is clicked, so password managers can't fill them.
+- **Connect Square and self-serve signup** are bracketed sections in `app.mjs` (`SQUARE OAUTH`, `HOSTED SIGNUP`). Signup links are sealed tokens (AES-256-GCM, `sealToken`/`openToken` in `utils/crypto-utils.mjs`), so venue details never travel readable through Square's sign-in.
 - **AWS SDK v2 is still in use** (`AWS.SES`, `s3.getSignedUrlPromise`) alongside v3 clients for newer code — not urgent to migrate, AWS extended v2 support past the original deprecation date.
 - **The Marquee Engine marketing subsystem** (`marketing.html`/`.js`, `/api/marketing/*` routes) is split across two repos: the separate `marketingEngine` Lambda expands schedules into `MarketingPost` drafts and runs the 5-minute poller that actually sends approved, due posts across email/Facebook/Instagram/TikTok; this app is where staff review, approve, edit, delete, and (for email only) manually force an immediate send via `POST /api/marketing/posts/:postId/send-now`. `PUT /api/marketing/posts/:postId/approve` is the one human-review checkpoint for every channel — once approved, nothing here has to click "send" again per channel. AI-generated captions (`POST /api/marketing/posts/:postId/regenerate-caption`) are prompted explicitly to avoid obvious "AI tells" (no rhetorical questions, no stock marketing phrases, ≤1 exclamation point, no em dashes).
 

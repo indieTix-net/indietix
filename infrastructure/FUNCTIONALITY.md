@@ -47,6 +47,12 @@ Tickets are sold through Square — IndieTix doesn't run its own checkout. When 
 - Captions can be hand-written, template-generated, or AI-generated, your choice per schedule.
 - **Email List** — manage the list of subscribers who receive marketing emails, separately from ticket buyers' transactional emails.
 
+## Getting started (hosted)
+
+- **Self-serve signup.** A venue fills in its name and contact details, signs in with Square, and has a working box office about a minute later. A welcome email sets the password.
+- **Connect Square in one click.** No developer account or pasted tokens. Access renews itself, and if a venue disconnects IndieTix in Square, it's told how to reconnect.
+- **A support page** with the support address and answers to common questions.
+
 ## Accounts and access
 
 - **User Management** (client login only) — add staff accounts and control what each one can do. Five permission flags: `view`, `edit`, `checkIn`, `marketing`, `admin`. A new account gets `checkIn` only, so it's least privilege unless you grant more. There are two kinds of login: the venue's own **client** login (the original master account, which can do everything) and **sub-user** logins, which can only do what their flags allow. The flags are independent of each other; `admin` is not a "grant everything" flag. What each flag unlocks:

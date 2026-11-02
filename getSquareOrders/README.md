@@ -44,6 +44,8 @@ Per-client values (Square credentials, feature flags, bucket names, ticket filen
 | `AWS_REGION` | Region for Secrets Manager, S3, and SES clients |
 | `TICKET_SIGNER_ACCESS_KEY` / `TICKET_SIGNER_SECRET_KEY` | A dedicated IAM user's long-lived credentials, used only to presign ticket-PDF download URLs. Deliberately *not* this Lambda's own execution-role credentials — an STS-signed URL carries a security token that can push the link past SMS's 1600-character limit; a plain IAM user's keys produce a much shorter URL. Scoped to `s3:GetObject` on `tickets-out/*` only, shared across every client (one of two documented exceptions to this platform's otherwise-total per-client isolation) |
 
+| `SQUARE_API_BASE` | Optional. Square's API address; unset means production. Set to `https://connect.squareupsandbox.com` in an environment that uses Square's sandbox |
+
 Database credentials for each client come from Secrets Manager at `indieTix/rds/clients/{clientId}/credentials` — there's no `DB_HOST`/`DB_PORT` env var on this function at all; the client ID read off the incoming webhook (Square's `merchant_id` field) is what selects which secret to fetch.
 
 ## Non-obvious behavior worth knowing
@@ -51,6 +53,8 @@ Database credentials for each client come from Secrets Manager at `indieTix/rds/
 - **This handler always marks every SQS message as successfully processed, and never retries.** That's deliberate, not an oversight: Square's own webhook retry behavior is governed entirely by `square-queue-forwarder` (which always returns 200, regardless of anything that happens here), so this function's return value was never visible to Square at all — the only thing a "needs retry" classification would control is SQS's own internal redelivery. Given how costly a wrong failure classification can be on a FIFO queue (one deterministically-failing message blocks every other message behind it in the same group until retries exhaust), the simpler design — always succeed, log clearly, no automatic retry — is the one this repo keeps. If you're extending this handler, don't reintroduce `ReportBatchItemFailures`-based retry logic without understanding this tradeoff first.
 - **Bar/concession orders share this same webhook.** Not every Square order is for a ticketed item — a walk-up candy or drink sale fires the same webhook. `processWebhook` has to handle that case explicitly (an order with no ticketed line items is a normal, successful no-op, not an error) rather than falling through unhandled.
 - **SMS body times are Chicago wall-clock, formatted without round-tripping through a JS `Date` object.** `ProductDate` is stored as `TIMESTAMP WITHOUT TIME ZONE` representing Chicago local time with no timezone suffix — parsing that string with `new Date(...)` in a Lambda (which runs in UTC) and then re-formatting with a timezone conversion double-applies the offset. The SMS formatter parses the wall-clock digits directly instead.
+- **`oauth.authorization.revoked` is handled here too.** When a Connect Square (OAuth) venue removes IndieTix in Square, this sets `SQUARE_OAUTH_REVOKED_AT` on the venue and emails it once, asking someone to click "Reconnect Square". Personal-token venues are left alone.
+- **Configuration is logged as key names only.** Values include Square tokens and FTP passwords.
 - **Every invocation logs the raw event first.** Deliberate, for CloudWatch debugging — if you're tracing a specific order, start there.
 
 ## Deploying

@@ -43,6 +43,7 @@ cat result.json
 | `sender_email` | no | defaults to `<contactname-no-spaces-lowercase>@indietix.net` |
 | `admin_username`, `admin_password` | no, but together | creates a named, full-permission `Users` row in the same call — see "Logging in" below for why this is optional |
 | `admin_email`, `admin_first_name`, `admin_last_name` | no | only used alongside `admin_username`/`admin_password`; `admin_email` defaults to `clientEmail` |
+| `square_oauth` | no | `{ "merchant_id", "expires_at" }`. Sent by QRScanner's self-serve signup: puts the venue in Connect Square (OAuth) mode, whose refresh token is already in Secrets Manager |
 
 What actually happens, in order: create the PostgreSQL user → create the database → build the full schema (`createDatabaseObjects` — every table, function, view, index a client gets; this function is the canonical source of truth for the schema, not any running database, which might be mid-migration or drifted) → grant permissions → create the Secrets Manager secret → insert the `Client` row with its default `configuration` JSON → create the two S3 buckets (`<prefix><username>` and `<prefix><username>-bdor`) and copy the ticket PDF templates into the main one → optionally insert the first admin user. A `statusCode: 200` response means all of it worked; `500` includes a `message` naming exactly what failed (e.g. a duplicate username).
 
@@ -59,7 +60,7 @@ aws lambda invoke \
   result.json
 ```
 
-Deletes, in order: the Secrets Manager secret, both S3 buckets (objects first, then the buckets themselves — the bucket prefix is read from the client's own `Client.configuration` before the database is dropped, falling back to `"indietix-"` for any client onboarded before that field existed), then the database and PostgreSQL user. The response lists exactly what succeeded and what didn't, per step — a partial failure (e.g. a bucket that wouldn't empty) doesn't silently roll back everything else; check the response for what still needs manual cleanup.
+Deletes, in order: the Secrets Manager secret (and the venue's Connect Square refresh-token secret, `indieTix/square/clients/<username>`, if it has one), both S3 buckets (objects first, then the buckets themselves — the bucket prefix is read from the client's own `Client.configuration` before the database is dropped, falling back to `"indietix-"` for any client onboarded before that field existed), then the database and PostgreSQL user. The response lists exactly what succeeded and what didn't, per step — a partial failure (e.g. a bucket that wouldn't empty) doesn't silently roll back everything else; check the response for what still needs manual cleanup.
 
 **There's no confirmation step and no undo.** This is a direct, destructive action — treat the invoke itself as the point of no return, not something to script casually.
 

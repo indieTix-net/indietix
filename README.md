@@ -34,6 +34,7 @@ Each folder below is one piece of the platform, with its own README and tests. S
 | [`expireQRCodeSquareModifiers`](./expireQRCodeSquareModifiers) | Expires past showtimes in Square's catalog |
 | [`DailyPgQueryAndSftp`](./DailyPgQueryAndSftp) | Nightly box-office report generation and delivery (BDOR/EBOR) |
 | [`marketingEngine`](./marketingEngine) | Turns schedules into marketing post drafts; sends approved posts across channels |
+| [`squareTokenRefresher`](./squareTokenRefresher) | Daily renewal of Connect Square (OAuth) venues' Square access |
 | [`printer`](./printer) | Optional local agent for printing physical ticket stubs on a LAN label printer |
 | [`sms-utils`](./sms-utils) | Shared phone normalization + SMS-sending Lambda layer |
 | [`ticket-pdf-lib`](./ticket-pdf-lib) | Shared QR-code + ticket-PDF rendering Lambda layer |
