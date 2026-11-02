@@ -2552,7 +2552,11 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
 // on with three environment variables:
 //   SQUARE_APP_ID             the app's Application ID (Developer Dashboard)
 //   SQUARE_APP_SECRET_ID      Secrets Manager secret holding the app's
-//                             secret as {"client_secret": "..."}
+//                             secret as {"client_secret": "..."}, plus the
+//                             environment's app-wide webhook subscription
+//                             ("webhook_signature_key", "webhook_url"), which
+//                             each connected venue gets so getSquareOrders
+//                             can verify that subscription's events
 //   SQUARE_OAUTH_REDIRECT_URL this API's /square/oauth/callback, exactly as
 //                             registered in the Developer Dashboard
 // The access token goes in the venue's existing SQUARE_ACCESS_TOKEN, so
@@ -2618,6 +2622,7 @@ app.get('/api/square/oauth/status', requireAuth, requireClientAuth, async (req, 
       available: !!squareOAuthSettings(),
       sandbox: SQUARE_API_BASE.includes('squareupsandbox'),
       mode: config.SQUARE_AUTH_MODE === 'oauth' ? 'oauth' : 'personal',
+      revokedAt: config.SQUARE_AUTH_MODE === 'oauth' ? (config.SQUARE_OAUTH_REVOKED_AT || null) : null,
       merchantId: config.SQUARE_MERCHANT_ID || null,
       expiresAt: config.SQUARE_TOKEN_EXPIRES_AT || null,
       locationId: config.SQUARE_LOCATION_ID || null
@@ -2695,7 +2700,8 @@ app.get('/square/oauth/callback', async (req, res) => {
 
   try {
     const secretResponse = await secretsClient.send(new GetSecretValueCommand({ SecretId: settings.secretId }));
-    const clientSecret = JSON.parse(secretResponse.SecretString).client_secret;
+    const appSecret = JSON.parse(secretResponse.SecretString);
+    const clientSecret = appSecret.client_secret;
     if (!clientSecret) throw new Error('Square app secret has no client_secret');
 
     const tokenResponse = await fetch(`${SQUARE_API_BASE}/oauth2/token`, {
@@ -2723,8 +2729,15 @@ app.get('/square/oauth/callback', async (req, res) => {
       SQUARE_ACCESS_TOKEN: tokens.access_token,
       SQUARE_TOKEN_EXPIRES_AT: tokens.expires_at || null,
       SQUARE_AUTH_MODE: 'oauth',
-      SQUARE_MERCHANT_ID: tokens.merchant_id
+      SQUARE_MERCHANT_ID: tokens.merchant_id,
+      SQUARE_OAUTH_REVOKED_AT: null
     };
+    // Events for every connected venue arrive on the environment's one
+    // app-wide subscription, signed with its key and URL.
+    if (appSecret.webhook_signature_key && appSecret.webhook_url) {
+      update.SQUARE_SIGNATURE_KEY = appSecret.webhook_signature_key;
+      update.SQUARE_WEBHOOK_URL = appSecret.webhook_url;
+    }
     // A venue with one active location gets it filled in, as bootstrap.sh
     // does for a personal token; with several, they pick in Client Settings.
     if (!config.SQUARE_LOCATION_ID) {

@@ -398,7 +398,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!data || !data.success || !data.available) return;
                 squareConnect.hidden = false;
                 const where = data.sandbox ? ' (Square sandbox)' : '';
-                if (data.mode === 'oauth') {
+                if (data.mode === 'oauth' && data.revokedAt) {
+                    squareConnectStatus.textContent = `Square access was removed on ${new Date(data.revokedAt).toLocaleDateString()}${where}. Tickets for new orders won't send until you reconnect.`;
+                    squareConnect.className = 'alert alert-warning mb-3';
+                    squareConnectBtn.textContent = 'Reconnect Square';
+                } else if (data.mode === 'oauth') {
                     const expires = data.expiresAt ? new Date(data.expiresAt).toLocaleDateString() : 'unknown';
                     squareConnectStatus.textContent = `Connected to Square${where} as ${data.merchantId}. Access renews automatically (current access expires ${expires}).`;
                     squareConnectBtn.textContent = 'Reconnect Square';

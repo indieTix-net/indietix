@@ -1435,6 +1435,11 @@ async function processWebhook(event) {
 
     console.log(`Authenticated client: ${clientId}`);
 
+    // A venue removed IndieTix's access in Square (Connect Square / OAuth).
+    if (webhookData.type === 'oauth.authorization.revoked') {
+      return await handleSquareAccessRevoked(clientPool, clientId, clientConfig, clientRecord[0]);
+    }
+
     if (webhookData.data?.object?.payment?.status != "COMPLETED") {
       return {
         statusCode: 200,
@@ -1985,6 +1990,59 @@ console.log('customerId:', customerId);
         // If you want to close it, uncomment: await clientPool.end();
     }
 }
+
+// ---- SQUARE OAUTH REVOKED ----
+// Square sends oauth.authorization.revoked (to the app-wide subscription)
+// when a Connect Square venue removes IndieTix's access. Its tokens stop
+// working at once, so: flag the venue (SQUARE_OAUTH_REVOKED_AT, shown in
+// Client Settings, and the daily token refresher skips it), and email
+// the venue once so someone clicks "Reconnect Square". A personal-token
+// venue isn't on OAuth, so it's only logged. Always 200: there's nothing
+// for Square to retry.
+async function handleSquareAccessRevoked(pool, clientId, config, clientRow) {
+  if (config.SQUARE_AUTH_MODE !== 'oauth') {
+    console.log(`Square access revoked for ${clientId}, but it uses a personal token; nothing to do.`);
+    return { statusCode: 200, body: JSON.stringify({ message: 'Not a Connect Square venue' }) };
+  }
+  if (config.SQUARE_OAUTH_REVOKED_AT) {
+    console.log(`Square access revoked for ${clientId} (already recorded ${config.SQUARE_OAUTH_REVOKED_AT}).`);
+    return { statusCode: 200, body: JSON.stringify({ message: 'Already recorded' }) };
+  }
+  const revokedAt = new Date().toISOString();
+  await pool.query(
+    `UPDATE "Client" SET "configuration" = "configuration"::jsonb || $1::jsonb, "updatedDate" = CURRENT_TIMESTAMP WHERE "clientID" = $2`,
+    [JSON.stringify({ SQUARE_OAUTH_REVOKED_AT: revokedAt }), clientId]
+  );
+  console.error(`SQUARE ACCESS REVOKED for ${clientId} at ${revokedAt}`);
+
+  const recipient = (clientRow && clientRow.clientEmail) || config.OWNER_BCC_EMAIL;
+  const ownerBcc = config.OWNER_BCC_EMAIL && config.OWNER_BCC_EMAIL !== recipient ? config.OWNER_BCC_EMAIL : null;
+  if (config.SENDER_EMAIL && recipient) {
+    const venue = config.WEB_HEADER_COMPANY || config.THEATER_NAME || clientId;
+    try {
+      await sendEmailWithMultipleAttachments(
+        config.SENDER_EMAIL,
+        recipient,
+        `IndieTix: Square was disconnected for ${venue}`,
+        [
+          `IndieTix's access to ${venue}'s Square account was removed in Square.`,
+          '',
+          'Until it\'s reconnected, IndieTix can\'t send tickets for new orders or update your Square items.',
+          '',
+          'If that wasn\'t intended: open Client Settings in IndieTix and click "Reconnect Square".',
+          '',
+          `Venue ID: ${clientId}`
+        ].join('\n'),
+        [],
+        ownerBcc
+      );
+    } catch (error) {
+      console.error(`Square revoked email failed for ${clientId}: ${error.message}`);
+    }
+  }
+  return { statusCode: 200, body: JSON.stringify({ message: 'Square access revoked; venue flagged' }) };
+}
+// ---- END SQUARE OAUTH REVOKED ----
 
 /**
  * Sends an email with multiple PDF attachments

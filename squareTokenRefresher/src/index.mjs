@@ -112,6 +112,12 @@ export async function refreshVenue(clientId, { secrets = secretsClient, db, appI
   if (config.SQUARE_AUTH_MODE !== 'oauth') {
     return { clientId, venue, status: 'skipped', reason: 'venue uses a personal access token' };
   }
+  // Access already removed in Square (getSquareOrders records Square's
+  // oauth.authorization.revoked event, or a refused refresh below): the
+  // venue was emailed once; only "Reconnect Square" helps now.
+  if (config.SQUARE_OAUTH_REVOKED_AT) {
+    return { clientId, venue, status: 'skipped', reason: `access was removed ${config.SQUARE_OAUTH_REVOKED_AT}; waiting for Reconnect Square` };
+  }
   if (!isRefreshDue(config.SQUARE_TOKEN_EXPIRES_AT, now)) {
     return { clientId, venue, status: 'not-due', expiresAt: config.SQUARE_TOKEN_EXPIRES_AT };
   }
@@ -137,6 +143,13 @@ export async function refreshVenue(clientId, { secrets = secretsClient, db, appI
       // A refresh token is only refused like this once the seller has
       // revoked IndieTix's access in Square: reconnecting is the fix.
       const revoked = response.status === 401 || codes.some(c => /UNAUTHORIZED|REVOKED|INVALID_GRANT/i.test(c));
+      if (revoked) {
+        // Flag it, so this venue gets one email, not one a day.
+        await db.query(
+          `UPDATE "Client" SET "configuration" = "configuration"::jsonb || $1::jsonb, "updatedDate" = CURRENT_TIMESTAMP WHERE "clientID" = $2`,
+          [JSON.stringify({ SQUARE_OAUTH_REVOKED_AT: new Date(now).toISOString() }), clientId]
+        );
+      }
       return {
         clientId, venue, status: 'failed', revoked,
         expiresAt: config.SQUARE_TOKEN_EXPIRES_AT,
