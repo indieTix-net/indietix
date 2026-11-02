@@ -96,6 +96,7 @@ SQUARE_ENVIRONMENT="production"
 # register under your app > OAuth. Blank SQUARE_APP_ID leaves it off.
 SQUARE_APP_ID=""       # Application ID (sandbox ones start with sandbox-sq0idb-)
 SQUARE_APP_SECRET=""   # Application Secret. Secret: this file only, never commit or share it
+OPERATOR_ALERT_EMAIL="" # Copied on the daily Square token refresher's failure emails. Blank uses BUDGET_ALERT_EMAIL
 
 # ---- First client's other Client Settings (optional) ----
 # Path to a JSON file of initial Client Settings for the first client --

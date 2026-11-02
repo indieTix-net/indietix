@@ -160,7 +160,7 @@ BUDGET_BREAKER="${BUDGET_BREAKER:-false}"
 # unblock/breaker-status act on exactly these -- never a ${ENV_PREFIX}-*
 # wildcard, since one environment's prefix can start another's name. Keep
 # in step with cost-guard/template.yaml's FUNCTION_SUFFIXES.
-ENV_FUNCTIONS="client-reporting client-setup-teardown daily-pg-sftp expire-modifiers get-square-orders marketing-engine qrscanner sms-inbound sql-runner square-queue-forwarder"
+ENV_FUNCTIONS="client-reporting client-setup-teardown daily-pg-sftp expire-modifiers get-square-orders marketing-engine qrscanner sms-inbound sql-runner square-queue-forwarder square-token-refresher"
 if [ "$SQUARE_WEBHOOK_AUTO" = "true" ]; then
   [ -z "$FIRST_CLIENT_SQUARE_ACCESS_TOKEN" ] && { echo "SQUARE_WEBHOOK_AUTO=true needs FIRST_CLIENT_SQUARE_ACCESS_TOKEN (the Square application's own access token)" >&2; exit 1; }
   [ -z "$SQUARE_EXPECTED_MERCHANT_ID" ] && { echo "SQUARE_WEBHOOK_AUTO=true needs SQUARE_EXPECTED_MERCHANT_ID (the merchant that token belongs to)" >&2; exit 1; }
@@ -244,7 +244,7 @@ else:
 # "sandbox", removes it for "production" (the code's default).
 set_square_api_base() {
   local suffix
-  for suffix in get-square-orders qrscanner expire-modifiers marketing-engine; do
+  for suffix in get-square-orders qrscanner expire-modifiers marketing-engine square-token-refresher; do
     if [ "$SQUARE_ENVIRONMENT" = "sandbox" ]; then
       [ "$(merge_lambda_env "${ENV_PREFIX}-${suffix}" "{\"SQUARE_API_BASE\": \"$SQUARE_API_BASE\"}")" = "changed" ] \
         && echo "  ${ENV_PREFIX}-${suffix}: Square API set to $SQUARE_API_BASE"
@@ -263,9 +263,10 @@ set_square_api_base() {
 # and its callback URL. Without it: removes those, which turns the
 # feature off. Venues' own tokens are never touched here.
 set_square_oauth() {
-  local fn="${ENV_PREFIX}-qrscanner" secret_name="indieTix/square/app/${ENV_PREFIX}"
-  local secret_file redirect_url
+  local fn="${ENV_PREFIX}-qrscanner" refresher="${ENV_PREFIX}-square-token-refresher"
+  local secret_name="indieTix/square/app/${ENV_PREFIX}" secret_file redirect_url
   if [ -z "$SQUARE_APP_ID" ]; then
+    merge_lambda_env "$refresher" '{}' SQUARE_APP_ID SQUARE_APP_SECRET_ID OPERATOR_ALERT_EMAIL >/dev/null
     [ "$(merge_lambda_env "$fn" '{}' SQUARE_APP_ID SQUARE_APP_SECRET_ID SQUARE_OAUTH_REDIRECT_URL)" = "changed" ] \
       && echo "  Connect Square turned off (SQUARE_APP_ID is blank)"
     return 0
@@ -289,6 +290,10 @@ json.dump({"client_secret": os.environ["SQUARE_APP_SECRET"]}, open(sys.argv[1], 
   redirect_url="${redirect_url%/}/square/oauth/callback"
   merge_lambda_env "$fn" "$(python3 -c 'import json, sys; print(json.dumps({"SQUARE_APP_ID": sys.argv[1], "SQUARE_APP_SECRET_ID": sys.argv[2], "SQUARE_OAUTH_REDIRECT_URL": sys.argv[3]}))' \
     "$SQUARE_APP_ID" "$secret_name" "$redirect_url")" >/dev/null
+  # The daily token refresher: the same app, plus who to copy on its
+  # failure emails (OPERATOR_ALERT_EMAIL, else BUDGET_ALERT_EMAIL).
+  merge_lambda_env "$refresher" "$(python3 -c 'import json, sys; print(json.dumps({k: v for k, v in {"SQUARE_APP_ID": sys.argv[1], "SQUARE_APP_SECRET_ID": sys.argv[2], "OPERATOR_ALERT_EMAIL": sys.argv[3]}.items() if v}))' \
+    "$SQUARE_APP_ID" "$secret_name" "${OPERATOR_ALERT_EMAIL:-$BUDGET_ALERT_EMAIL}")" >/dev/null
   echo "  Connect Square is on. Register this OAuth redirect URL in the Square"
   echo "  Developer Dashboard (app > OAuth, $SQUARE_ENVIRONMENT):"
   echo "    $redirect_url"
@@ -596,6 +601,9 @@ cmd_up() {
 
   sync_stack_source "expire-modifiers" "expireQRCodeSquareModifiers"
   deploy_stack "expire-modifiers" "expire-modifiers"
+
+  sync_stack_source "square-token-refresher" "squareTokenRefresher"
+  deploy_stack "square-token-refresher" "square-token-refresher"
 
   sync_stack_source "marketing-engine" "marketingEngine"
   deploy_stack "marketing-engine" "marketing-engine" \
@@ -991,6 +999,7 @@ cmd_down() {
   delete_stack "cost-guard"
   delete_stack "sms-inbound"
   delete_stack "marketing-engine"
+  delete_stack "square-token-refresher"
   delete_stack "expire-modifiers"
   delete_stack "daily-pg-sftp"
   delete_stack "client-reporting"

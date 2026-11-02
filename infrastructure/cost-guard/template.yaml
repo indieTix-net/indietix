@@ -118,7 +118,7 @@ Resources:
       Environment:
         Variables:
           ENV_PREFIX: !Ref EnvPrefix
-          FUNCTION_SUFFIXES: "client-reporting client-setup-teardown daily-pg-sftp expire-modifiers get-square-orders marketing-engine qrscanner sms-inbound sql-runner square-queue-forwarder"
+          FUNCTION_SUFFIXES: "client-reporting client-setup-teardown daily-pg-sftp expire-modifiers get-square-orders marketing-engine qrscanner sms-inbound sql-runner square-queue-forwarder square-token-refresher"
       Policies:
         - Statement:
             - Effect: Allow

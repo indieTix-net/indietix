@@ -64,3 +64,4 @@ expire-modifiers/src/
 marketing-engine/src/
 sms-inbound/src/
 square-queue-forwarder/src/
+square-token-refresher/src/
