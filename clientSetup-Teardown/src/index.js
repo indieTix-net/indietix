@@ -1275,6 +1275,19 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
     }
     // ---- END ONBOARDING SETTINGS ----
 
+    // ---- CONNECT SQUARE (OAuth) ----
+    // Hosted signup (QRScanner) passes square_oauth when the venue connected
+    // with Square's sign-in: its access token is square_access_token above,
+    // its refresh token is already in Secrets Manager. These keys aren't
+    // user-definable, so they can't come in through `settings`.
+    if (clientData.square_oauth && clientData.square_oauth.merchant_id) {
+      configuration.SQUARE_AUTH_MODE = 'oauth';
+      configuration.SQUARE_MERCHANT_ID = clientData.square_oauth.merchant_id;
+      configuration.SQUARE_TOKEN_EXPIRES_AT = clientData.square_oauth.expires_at || null;
+      configuration.SIGNUP_SOURCE = 'hosted';
+    }
+    // ---- END CONNECT SQUARE ----
+
     // Insert client record
     const insertQuery = `
       INSERT INTO public."Client" (
@@ -1804,6 +1817,7 @@ exports.handler = async (event, context) => {
       square_signature_key,
       square_webhook_url,
       square_location_id,
+      square_oauth,
       settings,
       sender_email,
       theater_id = "000000",
@@ -1898,6 +1912,7 @@ exports.handler = async (event, context) => {
       square_signature_key,
       square_webhook_url,
       square_location_id,
+      square_oauth,
       settings,
       sender_email: sender_email || `${contactName.replace(/\s+/g, '').toLowerCase()}@indietix.net`,
       theater_id,

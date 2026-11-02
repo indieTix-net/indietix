@@ -265,6 +265,16 @@
       }
       e.target.dataset.oldValue = e.target.value;
     });
+
+    // A link from the signup welcome email (?client=) fills in the Client ID
+    // and username, which are the same for a venue's main login.
+    const linkedClient = new URLSearchParams(window.location.search).get('client');
+    if (linkedClient && /^[A-Za-z0-9]+$/.test(linkedClient)) {
+      const clientField = document.getElementById('clientId');
+      clientField.value = linkedClient;
+      clientField.dataset.oldValue = linkedClient;
+      document.getElementById('username').value = linkedClient;
+    }
   </script>
 </body>
 </html>

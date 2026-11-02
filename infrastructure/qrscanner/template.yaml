@@ -80,6 +80,12 @@ Resources:
                 - secretsmanager:PutSecretValue
               Resource:
                 - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/square/clients/*"
+            # Hosted signup starts onboarding in the background.
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource:
+                - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${EnvPrefix}-client-setup-teardown"
             - Effect: Allow
               Action:
                 - s3:PutObject

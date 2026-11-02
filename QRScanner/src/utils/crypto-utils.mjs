@@ -82,3 +82,35 @@ export function isPasswordResetTokenValid(timestamp) {
   const thirtyMinutes = 30 * 60 * 1000; // 30 minutes in milliseconds
   return (now - timestamp) < thirtyMinutes;
 }
+
+// ---- SEALED TOKENS ----
+// Encrypted, expiring, purpose-bound tokens for links that carry data
+// through a browser (hosted signup's Square sign-in state, its status page,
+// its set-password link). AES-256-GCM, so they can be neither read nor
+// altered; URL-safe base64. The key is 32 bytes (see signupKey in app.mjs).
+export function sealToken(payload, key, ttlMs) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([
+    cipher.update(JSON.stringify({ ...payload, exp: Date.now() + ttlMs }), 'utf8'),
+    cipher.final()
+  ]);
+  return Buffer.concat([iv, cipher.getAuthTag(), body]).toString('base64url');
+}
+
+// The payload, or null if the token is malformed, altered, expired, or
+// sealed for a different purpose.
+export function openToken(token, key, purpose) {
+  try {
+    const raw = Buffer.from(String(token), 'base64url');
+    if (raw.length < 29) return null;
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
+    decipher.setAuthTag(raw.subarray(12, 28));
+    const payload = JSON.parse(Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString('utf8'));
+    if (payload.p !== purpose || typeof payload.exp !== 'number' || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+// ---- END SEALED TOKENS ----

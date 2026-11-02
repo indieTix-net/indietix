@@ -127,6 +127,17 @@ SQUARE_APP_SECRET="${SQUARE_APP_SECRET:-}"
 if [ -n "$SQUARE_APP_ID" ] && [ -z "$SQUARE_APP_SECRET" ]; then
   echo "SQUARE_APP_ID is set, so SQUARE_APP_SECRET (the app's Application Secret) is needed too" >&2; exit 1
 fi
+# Hosted signup (QRScanner's HOSTED SIGNUP section): public self-serve
+# venue creation through Connect Square.
+HOSTED_SIGNUP="${HOSTED_SIGNUP:-false}"
+HOSTED_SENDER_EMAIL="${HOSTED_SENDER_EMAIL:-}"
+HOSTED_TERMS_URL="${HOSTED_TERMS_URL:-}"
+HOSTED_PRIVACY_URL="${HOSTED_PRIVACY_URL:-}"
+if [ "$HOSTED_SIGNUP" = "true" ]; then
+  [ -z "$SQUARE_APP_ID" ] && { echo "HOSTED_SIGNUP=true needs Connect Square (SQUARE_APP_ID/SQUARE_APP_SECRET)" >&2; exit 1; }
+  [ -z "$HOSTED_SENDER_EMAIL" ] && { echo "HOSTED_SIGNUP=true needs HOSTED_SENDER_EMAIL (an SES-verified From address)" >&2; exit 1; }
+  [ "${SQUARE_WEBHOOK_AUTO:-false}" != "true" ] && { echo "HOSTED_SIGNUP=true needs SQUARE_WEBHOOK_AUTO=true (new venues share this environment's subscription)" >&2; exit 1; }
+fi
 case "$SQUARE_ENVIRONMENT" in
   production) SQUARE_API_BASE="https://connect.squareup.com" ;;
   sandbox) SQUARE_API_BASE="https://connect.squareupsandbox.com" ;;
@@ -304,6 +315,22 @@ json.dump(secret, open(sys.argv[1], "w"))
   # failure emails (OPERATOR_ALERT_EMAIL, else BUDGET_ALERT_EMAIL).
   merge_lambda_env "$refresher" "$(python3 -c 'import json, sys; print(json.dumps({k: v for k, v in {"SQUARE_APP_ID": sys.argv[1], "SQUARE_APP_SECRET_ID": sys.argv[2], "OPERATOR_ALERT_EMAIL": sys.argv[3]}.items() if v}))' \
     "$SQUARE_APP_ID" "$secret_name" "${OPERATOR_ALERT_EMAIL:-$BUDGET_ALERT_EMAIL}")" >/dev/null
+  # Hosted signup: on with HOSTED_SIGNUP="true", otherwise its variables
+  # are removed, which turns it off.
+  local signup_vars="HOSTED_SIGNUP_ENABLED CLIENT_SETUP_FUNCTION HOSTED_STATIC_SITE_URL HOSTED_SENDER_EMAIL VENUE_BUCKET_PREFIX HOSTED_TERMS_URL HOSTED_PRIVACY_URL"
+  if [ "$HOSTED_SIGNUP" = "true" ]; then
+    local site_url="https://${STATIC_SITE_DOMAIN:-$(stack_output static-site DistributionDomainName)}"
+    # shellcheck disable=SC2086
+    merge_lambda_env "$fn" "$(python3 -c '
+import json, sys
+names = ["HOSTED_SIGNUP_ENABLED", "CLIENT_SETUP_FUNCTION", "HOSTED_STATIC_SITE_URL", "HOSTED_SENDER_EMAIL", "VENUE_BUCKET_PREFIX", "HOSTED_TERMS_URL", "HOSTED_PRIVACY_URL"]
+print(json.dumps({k: v for k, v in zip(names, sys.argv[1:]) if v}))
+' "true" "${ENV_PREFIX}-client-setup-teardown" "$site_url" "$HOSTED_SENDER_EMAIL" "${ENV_PREFIX}-" "$HOSTED_TERMS_URL" "$HOSTED_PRIVACY_URL")" $signup_vars >/dev/null
+    echo "  Hosted signup is open: ${site_url}/signup.html"
+  else
+    # shellcheck disable=SC2086
+    merge_lambda_env "$fn" '{}' $signup_vars >/dev/null
+  fi
   echo "  Connect Square is on. Register this OAuth redirect URL in the Square"
   echo "  Developer Dashboard (app > OAuth, $SQUARE_ENVIRONMENT):"
   echo "    $redirect_url"
