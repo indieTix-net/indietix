@@ -23,6 +23,8 @@ deploy.config.sh
 # Per-environment bootstrap.sh settings (VPC/subnet IDs, first client's
 # contact email, etc.) -- see bootstrap.config.sh.template
 bootstrap.config.sh
+# Configs for more environments (BOOTSTRAP_CONFIG=bootstrap.config.<name>.sh)
+bootstrap.config.*.sh
 .prod-backups/
 
 # First client's initial Client Settings (API keys, FTP passwords, Google

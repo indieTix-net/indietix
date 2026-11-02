@@ -86,7 +86,12 @@ EOF
 # --help answers before any config is loaded (a fresh clone has none yet).
 case "${1:-}" in help|-h|--help) usage; exit 0 ;; esac
 
-CONFIG_FILE="$SCRIPT_DIR/bootstrap.config.sh"
+# BOOTSTRAP_CONFIG=<file> picks another config, for a second environment
+# (e.g. BOOTSTRAP_CONFIG=bootstrap.config.square-sandbox.sh ./bootstrap.sh up).
+# A relative path is relative to this directory.
+CONFIG_FILE="${BOOTSTRAP_CONFIG:-bootstrap.config.sh}"
+case "$CONFIG_FILE" in /*) ;; *) CONFIG_FILE="$SCRIPT_DIR/$CONFIG_FILE" ;; esac
+echo "Config: $CONFIG_FILE" >&2
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Missing $CONFIG_FILE." >&2
   echo "Copy bootstrap.config.sh.template to bootstrap.config.sh and fill in your own values." >&2

@@ -15,6 +15,7 @@ Legend: **read-only** = changes nothing · **sandbox** = sandbox only · **PROD*
 |---|---|---|
 | `./bootstrap.sh up` | Deploys all 12 stacks in order, creates or updates the Square webhook (if `SQUARE_WEBHOOK_AUTO="true"`), and onboards the first venue with `FIRST_CLIENT_SETTINGS_FILE`. Asks first. Safe to re-run; onboarding fails cleanly once the venue exists. | ENV |
 | `./bootstrap.sh up --yes` | Same, no prompt (for unattended runs). | ENV |
+| `BOOTSTRAP_CONFIG=bootstrap.config.<name>.sh ./bootstrap.sh up` | Same, for a second environment with its own (gitignored) config file. Works with every command. | ENV |
 | `./bootstrap.sh down` | Removes the Square webhook (only if it points at this environment), offboards every venue, deletes every stack, bucket, layer and the Aurora cluster. **Not reversible. Never against production** (with `ENV_IS_PRODUCTION="true"` it refuses unless you add `--production`, then makes you type the name). | ENV |
 | `./bootstrap.sh block` | Emergency stop: every Lambda in the environment rejects all requests. What the cost-guard breaker does when the daily budget trips. | ENV |
 | `./bootstrap.sh unblock` | Undo `block` or a tripped breaker. | ENV |
