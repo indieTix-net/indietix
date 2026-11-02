@@ -29,6 +29,8 @@ aws lambda invoke \
 
 Omit `reportDate` entirely to use today (Chicago). An invalid date format returns a `400` before anything else runs.
 
+**Delivery-failure alerts.** A failed FTP upload doesn't fail the run (the summary still says `Failed: 0`), so each venue with a failed upload, or whose report couldn't run at all, gets an email: to its contact email and `OWNER_BCC_EMAIL`, from its `SENDER_EMAIL`. The log says `DELIVERY FAILED`, and the summary counts `deliveryFailures`. To check alerting works without sending any reports, invoke with `{"testAlert": true}`.
+
 **Be careful re-invoking this against real client configurations.** FTP destinations configured in production are live, real delivery targets for a nightly job — a manual test run with real client data will actually re-deliver a real report to a real third party, there's no dry-run mode. Test against a sandbox environment's clients (which won't have real FTP credentials configured) rather than production ones, or double-check a given client's `USE_FTP`/`FTP*_HOST` fields are genuinely safe to trigger before invoking against it directly.
 
 ## Key files

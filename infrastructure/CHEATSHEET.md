@@ -21,6 +21,16 @@ Legend: **read-only** = changes nothing · **sandbox** = sandbox only · **PROD*
 | `./bootstrap.sh unblock` | Undo `block` or a tripped breaker. | ENV |
 | `./bootstrap.sh breaker-status` | Shows each Lambda as open or BLOCKED. | read-only |
 
+**Optional features** (in `bootstrap.config.sh`, applied by `up`; details in the README):
+
+| Setting | Turns on |
+|---|---|
+| `SQUARE_ENVIRONMENT="sandbox"` | Square's sandbox instead of production |
+| `SQUARE_APP_ID` + `SQUARE_APP_SECRET` | Connect Square (OAuth) and the daily token refresher; `up` prints the redirect URL to register with Square |
+| `HOSTED_SIGNUP="true"` + `HOSTED_SENDER_EMAIL` | Self-serve signup at `<site>/signup.html` |
+| `HOSTED_SUPPORT_EMAIL` | The address shown on `<site>/support.html` |
+| `API_EDGE="true"` | CloudFront + WAF in front of the API (us-east-1); `up` prints the new API address for `config.js` |
+
 ## Ship a code change (`deploy.sh`)
 
 The normal path is: test → sandbox → diff → production, on a quiet weekday (never Sunday for `getSquareOrders` or `QRScanner`).
