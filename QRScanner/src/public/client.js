@@ -360,6 +360,75 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Success modal
     const successModal = new bootstrap.Modal(document.getElementById('success-modal'));
+
+    // ---- CONNECT SQUARE ----
+    // Shown only when this deployment has a Square app (GET
+    // /api/square/oauth/status says available). Connecting sends the
+    // browser to Square's sign-in; Square returns it here with
+    // ?square=<result>, which is shown once and then cleared from the URL.
+    const squareConnect = document.getElementById('square-connect');
+    const squareConnectStatus = document.getElementById('square-connect-status');
+    const squareConnectBtn = document.getElementById('square-connect-btn');
+    const SQUARE_CONNECT_RESULTS = {
+        connected: ['success', 'Square is connected. Your access renews automatically.'],
+        denied: ['warning', 'Square wasn\'t connected: access wasn\'t approved.'],
+        expired: ['warning', 'That sign-in took too long or was already used. Try Connect Square again.'],
+        'wrong-account': ['danger', 'That Square account isn\'t this venue\'s. Sign in to Square with this venue\'s account and try again.'],
+        failed: ['danger', 'Square couldn\'t be connected. Try again, and contact support if it keeps failing.']
+    };
+
+    function showSquareConnectResult() {
+        const params = new URLSearchParams(window.location.search);
+        const result = SQUARE_CONNECT_RESULTS[params.get('square')];
+        if (!result) return;
+        const notice = document.createElement('div');
+        notice.className = `alert alert-${result[0]}`;
+        notice.setAttribute('role', 'status');
+        notice.textContent = result[1];
+        squareConnect.before(notice);
+        params.delete('square');
+        const query = params.toString();
+        history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''));
+    }
+
+    function loadSquareConnect() {
+        fetch(`${API_URL}/api/square/oauth/status`, { headers: getAuthHeaders() })
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                if (!data || !data.success || !data.available) return;
+                squareConnect.hidden = false;
+                const where = data.sandbox ? ' (Square sandbox)' : '';
+                if (data.mode === 'oauth') {
+                    const expires = data.expiresAt ? new Date(data.expiresAt).toLocaleDateString() : 'unknown';
+                    squareConnectStatus.textContent = `Connected to Square${where} as ${data.merchantId}. Access renews automatically (current access expires ${expires}).`;
+                    squareConnectBtn.textContent = 'Reconnect Square';
+                } else {
+                    squareConnectStatus.textContent = `Connect your Square account${where} in one step, instead of pasting an access token below.`;
+                    squareConnectBtn.textContent = 'Connect Square';
+                }
+            })
+            .catch(() => { /* panel stays hidden */ });
+    }
+
+    squareConnectBtn.addEventListener('click', function() {
+        squareConnectBtn.disabled = true;
+        fetch(`${API_URL}/api/square/oauth/start`, { headers: getAuthHeaders() })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success || !data.url) throw new Error(data.message || 'Could not start Connect Square');
+                window.location.href = data.url;
+            })
+            .catch(error => {
+                squareConnectBtn.disabled = false;
+                alert(error.message);
+            });
+    });
+
+    if (isClientLogin) {
+        showSquareConnectResult();
+        loadSquareConnect();
+    }
+    // ---- END CONNECT SQUARE ----
     
     let originalClientData = null;
     

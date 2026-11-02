@@ -7,7 +7,7 @@ import pkg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import AWS from 'aws-sdk';
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { SecretsManagerClient, GetSecretValueCommand, PutSecretValueCommand, CreateSecretCommand } from '@aws-sdk/client-secrets-manager';
 import mailcomposer from 'mailcomposer';
 import { calendar } from '@googleapis/calendar';
 import { GoogleAuth } from 'google-auth-library';
@@ -2511,6 +2511,10 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
           else ignoredKeys.push(key);
         }
       }
+      // A token typed or removed here is a personal token: the venue is no
+      // longer on Connect Square (see SQUARE OAUTH), so the refresh job
+      // must leave it alone.
+      if (accepted.SQUARE_ACCESS_TOKEN !== undefined) accepted.SQUARE_AUTH_MODE = 'personal';
       if (ignoredKeys.length) {
         console.warn(`Client settings save ignored non-user-definable keys: ${ignoredKeys.join(', ')}`);
       }
@@ -2541,6 +2545,218 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
     });
   }
 });
+
+// ---- SQUARE OAUTH ----
+// "Connect Square": a venue authorizes the IndieTix Square app (OAuth code
+// flow) instead of pasting a personal access token. A deployment turns it
+// on with three environment variables:
+//   SQUARE_APP_ID             the app's Application ID (Developer Dashboard)
+//   SQUARE_APP_SECRET_ID      Secrets Manager secret holding the app's
+//                             secret as {"client_secret": "..."}
+//   SQUARE_OAUTH_REDIRECT_URL this API's /square/oauth/callback, exactly as
+//                             registered in the Developer Dashboard
+// The access token goes in the venue's existing SQUARE_ACCESS_TOKEN, so
+// every Lambda keeps working unchanged; the refresh token goes in Secrets
+// Manager (indieTix/square/clients/{clientId}), never in the database.
+// Personal-token mode (SQUARE_AUTH_MODE unset or "personal") stays the
+// default, for Liberty Hall and self-hosters.
+const SQUARE_OAUTH_SCOPES = [
+  'MERCHANT_PROFILE_READ',
+  'ITEMS_READ', 'ITEMS_WRITE',
+  'INVENTORY_READ', 'INVENTORY_WRITE',
+  'ORDERS_READ',
+  'PAYMENTS_READ', 'PAYMENTS_WRITE',
+  'CUSTOMERS_READ'
+];
+
+function squareOAuthSettings() {
+  const appId = process.env.SQUARE_APP_ID;
+  const secretId = process.env.SQUARE_APP_SECRET_ID;
+  const redirectUrl = process.env.SQUARE_OAUTH_REDIRECT_URL;
+  return appId && secretId && redirectUrl ? { appId, secretId, redirectUrl } : null;
+}
+
+async function loadClientConfigFresh(clientId) {
+  const pool = await createClientDbConnection(clientId);
+  try {
+    return await getClientConfiguration(pool, clientId);
+  } finally {
+    await pool.end();
+  }
+}
+
+async function saveSquareRefreshToken(clientId, refreshToken) {
+  const name = `indieTix/square/clients/${clientId}`;
+  const SecretString = JSON.stringify({ refresh_token: refreshToken });
+  try {
+    await secretsClient.send(new PutSecretValueCommand({ SecretId: name, SecretString }));
+  } catch (error) {
+    if (error.name !== 'ResourceNotFoundException') throw error;
+    await secretsClient.send(new CreateSecretCommand({
+      Name: name,
+      SecretString,
+      Description: `Square OAuth refresh token for IndieTix venue ${clientId}`
+    }));
+  }
+}
+
+// Where the browser goes when the flow ends: back to Client Settings with
+// a result the page shows. Without a known venue there's no page to go to.
+function squareOAuthReturn(res, config, result) {
+  if (config && config.STATIC_WEBSITE_URL) {
+    return res.redirect(302, `${config.STATIC_WEBSITE_URL.replace(/\/+$/, '')}/client.html?square=${encodeURIComponent(result)}`);
+  }
+  return res.status(400).type('text/plain').send('Square could not be connected. Go back to Client Settings and try again.');
+}
+
+// Status for Client Settings' Connect Square panel.
+app.get('/api/square/oauth/status', requireAuth, requireClientAuth, async (req, res) => {
+  try {
+    const config = await loadClientConfigFresh(req.user.dbName);
+    res.json({
+      success: true,
+      available: !!squareOAuthSettings(),
+      sandbox: SQUARE_API_BASE.includes('squareupsandbox'),
+      mode: config.SQUARE_AUTH_MODE === 'oauth' ? 'oauth' : 'personal',
+      merchantId: config.SQUARE_MERCHANT_ID || null,
+      expiresAt: config.SQUARE_TOKEN_EXPIRES_AT || null,
+      locationId: config.SQUARE_LOCATION_ID || null
+    });
+  } catch (error) {
+    console.error('Square OAuth status failed:', error.message);
+    res.status(500).json({ success: false, message: 'Could not read the Square connection' });
+  }
+});
+
+// Step 1: the page asks for Square's sign-in URL (a fetch can't follow a
+// redirect with the login token on it), then sends the browser there.
+// state = a 10-minute token signed with the venue's own JWT_SECRET, naming
+// the venue, so the public callback knows which venue it's for and can't
+// be forged or replayed later.
+app.get('/api/square/oauth/start', requireAuth, requireClientAuth, async (req, res) => {
+  const settings = squareOAuthSettings();
+  if (!settings) {
+    return res.status(404).json({ success: false, message: 'Connect Square is not set up on this deployment' });
+  }
+  try {
+    const config = await loadClientConfigFresh(req.user.dbName);
+    const state = jwt.sign(
+      { purpose: 'square-oauth', clientId: req.user.dbName, nonce: crypto.randomBytes(16).toString('hex') },
+      config.JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+    const url = new URL(`${SQUARE_API_BASE}/oauth2/authorize`);
+    url.searchParams.set('client_id', settings.appId);
+    url.searchParams.set('scope', SQUARE_OAUTH_SCOPES.join(' '));
+    url.searchParams.set('session', 'false');
+    url.searchParams.set('state', state);
+    url.searchParams.set('redirect_uri', settings.redirectUrl);
+    res.json({ success: true, url: url.toString() });
+  } catch (error) {
+    console.error('Square OAuth start failed:', error.message);
+    res.status(500).json({ success: false, message: 'Could not start Connect Square' });
+  }
+});
+
+// Step 2 (public): Square sends the browser back here with a code. Checks
+// state, swaps the code for tokens, makes sure the Square account is this
+// venue's (venue ID = Square merchant ID), stores the tokens, and returns
+// to Client Settings. Tokens are never logged.
+app.get('/square/oauth/callback', async (req, res) => {
+  const settings = squareOAuthSettings();
+  const { code, state, error } = req.query;
+
+  // Which venue: from state, verified below with that venue's own secret.
+  const unverified = typeof state === 'string' ? jwt.decode(state) : null;
+  const clientId = unverified && typeof unverified.clientId === 'string' ? unverified.clientId : null;
+  if (!settings || !clientId || !/^[A-Za-z0-9]+$/.test(clientId)) {
+    console.warn('Square OAuth callback: no usable state');
+    return squareOAuthReturn(res, null);
+  }
+
+  let config;
+  try {
+    config = await loadClientConfigFresh(clientId);
+  } catch (loadError) {
+    console.warn(`Square OAuth callback: unknown venue ${clientId}`);
+    return squareOAuthReturn(res, null);
+  }
+  try {
+    const verified = jwt.verify(state, config.JWT_SECRET);
+    if (verified.purpose !== 'square-oauth' || verified.clientId !== clientId) throw new Error('wrong purpose');
+  } catch (stateError) {
+    console.warn(`Square OAuth callback for ${clientId}: state rejected (${stateError.message})`);
+    return squareOAuthReturn(res, config, 'expired');
+  }
+  if (error || typeof code !== 'string' || !code) {
+    console.log(`Square OAuth callback for ${clientId}: not authorized (${error || 'no code'})`);
+    return squareOAuthReturn(res, config, 'denied');
+  }
+
+  try {
+    const secretResponse = await secretsClient.send(new GetSecretValueCommand({ SecretId: settings.secretId }));
+    const clientSecret = JSON.parse(secretResponse.SecretString).client_secret;
+    if (!clientSecret) throw new Error('Square app secret has no client_secret');
+
+    const tokenResponse = await fetch(`${SQUARE_API_BASE}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: settings.appId,
+        client_secret: clientSecret,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: settings.redirectUrl
+      })
+    });
+    const tokens = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokens.access_token || !tokens.refresh_token) {
+      console.error(`Square OAuth token exchange failed for ${clientId}: HTTP ${tokenResponse.status} ${(tokens.errors || []).map(e => e.code).join(',')}`);
+      return squareOAuthReturn(res, config, 'failed');
+    }
+    if (tokens.merchant_id !== clientId) {
+      console.warn(`Square OAuth callback for ${clientId}: signed in as a different Square account (${tokens.merchant_id})`);
+      return squareOAuthReturn(res, config, 'wrong-account');
+    }
+
+    const update = {
+      SQUARE_ACCESS_TOKEN: tokens.access_token,
+      SQUARE_TOKEN_EXPIRES_AT: tokens.expires_at || null,
+      SQUARE_AUTH_MODE: 'oauth',
+      SQUARE_MERCHANT_ID: tokens.merchant_id
+    };
+    // A venue with one active location gets it filled in, as bootstrap.sh
+    // does for a personal token; with several, they pick in Client Settings.
+    if (!config.SQUARE_LOCATION_ID) {
+      try {
+        const locationsResponse = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
+          headers: { 'Authorization': `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' }
+        });
+        const active = ((await locationsResponse.json()).locations || []).filter(l => l.status === 'ACTIVE');
+        if (active.length === 1) update.SQUARE_LOCATION_ID = active[0].id;
+      } catch (locationError) {
+        console.warn(`Square OAuth callback for ${clientId}: locations lookup failed (${locationError.message})`);
+      }
+    }
+
+    await saveSquareRefreshToken(clientId, tokens.refresh_token);
+    const pool = await createClientDbConnection(clientId);
+    try {
+      await pool.query(
+        `UPDATE "Client" SET "configuration" = "configuration"::jsonb || $1::jsonb, "updatedDate" = CURRENT_TIMESTAMP WHERE "clientID" = $2`,
+        [JSON.stringify(update), clientId]
+      );
+    } finally {
+      await pool.end();
+    }
+    console.log(`Square OAuth: ${clientId} connected (token expires ${update.SQUARE_TOKEN_EXPIRES_AT})`);
+    return squareOAuthReturn(res, config, 'connected');
+  } catch (callbackError) {
+    console.error(`Square OAuth callback failed for ${clientId}:`, callbackError.message);
+    return squareOAuthReturn(res, config, 'failed');
+  }
+});
+// ---- END SQUARE OAUTH ----
 
 // ---- CLIENT UI CONFIG ----
 // The handful of non-sensitive Client.configuration keys that operator pages

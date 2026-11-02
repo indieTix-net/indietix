@@ -88,6 +88,15 @@ SQUARE_WEBHOOK_NAME=""          # Subscription name to manage. Blank defaults to
 # Dashboard. Use it for building and testing the OAuth app safely.
 SQUARE_ENVIRONMENT="production"
 
+# ---- Connect Square (OAuth, optional) ----
+# Lets a venue connect its Square account with one click in Client Settings,
+# instead of pasting an access token. From the Square Developer Dashboard,
+# for the SQUARE_ENVIRONMENT above (sandbox and production have different
+# values): your app > Credentials. `up` prints the OAuth redirect URL to
+# register under your app > OAuth. Blank SQUARE_APP_ID leaves it off.
+SQUARE_APP_ID=""       # Application ID (sandbox ones start with sandbox-sq0idb-)
+SQUARE_APP_SECRET=""   # Application Secret. Secret: this file only, never commit or share it
+
 # ---- First client's other Client Settings (optional) ----
 # Path to a JSON file of initial Client Settings for the first client --
 # OMDB, Google Calendar, FTP reporting, API keys, social media, and so on.

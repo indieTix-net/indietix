@@ -120,6 +120,13 @@ SQUARE_WEBHOOK_NAME="${SQUARE_WEBHOOK_NAME:-$ENV_PREFIX}"
 # "sandbox" (Square's test environment, fake sellers and money). Sets
 # SQUARE_API_BASE for the Square-calling Lambdas and square-webhook.py.
 SQUARE_ENVIRONMENT="${SQUARE_ENVIRONMENT:-production}"
+# Connect Square (OAuth): the Square app's Application ID and Application
+# Secret for SQUARE_ENVIRONMENT. Blank SQUARE_APP_ID leaves it off.
+SQUARE_APP_ID="${SQUARE_APP_ID:-}"
+SQUARE_APP_SECRET="${SQUARE_APP_SECRET:-}"
+if [ -n "$SQUARE_APP_ID" ] && [ -z "$SQUARE_APP_SECRET" ]; then
+  echo "SQUARE_APP_ID is set, so SQUARE_APP_SECRET (the app's Application Secret) is needed too" >&2; exit 1
+fi
 case "$SQUARE_ENVIRONMENT" in
   production) SQUARE_API_BASE="https://connect.squareup.com" ;;
   sandbox) SQUARE_API_BASE="https://connect.squareupsandbox.com" ;;
@@ -196,46 +203,95 @@ square_webhook_for() {
     python3 "$SCRIPT_DIR/lib/square-webhook.py" "$1"
 }
 
-# set_square_api_base -- points each Square-calling Lambda at this
-# environment's Square (SQUARE_ENVIRONMENT): sets SQUARE_API_BASE for
-# "sandbox", removes it for "production" (the code's default). Merges into
-# the function's existing variables instead of owning them in the SAM
-# templates, because CloudFormation would wipe anything set outside them
-# (TICKET_SIGNER_*). The variables go through a 0600 temp file, never argv.
-set_square_api_base() {
-  local suffix fn env_file result
-  for suffix in get-square-orders qrscanner expire-modifiers marketing-engine; do
-    fn="${ENV_PREFIX}-${suffix}"
-    env_file="$(umask 077; mktemp "$STAGING/lambda-env.XXXXXX")"
-    result=$(aws lambda get-function-configuration --function-name "$fn" \
-        "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
-        --query 'Environment.Variables' --output json \
-      | python3 -c '
+# merge_lambda_env <function> <set-json> [key-to-remove ...] -- sets the
+# variables in <set-json> (a JSON object) and removes the listed keys on one
+# Lambda, keeping every other variable. Not in the SAM templates, because
+# CloudFormation would wipe anything set outside them (TICKET_SIGNER_*).
+# The variables go through a 0600 temp file, never argv.
+merge_lambda_env() {
+  local fn="$1" set_json="$2" env_file result
+  shift 2
+  env_file="$(umask 077; mktemp "$STAGING/lambda-env.XXXXXX")"
+  result=$(aws lambda get-function-configuration --function-name "$fn" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
+      --query 'Environment.Variables' --output json \
+    | python3 -c '
 import json, sys
 current = json.load(sys.stdin) or {}
-mode, base, out = sys.argv[1], sys.argv[2], sys.argv[3]
-wanted = dict(current)
-if mode == "sandbox":
-    wanted["SQUARE_API_BASE"] = base
-else:
-    wanted.pop("SQUARE_API_BASE", None)
+out, sets, removes = sys.argv[1], json.loads(sys.argv[2]), sys.argv[3:]
+wanted = {k: v for k, v in current.items() if k not in removes}
+wanted.update(sets)
 if wanted == current:
     print("unchanged")
 else:
     with open(out, "w") as f:
         json.dump({"Variables": wanted}, f)
     print("changed")
-' "$SQUARE_ENVIRONMENT" "$SQUARE_API_BASE" "$env_file")
-    if [ "$result" = "changed" ]; then
-      aws lambda update-function-configuration --function-name "$fn" \
-        --environment "file://$env_file" \
-        "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null
-      aws lambda wait function-updated --function-name "$fn" \
-        "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
-      echo "  $fn: Square API set to $SQUARE_API_BASE"
+' "$env_file" "$set_json" "$@")
+  if [ "$result" = "changed" ]; then
+    aws lambda update-function-configuration --function-name "$fn" \
+      --environment "file://$env_file" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null
+    aws lambda wait function-updated --function-name "$fn" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
+  fi
+  rm -f "$env_file"
+  echo "$result"
+}
+
+# set_square_api_base -- points each Square-calling Lambda at this
+# environment's Square (SQUARE_ENVIRONMENT): sets SQUARE_API_BASE for
+# "sandbox", removes it for "production" (the code's default).
+set_square_api_base() {
+  local suffix
+  for suffix in get-square-orders qrscanner expire-modifiers marketing-engine; do
+    if [ "$SQUARE_ENVIRONMENT" = "sandbox" ]; then
+      [ "$(merge_lambda_env "${ENV_PREFIX}-${suffix}" "{\"SQUARE_API_BASE\": \"$SQUARE_API_BASE\"}")" = "changed" ] \
+        && echo "  ${ENV_PREFIX}-${suffix}: Square API set to $SQUARE_API_BASE"
+    else
+      [ "$(merge_lambda_env "${ENV_PREFIX}-${suffix}" '{}' SQUARE_API_BASE)" = "changed" ] \
+        && echo "  ${ENV_PREFIX}-${suffix}: Square API set to $SQUARE_API_BASE"
     fi
-    rm -f "$env_file"
   done
+  return 0
+}
+
+# set_square_oauth -- Connect Square (QRScanner's SQUARE OAUTH section).
+# With SQUARE_APP_ID set: stores SQUARE_APP_SECRET in Secrets Manager as
+# indieTix/square/app/<ENV_PREFIX> ({"client_secret": ...}, via a 0600
+# temp file) and gives the QRScanner Lambda the app ID, that secret's name
+# and its callback URL. Without it: removes those, which turns the
+# feature off. Venues' own tokens are never touched here.
+set_square_oauth() {
+  local fn="${ENV_PREFIX}-qrscanner" secret_name="indieTix/square/app/${ENV_PREFIX}"
+  local secret_file redirect_url
+  if [ -z "$SQUARE_APP_ID" ]; then
+    [ "$(merge_lambda_env "$fn" '{}' SQUARE_APP_ID SQUARE_APP_SECRET_ID SQUARE_OAUTH_REDIRECT_URL)" = "changed" ] \
+      && echo "  Connect Square turned off (SQUARE_APP_ID is blank)"
+    return 0
+  fi
+  secret_file="$(umask 077; mktemp "$STAGING/square-app-secret.XXXXXX")"
+  SQUARE_APP_SECRET="$SQUARE_APP_SECRET" python3 -c '
+import json, os, sys
+json.dump({"client_secret": os.environ["SQUARE_APP_SECRET"]}, open(sys.argv[1], "w"))
+' "$secret_file"
+  if aws secretsmanager describe-secret --secret-id "$secret_name" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
+    aws secretsmanager put-secret-value --secret-id "$secret_name" --secret-string "file://$secret_file" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null
+  else
+    aws secretsmanager create-secret --name "$secret_name" --secret-string "file://$secret_file" \
+      --description "IndieTix Square app secret for $ENV_PREFIX (Connect Square)" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null
+  fi
+  rm -f "$secret_file"
+  redirect_url="$(stack_output qrscanner FunctionUrl)"
+  redirect_url="${redirect_url%/}/square/oauth/callback"
+  merge_lambda_env "$fn" "$(python3 -c 'import json, sys; print(json.dumps({"SQUARE_APP_ID": sys.argv[1], "SQUARE_APP_SECRET_ID": sys.argv[2], "SQUARE_OAUTH_REDIRECT_URL": sys.argv[3]}))' \
+    "$SQUARE_APP_ID" "$secret_name" "$redirect_url")" >/dev/null
+  echo "  Connect Square is on. Register this OAuth redirect URL in the Square"
+  echo "  Developer Dashboard (app > OAuth, $SQUARE_ENVIRONMENT):"
+  echo "    $redirect_url"
 }
 
 # json_field <key> -- prints one top-level field of the JSON object on stdin.
@@ -553,6 +609,7 @@ cmd_up() {
   # 5a. Which Square the Lambdas call (SQUARE_ENVIRONMENT).
   echo "Square API for this environment: $SQUARE_API_BASE"
   set_square_api_base
+  set_square_oauth
   echo
 
   # 5b. Optional cost guard: budgets that email BUDGET_ALERT_EMAIL, plus
