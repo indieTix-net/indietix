@@ -277,6 +277,21 @@ set_square_api_base() {
   return 0
 }
 
+# set_static_site_bucket -- tells QRScanner and client-setup-teardown this
+# environment's static site bucket (STATIC_SITE_BUCKET): QRScanner's Client
+# Settings logo upload writes venue-logos/<clientId>/, and removing a venue
+# deletes that folder. Both roles can already write ${ENV_PREFIX}-* buckets.
+set_static_site_bucket() {
+  local bucket suffix
+  bucket="$(stack_output static-site BucketName)"
+  [ -n "$bucket" ] || return 0
+  for suffix in qrscanner client-setup-teardown; do
+    [ "$(merge_lambda_env "${ENV_PREFIX}-${suffix}" "{\"STATIC_SITE_BUCKET\": \"$bucket\"}")" = "changed" ] \
+      && echo "  ${ENV_PREFIX}-${suffix}: venue logos in $bucket"
+  done
+  return 0
+}
+
 # set_square_oauth <webhook-url> -- Connect Square (QRScanner's SQUARE
 # OAUTH section). With SQUARE_APP_ID set: stores, via a 0600 temp file, the
 # Secrets Manager secret indieTix/square/app/<ENV_PREFIX> = {"client_secret":
@@ -710,6 +725,7 @@ cmd_up() {
   # 5a. Which Square the Lambdas call (SQUARE_ENVIRONMENT).
   echo "Square API for this environment: $SQUARE_API_BASE"
   set_square_api_base
+  set_static_site_bucket
   set_api_edge
   set_square_oauth "$webhook_url"
   echo

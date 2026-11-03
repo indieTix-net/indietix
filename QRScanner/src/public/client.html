@@ -215,9 +215,22 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="logo-file" class="form-label">Logo File</label>
-                                <input type="text" class="form-control" id="logo-file" name="logo_file" autocomplete="off" placeholder="e.g., company-logo.png">
-                                <div class="form-text">Filename for your company logo (defaults to indieTixLogo.png)</div>
+                                <!-- Logo upload: shown when this site can store logos (GET /api/client logoUpload) -->
+                                <div id="logo-upload" hidden>
+                                    <label for="logo-upload-file" class="form-label">Logo</label>
+                                    <div class="mb-2"><img id="logo-preview" alt="Current logo" style="max-width: 200px; max-height: 100px;"></div>
+                                    <input type="file" class="form-control" id="logo-upload-file" accept="image/png,image/jpeg,image/webp,image/gif">
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-primary btn-sm" id="logo-upload-btn">Upload Logo</button>
+                                        <button type="button" class="btn btn-secondary btn-sm" id="logo-reset-btn">Use Default Logo</button>
+                                    </div>
+                                    <div class="form-text" id="logo-upload-status">PNG, JPG, WebP or GIF, up to 4 MB. A PNG with a transparent background looks best. It's saved as soon as it uploads.</div>
+                                </div>
+                                <div id="logo-file-manual">
+                                    <label for="logo-file" class="form-label">Logo File</label>
+                                    <input type="text" class="form-control" id="logo-file" name="logo_file" autocomplete="off" placeholder="e.g., company-logo.png">
+                                    <div class="form-text">Filename for your company logo (defaults to indieTixLogo.png)</div>
+                                </div>
                             </div>
                         </div>
                     </div>

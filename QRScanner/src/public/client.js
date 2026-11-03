@@ -434,6 +434,84 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // ---- END CONNECT SQUARE ----
     
+    // ---- VENUE LOGO UPLOAD ----
+    // When the site can store logos (GET /api/client says logoUpload), the
+    // file-name box is replaced by an upload. An upload or reset saves
+    // LOGO_FILE right away and copies it into the (hidden) box, so a later
+    // Save keeps it. The header caches branding, so clear that cache too.
+    const logoUpload = document.getElementById('logo-upload');
+    const logoManual = document.getElementById('logo-file-manual');
+    const logoPreview = document.getElementById('logo-preview');
+    const logoUploadFile = document.getElementById('logo-upload-file');
+    const logoUploadBtn = document.getElementById('logo-upload-btn');
+    const logoResetBtn = document.getElementById('logo-reset-btn');
+    const logoUploadStatus = document.getElementById('logo-upload-status');
+    const LOGO_MAX_BYTES = 4 * 1024 * 1024;
+
+    function showLogoUpload(enabled) {
+        logoUpload.hidden = !enabled;
+        logoManual.hidden = enabled;
+        if (enabled) logoPreview.src = logoFileInput.value || 'indieTixLogo.png';
+    }
+
+    function logoSaved(logoFile, message) {
+        logoFileInput.value = logoFile;
+        logoPreview.src = logoFile;
+        logoUploadFile.value = '';
+        logoUploadStatus.textContent = message;
+        if (window.HeaderLoader) {
+            window.HeaderLoader.clearCache();
+            const headerLogo = document.getElementById('header-logo');
+            if (headerLogo) headerLogo.src = logoFile;
+        }
+    }
+
+    function sendLogoRequest(method, body) {
+        logoUploadBtn.disabled = true;
+        logoResetBtn.disabled = true;
+        return fetch(`${API_URL}/api/client/logo`, {
+            method,
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) throw new Error(data.message || 'Logo could not be saved');
+                return data;
+            })
+            .finally(() => {
+                logoUploadBtn.disabled = false;
+                logoResetBtn.disabled = false;
+            });
+    }
+
+    logoUploadBtn.addEventListener('click', function() {
+        const file = logoUploadFile.files[0];
+        if (!file) {
+            alert('Choose an image first.');
+            return;
+        }
+        if (file.size > LOGO_MAX_BYTES) {
+            alert('That image is over 4 MB. Choose a smaller one.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            sendLogoRequest('POST', { dataUrl: reader.result })
+                .then(data => logoSaved(data.logoFile, 'Logo uploaded and saved.'))
+                .catch(error => alert(error.message));
+        };
+        reader.onerror = () => alert('That file could not be read.');
+        reader.readAsDataURL(file);
+    });
+
+    logoResetBtn.addEventListener('click', function() {
+        sendLogoRequest('DELETE')
+            .then(data => logoSaved(data.logoFile, 'Back to the default logo.'))
+            .catch(error => alert(error.message));
+    });
+    // ---- END VENUE LOGO UPLOAD ----
+
     let originalClientData = null;
     
     console.log('DOM Elements found:', {
@@ -561,6 +639,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success && data.client) {
                 originalClientData = data.client;
                 populateForm(data.client);
+                showLogoUpload(Boolean(data.logoUpload));
             } else {
                 throw new Error(data.message || 'Failed to load client data');
             }

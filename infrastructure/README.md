@@ -173,6 +173,8 @@ Optional features, each switched on in `bootstrap.config.sh` and applied by `up`
 | `API_EDGE="true"` | **API firewall**: CloudFront + WAF in front of the QRScanner API |
 | `OPERATOR_ALERT_EMAIL` | Who's copied on Connect Square renewal failures (default: `BUDGET_ALERT_EMAIL`) |
 
+Always on: `up` gives QRScanner and client teardown the static site's bucket name (`STATIC_SITE_BUCKET`), which turns on **logo upload** in Client Settings. Every venue in an environment shares the static site, so each venue's logo goes in its own `venue-logos/<clientId>/` folder, and removing a venue deletes that folder.
+
 It's safe to re-run. CloudFormation only applies what changed, and a stack left behind by a failed earlier attempt gets cleaned up and retried automatically. With `SQUARE_WEBHOOK_AUTO="true"`, one run is enough. Without it, the usual flow for a first-timer is: run `up` once, take the webhook URL it prints over to Square to get a signature key, add that key to the config, and run `up` again.
 
 **Tear it down:**

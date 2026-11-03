@@ -216,6 +216,37 @@ async function deleteSquareRefreshSecret(clientUsername) {
 }
 
 /**
+ * Deletes the venue's uploaded logos (venue-logos/<id>/ in the static site
+ * bucket, written by QRScanner's VENUE LOGO UPLOAD). The static site is
+ * shared by every venue in the environment, so only this one folder goes.
+ * Off unless STATIC_SITE_BUCKET is set (bootstrap.sh sets it).
+ * @returns {Promise<number|'off'|false>} logos deleted, 'off', or false on error
+ */
+async function deleteVenueLogos(clientUsername) {
+  const bucket = process.env.STATIC_SITE_BUCKET;
+  if (!bucket) return 'off';
+  const prefix = `venue-logos/${clientUsername}/`;
+  let deleted = 0;
+  try {
+    let token;
+    do {
+      const page = await s3Client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }));
+      const objects = (page.Contents || []).map(obj => ({ Key: obj.Key })).filter(obj => obj.Key.startsWith(prefix));
+      if (objects.length > 0) {
+        await s3Client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: objects } }));
+        deleted += objects.length;
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    console.log(`Deleted ${deleted} logo file(s) from ${bucket}/${prefix}`);
+    return deleted;
+  } catch (error) {
+    console.error(`Error deleting logos from ${bucket}/${prefix}:`, error);
+    return false;
+  }
+}
+
+/**
  * Creates a new PostgreSQL user for the client
  * @param {Object} dbConfig - Database configuration
  * @param {string} clientUsername - Client username
@@ -1676,6 +1707,7 @@ async function deleteClient(dbConfig, clientUsername) {
     databaseDeleted: false,
     secretDeleted: false,
     squareSecretDeleted: false,
+    logosDeleted: false,
     s3BucketsHandled: []
   };
   
@@ -1685,6 +1717,8 @@ async function deleteClient(dbConfig, clientUsername) {
     results.secretDeleted = secretDeleted;
     // 1a. Its Connect Square refresh token, if any ('none' for personal-token venues).
     results.squareSecretDeleted = await deleteSquareRefreshSecret(clientUsername);
+    // 1a2. Its uploaded logos on the shared static site ('off' if not set up).
+    results.logosDeleted = await deleteVenueLogos(clientUsername);
 
     // 1b. Look up the bucket prefix this client was actually created with,
     // from its own database -- must happen before the database is dropped
@@ -2010,5 +2044,6 @@ exports.handler = async (event, context) => {
 // Does NOT change exports.handler's own behavior.
 exports.createDatabaseObjects = createDatabaseObjects;
 exports.createS3Buckets = createS3Buckets;
+exports.deleteVenueLogos = deleteVenueLogos;
 exports.deleteSquareRefreshSecret = deleteSquareRefreshSecret;
 exports.insertClientRecord = insertClientRecord;

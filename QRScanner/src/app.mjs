@@ -2329,7 +2329,10 @@ app.get('/api/client', requireAuth, requireClientAuth, async (req, res) => {
     
     res.json({
       success: true,
-      client: clientData
+      client: clientData,
+      // Client Settings shows the logo upload instead of the file-name box
+      // when this deployment can store logos (see VENUE LOGO UPLOAD).
+      logoUpload: Boolean(staticSiteBucket())
     });
   } catch (error) {
     console.error('Error fetching client:', error);
@@ -2566,6 +2569,99 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
     });
   }
 });
+
+// ---- VENUE LOGO UPLOAD ----
+// Client Settings uploads the venue's logo instead of typing a file name.
+// The header loads LOGO_FILE relative to the environment's static site,
+// which every venue in the environment shares, so each venue's uploads go
+// under its own venue-logos/<clientId>/ folder with a random name (no venue
+// can replace another's file, and a new name means no stale CDN copy).
+// Off unless STATIC_SITE_BUCKET names the static site's bucket (bootstrap.sh
+// sets it); without it the page keeps the file-name box.
+const staticSiteBucket = () => process.env.STATIC_SITE_BUCKET || '';
+const LOGO_MAX_BYTES = 4 * 1024 * 1024;
+// No SVG: it can carry script, and it's served from the site's own origin.
+const LOGO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const DEFAULT_LOGO_FILE = 'indieTixLogo.png';
+const venueLogoFolder = (clientId) => `venue-logos/${clientId}/`;
+
+async function setVenueLogoFile(req, logoFile) {
+  const dbCredentials = await getDatabaseCredentials(req.user.dbName);
+  const { Client } = await initializeClientModel(req.user.dbName, dbCredentials);
+  const client = await Client.findOne({ where: { clientID: req.user.username } });
+  if (!client) return null;
+  const previous = (client.configuration || {}).LOGO_FILE || '';
+  await client.update({
+    configuration: { ...(client.configuration || {}), LOGO_FILE: logoFile },
+    updatedDate: new Date()
+  });
+  // Only ever delete this venue's own earlier upload.
+  if (previous !== logoFile && previous.startsWith(venueLogoFolder(req.user.username))) {
+    try {
+      await s3.deleteObject({ Bucket: staticSiteBucket(), Key: previous }).promise();
+    } catch (error) {
+      console.warn(`Could not delete old logo ${previous}: ${error.message}`);
+    }
+  }
+  return logoFile;
+}
+
+app.post('/api/client/logo', requireAuth, requireClientAuth, async (req, res) => {
+  try {
+    if (!staticSiteBucket()) {
+      return res.status(503).json({ success: false, message: 'Logo upload is not set up for this site' });
+    }
+    const match = /^data:([a-z]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/i.exec(String(req.body?.dataUrl || ''));
+    if (!match || !LOGO_TYPES.has(match[1].toLowerCase())) {
+      return res.status(400).json({ success: false, message: 'Choose a PNG, JPG, WebP or GIF image' });
+    }
+    const input = Buffer.from(match[2], 'base64');
+    if (input.length > LOGO_MAX_BYTES) {
+      return res.status(413).json({ success: false, message: 'That image is over 4 MB' });
+    }
+    let png;
+    try {
+      // PNG keeps transparency; 600x300 is plenty for the header's 200px.
+      png = await sharp(input).rotate()
+        .resize({ width: 600, height: 300, fit: 'inside', withoutEnlargement: true })
+        .png().toBuffer();
+    } catch (error) {
+      return res.status(400).json({ success: false, message: 'That file could not be read as an image' });
+    }
+    const key = `${venueLogoFolder(req.user.username)}logo-${crypto.randomBytes(8).toString('hex')}.png`;
+    await s3.putObject({
+      Bucket: staticSiteBucket(),
+      Key: key,
+      Body: png,
+      ContentType: 'image/png',
+      CacheControl: 'public, max-age=31536000, immutable'
+    }).promise();
+    if (!await setVenueLogoFile(req, key)) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    console.log(`Logo uploaded for ${req.user.username}: ${key} (${png.length} bytes)`);
+    return res.json({ success: true, logoFile: key });
+  } catch (error) {
+    console.error('Logo upload failed:', error);
+    return res.status(500).json({ success: false, message: 'Logo upload failed' });
+  }
+});
+
+app.delete('/api/client/logo', requireAuth, requireClientAuth, async (req, res) => {
+  try {
+    if (!staticSiteBucket()) {
+      return res.status(503).json({ success: false, message: 'Logo upload is not set up for this site' });
+    }
+    if (!await setVenueLogoFile(req, DEFAULT_LOGO_FILE)) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    return res.json({ success: true, logoFile: DEFAULT_LOGO_FILE });
+  } catch (error) {
+    console.error('Logo reset failed:', error);
+    return res.status(500).json({ success: false, message: 'Could not reset the logo' });
+  }
+});
+// ---- END VENUE LOGO UPLOAD ----
 
 // ---- SQUARE OAUTH ----
 // "Connect Square": a venue authorizes the IndieTix Square app (OAuth code
