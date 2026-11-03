@@ -869,7 +869,8 @@ async function createSquareItem() {
             throw new Error(data.error || data.details || 'Failed to create item');
         }
         
-        alert(`Success! ${data.message}\n\nRemember to set the shipping rate profile to 'Tickets'.  View in Square: ${data.squareUrl}`);
+        // Square's API can't set Square Online fulfillment, so it's a manual step.
+        alert(`Success! ${data.message}\n\nOne more step: in Square, set this item's fulfillment to Pickup only (turn off Shipping and Delivery).\n\nView in Square: ${data.squareUrl}`);
         
         // Clear showtimes after successful creation
         showtimes = [];

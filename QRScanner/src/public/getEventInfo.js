@@ -489,7 +489,8 @@ async function createSquareItem() {
         const message = data.message || 'Event item created successfully!';
         const squareUrl = data.squareUrl;
         
-        let alertMessage = message;
+        // Square's API can't set Square Online fulfillment, so it's a manual step.
+        let alertMessage = `${message}\n\nOne more step: in Square, set this item's fulfillment to Pickup only (turn off Shipping and Delivery).`;
         if (squareUrl) {
             alertMessage += `\n\nView in Square: ${squareUrl}`;
         }
