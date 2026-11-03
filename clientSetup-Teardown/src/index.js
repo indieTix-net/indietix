@@ -1391,8 +1391,11 @@ async function insertAdminUser(dbConfig, clientUsername, adminData) {
 /**
  * Creates S3 buckets for the client and sets up initial files/folders
  * @param {string} clientUsername - Client username (will be lowercased for bucket names)
+ * @param {string} [siteUrl] - The venue's STATIC_WEBSITE_URL. When given, the
+ *   main bucket's CORS allows uploads from that site (hosted signup passes it);
+ *   when not, the old default origin is kept.
  */
-async function createS3Buckets(clientUsername, bucketPrefix = "indietix-") {
+async function createS3Buckets(clientUsername, bucketPrefix = "indietix-", siteUrl = "") {
   const lowerUsername = clientUsername.toLowerCase();
   console.log(`Creating S3 buckets for client: ${clientUsername} (buckets: ${bucketPrefix}${lowerUsername})`);
 
@@ -1602,15 +1605,22 @@ async function createS3Buckets(clientUsername, bucketPrefix = "indietix-") {
         });
       }
     
-      // Apply CORS configuration
+      // Apply CORS configuration. The browser uploads custom posters straight
+      // to this bucket (presigned PUT), so it has to allow the venue's own site.
       try {
+        let siteOrigin = "https://dyme6dznlnzgk.cloudfront.net";
+        try {
+          if (siteUrl) siteOrigin = new URL(siteUrl).origin;
+        } catch (e) {
+          console.warn(`Ignoring unparseable site URL for CORS: ${siteUrl}`);
+        }
         const corsConfiguration = {
           CORSRules: [
             {
               AllowedHeaders: ["*"],
               AllowedMethods: ["PUT", "POST", "GET"],
               AllowedOrigins: [
-                "https://dyme6dznlnzgk.cloudfront.net",
+                siteOrigin,
                 "http://localhost:3000",
                 "http://localhost:8080"
               ],
@@ -1942,7 +1952,7 @@ exports.handler = async (event, context) => {
     await insertClientRecord(baseDbConfig, username, clientData);
 
     // Step 7: Create S3 buckets
-    const s3Results = await createS3Buckets(username, clientData.s3_bucket_prefix);
+    const s3Results = await createS3Buckets(username, clientData.s3_bucket_prefix, clientData.settings?.STATIC_WEBSITE_URL);
 
     // Step 8: Insert the first admin user, if credentials were provided.
     // Optional -- see insertAdminUser's own comment for why this exists.

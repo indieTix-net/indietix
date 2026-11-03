@@ -50,3 +50,24 @@ test('createS3Buckets: any other create error still skips setup', async () => {
   await createS3Buckets('ABC123', 'env-');
   assert.ok(!names().includes('CopyObjectCommand'));
 });
+
+// Hosted signup creates the bucket here (no bootstrap client-buckets stack),
+// and the browser uploads custom posters straight to it, so its CORS has to
+// name the venue's own site, not another deployment's.
+const corsOrigins = () => calls.find(c => c.name === 'PutBucketCorsCommand').input.CORSConfiguration.CORSRules[0].AllowedOrigins;
+
+test("createS3Buckets: a new bucket's CORS allows the venue's own site", async () => {
+  await createS3Buckets('ABC123', 'env-', 'https://d111example.cloudfront.net/');
+  assert.equal(corsOrigins()[0], 'https://d111example.cloudfront.net');
+  assert.ok(!corsOrigins().includes('https://dyme6dznlnzgk.cloudfront.net'));
+});
+
+test('createS3Buckets: with no site URL the CORS default is unchanged', async () => {
+  await createS3Buckets('ABC123', 'env-');
+  assert.equal(corsOrigins()[0], 'https://dyme6dznlnzgk.cloudfront.net');
+});
+
+test('createS3Buckets: an unparseable site URL falls back to the default', async () => {
+  await createS3Buckets('ABC123', 'env-', 'not a url');
+  assert.equal(corsOrigins()[0], 'https://dyme6dznlnzgk.cloudfront.net');
+});
