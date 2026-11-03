@@ -90,8 +90,61 @@ test('POST /api/square/create-movie-item: a name collision in Square is rejected
   assert.match(json.error, /already exists/);
 });
 
-test('POST /api/square/create-movie-item: missing Cinema category is a 500, not a crash', async () => {
+// Records every catalog object create, answering a CATEGORY create with a
+// mock id and everything else the way the default handler does.
+function recordCatalogCreates(categoryResult) {
+  const created = [];
+  const defaultCreate = squareHandlers.createCatalogObject;
+  squareHandlers.createCatalogObject = async (body) => {
+    created.push(body.object);
+    if (body.object.type === 'CATEGORY') {
+      return categoryResult || { ok: true, status: 200, json: async () => ({ catalog_object: { ...body.object, id: `MOCK_CAT_NEW_${body.object.category_data.name}` } }) };
+    }
+    return defaultCreate(body);
+  };
+  return created;
+}
+
+test('POST /api/square/create-movie-item: missing Cinema category is created, then used for the item', async () => {
   squareHandlers.listCatalogCategories = async () => ({ ok: true, status: 200, json: async () => ({ objects: [] }) });
+  const created = recordCatalogCreates();
+  const { status, json } = await ctx.request('POST', '/api/square/create-movie-item', { token: ctx.clientToken, body: movieBody() });
+  assert.equal(status, 200);
+  assert.equal(json.success, true);
+  const categories = created.filter(o => o.type === 'CATEGORY');
+  assert.equal(categories.length, 1);
+  assert.equal(categories[0].category_data.name, 'Cinema');
+  const item = created.find(o => o.type === 'ITEM');
+  assert.equal(item.item_data.reporting_category.id, 'MOCK_CAT_NEW_Cinema');
+});
+
+test('POST /api/square/create-movie-item: an existing Cinema category is reused, not duplicated', async () => {
+  const created = recordCatalogCreates();
+  const { status } = await ctx.request('POST', '/api/square/create-movie-item', { token: ctx.clientToken, body: movieBody() });
+  assert.equal(status, 200);
+  assert.equal(created.filter(o => o.type === 'CATEGORY').length, 0);
+  assert.equal(created.find(o => o.type === 'ITEM').item_data.reporting_category.id, 'MOCK_CAT_CINEMA');
+});
+
+test('POST /api/square/create-movie-item: Cinema category on a later page of the list is found', async () => {
+  let calls = 0;
+  squareHandlers.listCatalogCategories = async () => {
+    calls += 1;
+    return calls === 1
+      ? { ok: true, status: 200, json: async () => ({ objects: [{ id: 'CAT_OTHER', category_data: { name: 'Bar' } }], cursor: 'PAGE2' }) }
+      : { ok: true, status: 200, json: async () => ({ objects: [{ id: 'CAT_PAGE2_CINEMA', category_data: { name: 'Cinema' } }] }) };
+  };
+  const created = recordCatalogCreates();
+  const { status } = await ctx.request('POST', '/api/square/create-movie-item', { token: ctx.clientToken, body: movieBody() });
+  assert.equal(status, 200);
+  assert.equal(calls, 2);
+  assert.equal(created.filter(o => o.type === 'CATEGORY').length, 0);
+  assert.equal(created.find(o => o.type === 'ITEM').item_data.reporting_category.id, 'CAT_PAGE2_CINEMA');
+});
+
+test('POST /api/square/create-movie-item: a failed category create is a 500, not a crash', async () => {
+  squareHandlers.listCatalogCategories = async () => ({ ok: true, status: 200, json: async () => ({ objects: [] }) });
+  recordCatalogCreates({ ok: false, status: 500, text: async () => 'square category failure' });
   const { status, json } = await ctx.request('POST', '/api/square/create-movie-item', { token: ctx.clientToken, body: movieBody() });
   assert.equal(status, 500);
   assert.match(json.error, /Cinema category/);
@@ -146,9 +199,15 @@ test('POST /api/square/create-event-item: a name collision in Square is rejected
   assert.equal(status, 409);
 });
 
-test('POST /api/square/create-event-item: missing Events category is a 500, not a crash', async () => {
+test('POST /api/square/create-event-item: missing Events category is created, then used for the item', async () => {
   squareHandlers.listCatalogCategories = async () => ({ ok: true, status: 200, json: async () => ({ objects: [{ id: 'CAT_X', category_data: { name: 'Cinema' } }] }) });
+  const created = recordCatalogCreates();
   const { status, json } = await ctx.request('POST', '/api/square/create-event-item', { token: ctx.clientToken, body: eventBody() });
-  assert.equal(status, 500);
-  assert.match(json.error, /Events category/);
+  assert.equal(status, 200);
+  assert.equal(json.success, true);
+  const categories = created.filter(o => o.type === 'CATEGORY');
+  assert.equal(categories.length, 1);
+  assert.equal(categories[0].category_data.name, 'Events');
+  const item = created.find(o => o.type === 'ITEM');
+  assert.equal(item.item_data.reporting_category.id, 'MOCK_CAT_NEW_Events');
 });

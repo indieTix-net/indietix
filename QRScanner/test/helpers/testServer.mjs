@@ -133,8 +133,8 @@ function defaultSquareHandlers() {
       json: async () => ({ objects: [] })
     }),
     // GET /v2/catalog/list?types=CATEGORY|CUSTOM_ATTRIBUTE_DEFINITION, used
-    // by create-movie-item/create-event-item. Category must include a
-    // "Cinema" category by default -- the route 500s without one.
+    // by create-movie-item/create-event-item. Includes a "Cinema" category
+    // by default; a missing one gets created through createCatalogObject.
     listCatalogCategories: async () => ({
       ok: true,
       status: 200,

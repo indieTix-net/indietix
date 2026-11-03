@@ -400,7 +400,8 @@ async function normalizePosterImage({ url, buffer, dataUrl }, { square = false, 
       inputBuffer = Buffer.from(matches[1], 'base64');
       console.log(`Decoded data URL poster, ${inputBuffer.length} bytes (pre-normalization)`);
     } else if (url) {
-      console.log(`Downloading poster from: ${url}`);
+      // OMDB poster URLs carry the venue's API key; keep it out of the logs.
+      console.log(`Downloading poster from: ${String(url).replace(/([?&]apikey=)[^&]*/i, '$1[redacted]')}`);
       const posterResponse = await fetch(url);
       if (!posterResponse.ok) {
         throw new Error(`Failed to download poster: ${posterResponse.status}`);
@@ -4588,6 +4589,46 @@ app.post('/api/orders/:orderId/delete', requireAuth, requirePermission(...PERMS_
 });
 
 
+// ---- SQUARE CATEGORY FIND-OR-CREATE ----
+// Add Movie / Add Event file items under the "Cinema" / "Events" reporting
+// category. A brand-new venue (hosted signup) has neither, so create the
+// category the first time it's needed instead of failing. Walks every page
+// of the category list (the list endpoint is paginated) and matches the
+// name exactly, same as before.
+async function findOrCreateSquareCategory(accessToken, name) {
+  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+  let cursor;
+  do {
+    const url = SQUARE_CATALOG_LIST_API_URL + '?types=CATEGORY' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+    const response = await fetch(url, { method: 'GET', headers });
+    const data = await response.json();
+    for (const cat of data.objects || []) {
+      if (cat.category_data?.name === name) {
+        console.log(`Found ${name} category: ${cat.id}`);
+        return cat.id;
+      }
+    }
+    cursor = data.cursor;
+  } while (cursor);
+
+  const createResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      idempotency_key: crypto.randomUUID(),
+      object: { type: 'CATEGORY', id: '#new_category', category_data: { name } }
+    })
+  });
+  if (!createResponse.ok) {
+    console.error(`Failed to create ${name} category: ${await createResponse.text()}`);
+    return null;
+  }
+  const created = await createResponse.json();
+  console.log(`Created ${name} category: ${created.catalog_object?.id}`);
+  return created.catalog_object?.id || null;
+}
+// ---- END SQUARE CATEGORY FIND-OR-CREATE ----
+
 // UPDATED ENDPOINT for app.mjs
 // This replaces the existing app.post('/api/square/create-movie-item', ...) endpoint
 
@@ -4668,30 +4709,10 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       });
     }
     
-    // 2. Find Cinema category
-    const categoryResponse = await fetch(SQUARE_CATALOG_LIST_API_URL+'?types=CATEGORY', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const categoryData = await categoryResponse.json();
-    let cinemaCategoryId = null;
-    
-    if (categoryData.objects) {
-      for (const cat of categoryData.objects) {
-        if (cat.category_data?.name === 'Cinema') {
-          cinemaCategoryId = cat.id;
-          console.log(`Found Cinema category: ${cinemaCategoryId}`);
-          break;
-        }
-      }
-    }
-    
+    // 2. Find (or create) the Cinema category
+    const cinemaCategoryId = await findOrCreateSquareCategory(accessToken, 'Cinema');
     if (!cinemaCategoryId) {
-      return res.status(500).json({ error: 'Cinema category not found' });
+      return res.status(500).json({ error: 'Could not find or create the Cinema category in Square' });
     }
    
     // 3. Get custom attribute definitions
@@ -5273,30 +5294,10 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       });
     }
     
-    // 2. Find Events category
-    const categoryResponse = await fetch(SQUARE_CATALOG_LIST_API_URL+'?types=CATEGORY', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const categoryData = await categoryResponse.json();
-    let eventsCategoryId = null;
-    
-    if (categoryData.objects) {
-      for (const cat of categoryData.objects) {
-        if (cat.category_data?.name === 'Events') {
-          eventsCategoryId = cat.id;
-          console.log(`Found Events category: ${eventsCategoryId}`);
-          break;
-        }
-      }
-    }
-    
+    // 2. Find (or create) the Events category
+    const eventsCategoryId = await findOrCreateSquareCategory(accessToken, 'Events');
     if (!eventsCategoryId) {
-      return res.status(500).json({ error: 'Events category not found in Square' });
+      return res.status(500).json({ error: 'Could not find or create the Events category in Square' });
     }
    
     // 3. Get custom attribute definitions
