@@ -583,6 +583,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Render each event
+            // ---- ORDER REFUND ATTRIBUTION ----
+            // Tickets refunded with their order get no actions, just who refunded them and why
+            function escapeRefundText(value) {
+                return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            }
+            function orderRefundNote(refund) {
+                return `<div class="text-muted small refund-note">Refunded by: ${escapeRefundText(refund.refundedBy || 'Unknown')}<br>Reason: ${escapeRefundText(refund.refundReason || 'None given')}</div>`;
+            }
+            // ---- END ORDER REFUND ATTRIBUTION ----
+
             products.forEach((product, index) => {
                 console.log("Processing product:", product);
                 
@@ -597,6 +607,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const expirationDate = (product.ExpirationDate || product.expirationDate);
                 const checkedIn = product.CheckedIn || product.checkedIn || false;
                 const status = product.Status || product.status || 'valid';
+                // Set by the server for tickets an Orders-page refund invalidated
+                const refundNote = product.orderRefund ? orderRefundNote(product.orderRefund) : '';
                 
                 const customerFirstName = product.CustomerFirstName || product.customerFirstName || product.FirstName || product.firstName || '';
                 const customerLastName = product.CustomerLastName || product.customerLastName || product.LastName || product.lastName || '';
@@ -619,7 +631,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td data-column="price">${eventPrice}</td>
                     <td data-column="expiration">${expirationDate}</td>
                     <td class="action-cell">
-                        <div class="dropdown">
+                        ${refundNote || `<div class="dropdown">
                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle action-dropdown-btn"
                                     type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 Actions
@@ -667,7 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     Print Ticket
                                 </button></li>` : ''}
                             </ul>
-                        </div>
+                        </div>`}
                     </td>
                 `;
                 
@@ -719,7 +731,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         
                         <div class="card-action-right">
-                            <div class="dropdown dropup">
+                            ${refundNote || `<div class="dropdown dropup">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle action-dropdown-btn"
                                         type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     Actions
@@ -767,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         Print Ticket
                                     </button></li>` : ''}
                                 </ul>
-                            </div>
+                            </div>`}
                         </div>
                     </div>
                 `;

@@ -1675,8 +1675,14 @@ app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (r
     });
     
     console.log(`Found ${products.length} products`);
-    
-    res.json(products);
+
+    // Attach who refunded each ticket an order refund invalidated (ORDER REFUND ATTRIBUTION)
+    const refundedIds = products.filter(p => p.status === 'refunded').map(p => Number(p.id));
+    const orderRefunds = await getOrderRefundsForTickets(QRCodeProduct.sequelize, refundedIds);
+    res.json(products.map(p => {
+      const orderRefund = orderRefunds.get(Number(p.id));
+      return orderRefund ? { ...p.toJSON(), orderRefund } : p;
+    }));
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
@@ -3381,6 +3387,41 @@ app.post('/api/checkout', requireAuth, requirePermission(...PERMS_DOOR), async (
   }
 });
 
+// ---- ORDER REFUND ATTRIBUTION ----
+// A refund from the Orders page (POST /api/orders/:orderId/refund) lists the
+// tickets it invalidated, by QR code, in its order's OrderMetaData.refund.
+// Those tickets show who refunded them and why, and can't be marked valid
+// again. Tickets marked invalid by hand ("Mark as Invalid") aren't listed,
+// so they can still be toggled back.
+async function getOrderRefundsForTickets(sequelizeInstance, ticketIds) {
+  const refunds = new Map();
+  if (!ticketIds.length) return refunds;
+  const rows = await sequelizeInstance.query(
+    `SELECT qp."ID" AS "id", qp."QRCode" AS "qrCode", o."OrderMetaData" AS "meta"
+     FROM "QRCodeProduct" qp
+     JOIN "QRCodeProductToOrder" pto ON pto."QRCodeProductID" = qp."ID"
+     JOIN "Order" o ON o."ID" = pto."OrderID"
+     WHERE qp."ID" IN (:ticketIds)`,
+    { replacements: { ticketIds }, type: Sequelize.QueryTypes.SELECT }
+  );
+  for (const row of rows) {
+    let meta = row.meta;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch { meta = null; }
+    }
+    const refund = meta?.refund;
+    if (refund && Array.isArray(refund.refundedTickets) && refund.refundedTickets.includes(row.qrCode)) {
+      refunds.set(Number(row.id), {
+        refundedBy: refund.refundedBy || '',
+        refundReason: refund.refundReason || '',
+        refundedAt: refund.refundedAt || null
+      });
+    }
+  }
+  return refunds;
+}
+// ---- END ORDER REFUND ATTRIBUTION ----
+
 // API route to toggle refund status for a product by ID
 app.post('/api/products/:id/refund', requireAuth, requirePermission(...PERMS_DOOR), async (req, res) => {
   try {
@@ -3402,6 +3443,18 @@ app.post('/api/products/:id/refund', requireAuth, requirePermission(...PERMS_DOO
     
     // Get current status (default to 'valid' if null/undefined)
     const currentStatus = product.status || 'valid';
+
+    // A ticket invalidated by an order refund stays invalid
+    if (currentStatus === 'refunded') {
+      const orderRefunds = await getOrderRefundsForTickets(QRCodeProduct.sequelize, [Number(id)]);
+      if (orderRefunds.has(Number(id))) {
+        return res.status(409).json({
+          success: false,
+          returnStatus: 'failed_order_refunded',
+          message: 'This ticket was refunded with its order and can\'t be marked valid again'
+        });
+      }
+    }
     
     // Toggle the status
     const newStatus = currentStatus === 'valid' ? 'refunded' : 'valid';

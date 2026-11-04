@@ -258,3 +258,54 @@ test('POST /api/orders/:orderId/delete: a nonexistent order returns 404', async 
   });
   assert.equal(status, 404);
 });
+
+// ---- order refund attribution (ORDER REFUND ATTRIBUTION in app.mjs) ----
+
+const listedTicket = async (ticketId) =>
+  (await ctx.request('GET', '/api/products', { token: ctx.clientToken })).json.find(p => p.id === ticketId);
+
+test('order refund: its tickets list who refunded them and why, and stay invalid', async () => {
+  const { dbOrderId, ticketId } = await insertOrderWithTicket({ orderId: 'ORDER-REFUND-ATTR' });
+  const refund = await ctx.request('POST', `/api/orders/${dbOrderId}/refund`, { token: ctx.clientToken, body: refundBody() });
+  assert.equal(refund.status, 200);
+
+  const ticket = await listedTicket(ticketId);
+  assert.equal(ticket.status, 'refunded');
+  assert.equal(ticket.orderRefund.refundedBy, 'staff1');
+  assert.equal(ticket.orderRefund.refundReason, 'customer request');
+  assert.ok(ticket.orderRefund.refundedAt);
+
+  const { status, json } = await ctx.request('POST', `/api/products/${ticketId}/refund`, { token: ctx.clientToken });
+  assert.equal(status, 409);
+  assert.equal(json.returnStatus, 'failed_order_refunded');
+  const row = await ctx.pgClient.query(`SELECT "Status" FROM "QRCodeProduct" WHERE "ID" = $1`, [ticketId]);
+  assert.equal(row.rows[0].Status, 'refunded');
+});
+
+test('order refund: a ticket marked invalid by hand has no refund note and can be marked valid again', async () => {
+  const { ticketId } = await insertOrderWithTicket({ orderId: 'ORDER-HAND-INVALID', ticketStatus: 'refunded' });
+  assert.equal((await listedTicket(ticketId)).orderRefund, undefined);
+  const { status, json } = await ctx.request('POST', `/api/products/${ticketId}/refund`, { token: ctx.clientToken });
+  assert.equal(status, 200);
+  assert.equal(json.newStatus, 'valid');
+});
+
+test('order refund: a partial refund only locks the tickets it refunded', async () => {
+  const { dbOrderId, ticketId: refundedId } = await insertOrderWithTicket({ orderId: 'ORDER-PARTIAL-ATTR', qrCode: 'QR-PART-1' });
+  const other = await ctx.pgClient.query(
+    `INSERT INTO "QRCodeProduct" ("QRCode", "ExpirationDate", "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductID", "Status")
+     VALUES ('QR-PART-2', '2099-01-01', '2026-01-01 19:00:00', 'Movie', 'Main', 'Movie', 'details', 'ITEM', 'valid') RETURNING "ID"`
+  );
+  const otherId = other.rows[0].ID;
+  await ctx.pgClient.query(`INSERT INTO "QRCodeProductToOrder" ("QRCodeProductID", "OrderID") VALUES ($1, $2)`, [otherId, dbOrderId]);
+
+  const refund = await ctx.request('POST', `/api/orders/${dbOrderId}/refund`, { token: ctx.clientToken, body: refundBody({ refundAmount: 500, ticketIds: [refundedId] }) });
+  assert.equal(refund.status, 200);
+  assert.equal((await listedTicket(refundedId)).orderRefund.refundedBy, 'staff1');
+
+  // The ticket left out of the refund, later marked invalid by hand, can still be undone
+  await ctx.pgClient.query(`UPDATE "QRCodeProduct" SET "Status" = 'refunded' WHERE "ID" = $1`, [otherId]);
+  assert.equal((await listedTicket(otherId)).orderRefund, undefined);
+  const { status } = await ctx.request('POST', `/api/products/${otherId}/refund`, { token: ctx.clientToken });
+  assert.equal(status, 200);
+});

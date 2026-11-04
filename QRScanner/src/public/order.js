@@ -68,6 +68,22 @@ const editEmailAddress = document.getElementById('edit-email-address');
 const confirmEditOrderButton = document.getElementById('confirm-edit-order');
 
 // Refund order modal elements
+// ---- ORDER REFUND ATTRIBUTION ----
+// OrderMetaData.refund is written by POST /api/orders/:orderId/refund
+function escapeRefundText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function orderRefundNote(orderMetaData) {
+    let meta = orderMetaData;
+    if (typeof meta === 'string') {
+        try { meta = JSON.parse(meta); } catch { return ''; }
+    }
+    const refund = meta && meta.refund;
+    if (!refund) return '';
+    return `Refunded by: ${escapeRefundText(refund.refundedBy || 'Unknown')}<br>Reason: ${escapeRefundText(refund.refundReason || 'None given')}`;
+}
+// ---- END ORDER REFUND ATTRIBUTION ----
+
 const refundOrderModal = new bootstrap.Modal(document.getElementById('refund-order-modal'));
 const refundModalOrderId = document.getElementById('refund-modal-order-id');
 const refundModalCustomerName = document.getElementById('refund-modal-customer-name');
@@ -765,6 +781,8 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
                 const firstName = order.FirstName || order.firstName || '';
                 const emailAddress = order.EmailAddress || order.emailAddress || 'N/A';
                 const status = order.Status || order.status || 'Valid';
+                // A refunded order shows who refunded it and why instead of "No actions available"
+                const noActionsNote = orderRefundNote(orderMetaData) || '<em>No actions available</em>';
                 
                 const customerName = `${firstName} ${lastName}`.trim() || 'Unknown';
                 
@@ -854,8 +872,8 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
             </ul>
         </div>
         ` : `
-        <div class="text-muted small">
-            <em>No actions available</em>
+        <div class="text-muted small refund-note">
+            ${noActionsNote}
         </div>
         `}
     </td>
@@ -970,7 +988,7 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
                 </ul>
             </div>
             ` : `
-            <span class="text-muted small"><em>No actions available</em></span>
+            <span class="text-muted small refund-note">${noActionsNote}</span>
             `}
         </div>
     </div>
