@@ -115,8 +115,8 @@ API_EDGE="false"
 # Leave "false" for a self-hosted install.
 HOSTED_SIGNUP="false"
 HOSTED_SENDER_EMAIL=""  # From address for new venues' email (SES-verified), e.g. hello@yourdomain
-HOSTED_TERMS_URL=""     # Optional: your hosted service's Terms of Service, linked on the signup page
-HOSTED_PRIVACY_URL=""   # Optional: its Privacy Policy
+HOSTED_TERMS_URL=""     # Your hosted service's Terms of Service (https://), linked on the signup page; required unless SQUARE_ENVIRONMENT="sandbox"
+HOSTED_PRIVACY_URL=""   # Its Privacy Policy (https://); required unless SQUARE_ENVIRONMENT="sandbox"
 HOSTED_SUPPORT_EMAIL="" # Shown on support.html, e.g. support@yourdomain (must reach a person)
 
 # ---- First client's other Client Settings (optional) ----

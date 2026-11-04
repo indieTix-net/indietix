@@ -145,6 +145,16 @@ if [ "$HOSTED_SIGNUP" = "true" ]; then
   [ -z "$SQUARE_APP_ID" ] && { echo "HOSTED_SIGNUP=true needs Connect Square (SQUARE_APP_ID/SQUARE_APP_SECRET)" >&2; exit 1; }
   [ -z "$HOSTED_SENDER_EMAIL" ] && { echo "HOSTED_SIGNUP=true needs HOSTED_SENDER_EMAIL (an SES-verified From address)" >&2; exit 1; }
   [ "${SQUARE_WEBHOOK_AUTO:-false}" != "true" ] && { echo "HOSTED_SIGNUP=true needs SQUARE_WEBHOOK_AUTO=true (new venues share this environment's subscription)" >&2; exit 1; }
+  # Signing up means agreeing to them, so a real (Square production)
+  # environment needs both published; only a Square-sandbox one may skip.
+  if [ "$SQUARE_ENVIRONMENT" != "sandbox" ]; then
+    for legal_var in HOSTED_TERMS_URL HOSTED_PRIVACY_URL; do
+      case "${!legal_var}" in
+        https://*) ;;
+        *) echo "HOSTED_SIGNUP=true needs $legal_var (an https:// link to your hosted service's published page); only SQUARE_ENVIRONMENT=\"sandbox\" may leave it blank" >&2; exit 1 ;;
+      esac
+    done
+  fi
 fi
 case "$SQUARE_ENVIRONMENT" in
   production) SQUARE_API_BASE="https://connect.squareup.com" ;;

@@ -169,7 +169,7 @@ Optional features, each switched on in `bootstrap.config.sh` and applied by `up`
 |---|---|
 | `SQUARE_ENVIRONMENT="sandbox"` | Points every Square call at Square's sandbox (fake sellers and money), for testing. Default `"production"` |
 | `SQUARE_APP_ID`, `SQUARE_APP_SECRET` | **Connect Square**: venues connect with Square's sign-in instead of pasting a token, and a daily job keeps their access fresh |
-| `HOSTED_SIGNUP="true"` (+ `HOSTED_SENDER_EMAIL`, optional `HOSTED_TERMS_URL`, `HOSTED_PRIVACY_URL`, `HOSTED_SUPPORT_EMAIL`) | **Self-serve signup** at `<site>/signup.html`: any Square seller can create a venue, with no one running `add-client` |
+| `HOSTED_SIGNUP="true"` (+ `HOSTED_SENDER_EMAIL`, `HOSTED_TERMS_URL`, `HOSTED_PRIVACY_URL`, optional `HOSTED_SUPPORT_EMAIL`) | **Self-serve signup** at `<site>/signup.html`: any Square seller can create a venue, with no one running `add-client` |
 | `API_EDGE="true"` | **API firewall**: CloudFront + WAF in front of the QRScanner API |
 | `OPERATOR_ALERT_EMAIL` | Who's copied on Connect Square renewal failures (default: `BUDGET_ALERT_EMAIL`) |
 
@@ -237,7 +237,7 @@ Venues then see **Connect Square** in Client Settings. What happens behind it:
 - `square-token-refresher` renews each token about weekly; Square's expire after 30 days. If it fails, it emails the venue and `OPERATOR_ALERT_EMAIL`.
 - If a venue removes IndieTix in Square, it's flagged, emailed once, and shown **Reconnect Square**.
 
-**Self-serve signup:** add `HOSTED_SIGNUP="true"` and `HOSTED_SENDER_EMAIL` (an SES-verified From address). Optionally add `HOSTED_TERMS_URL` and `HOSTED_PRIVACY_URL` for your hosted service's own Terms and Privacy Policy, and `HOSTED_SUPPORT_EMAIL` (shown on `support.html`). Then:
+**Self-serve signup:** add `HOSTED_SIGNUP="true"` and `HOSTED_SENDER_EMAIL` (an SES-verified From address). Add `HOSTED_TERMS_URL` and `HOSTED_PRIVACY_URL`, https:// links to your hosted service's own published Terms and Privacy Policy: signing up means agreeing to them, so the signup page links both, and `up` refuses to turn signup on without them (only a `SQUARE_ENVIRONMENT="sandbox"` test environment may leave them blank). Optionally add `HOSTED_SUPPORT_EMAIL` (shown on `support.html`). Then:
 1. `<site>/signup.html` asks for a venue name, contact and Terms acceptance, then sends the person through Square's sign-in.
 2. The venue is created in the background, exactly as onboarding does, with the Square merchant ID as its ID.
 3. The contact gets a welcome email with a one-time link to set the main login's password.
