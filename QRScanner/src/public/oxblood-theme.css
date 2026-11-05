@@ -252,3 +252,38 @@ body.ui-dialog-open { overflow: hidden; }
 .ui-dialog .btn-primary:focus-visible,
 .ui-dialog .btn-primary:active { background: var(--lh-primary); color: #fff; }
 /* ---- END UI DIALOGS ---- */
+
+/* ---- HEADER MENU SCANNER ----
+   Hovering a header menu link sends a short glowing red light back and
+   forth along the faint line under it (its border-bottom), like KITT's
+   scanner in Knight Rider. CSS only. It stays still for people who've
+   asked their system to reduce motion. */
+#main-nav .nav-link { position: relative; }
+#main-nav .nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 28%;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 40, 40, 0), #ff2a2a 30%, #ff5a5a 50%, #ff2a2a 70%, rgba(255, 40, 40, 0));
+  box-shadow: 0 0 6px 1px rgba(255, 30, 30, 0.75);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+#main-nav .nav-link:hover::after,
+#main-nav .nav-link:focus-visible::after {
+  opacity: 1;
+  animation: lh-kitt-scan 0.8s ease-in-out infinite alternate;
+}
+@keyframes lh-kitt-scan {
+  from { left: 0; }
+  to { left: 72%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #main-nav .nav-link:hover::after,
+  #main-nav .nav-link:focus-visible::after { animation: none; left: 36%; }
+}
+/* ---- END HEADER MENU SCANNER ---- */
