@@ -604,3 +604,18 @@ tr.row-status-valid.row-checked-in > td {
 .search-container {
     margin-bottom: 20px !important;
 }
+
+/* "Confirm Check-in & Print" in the check-in confirm box: blue, set apart
+   from the green Confirm Check-in (the theme makes .btn-primary oxblood) */
+.btn.btn-checkin-print {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+.btn.btn-checkin-print:hover,
+.btn.btn-checkin-print:focus-visible,
+.btn.btn-checkin-print:active {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+    color: #fff;
+}
