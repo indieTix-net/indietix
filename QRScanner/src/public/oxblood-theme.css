@@ -238,3 +238,17 @@ h1, h2, h3, h4, h5, h6 { color: var(--lh-heading); }
 .alert-info      { --bs-alert-bg: rgba(61, 213, 243, 0.12);  --bs-alert-border-color: var(--lh-info); }
 .alert-warning   { --bs-alert-bg: rgba(255, 193, 7, 0.14);   --bs-alert-border-color: #E0A800; }
 .alert-danger    { --bs-alert-bg: rgba(220, 53, 69, 0.18);   --bs-alert-border-color: #E5606D; }
+
+/* ---- UI DIALOGS (ui-dialogs.js) ----
+   Message/confirm/prompt dialogs sit above any open Bootstrap modal
+   (1050/1055), so a result can show over the modal that triggered it. */
+.ui-dialog-backdrop { z-index: 1090; }
+.ui-dialog { z-index: 1095; }
+.ui-dialog-message { white-space: pre-line; }
+body.ui-dialog-open { overflow: hidden; }
+.ui-field-error { font-size: 0.875rem; }
+/* Keep the dialog's focused/pressed OK button oxblood (Bootstrap's
+   :focus-visible and :active states otherwise switch it to blue). */
+.ui-dialog .btn-primary:focus-visible,
+.ui-dialog .btn-primary:active { background: var(--lh-primary); color: #fff; }
+/* ---- END UI DIALOGS ---- */

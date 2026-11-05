@@ -49,10 +49,12 @@ class AuthHelper {
         localStorage.removeItem('authToken');
         
         // Show a brief message before redirect
-        if (reason === 'Session expired') {
-            alert('Your session has expired. Please log in again.');
+        if (reason === 'Session expired' && window.UIDialogs) {
+            window.UIDialogs.showMessage({ type: 'warning', title: 'Session expired', message: 'Please sign in again.' })
+                .then(() => { window.location.href = 'login.html'; });
+            return;
         }
-        
+
         window.location.href = 'login.html';
     }
     

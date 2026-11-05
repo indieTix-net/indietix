@@ -106,18 +106,18 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Could not update that contact.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't update contact", message: data.message || 'The contact could not be updated.' });
                 return;
             }
             await loadEmailContacts();
         } catch (error) {
             console.error('Error updating email contact:', error);
-            alert('Could not update that contact.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't update contact", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
 
     async function deleteEmailContact(id) {
-        if (!confirm('Remove this email address from the list? This cannot be undone.')) return;
+        if (!await UIDialogs.showConfirm({ title: 'Remove email address?', message: "Remove this email address from the list? This can't be undone.", confirmText: 'Remove', danger: true })) return;
 
         try {
             const response = await fetch(`${API_URL}/api/marketing/email-contacts/${id}`, {
@@ -126,13 +126,13 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Could not delete that contact.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't remove contact", message: data.message || 'The contact could not be removed.' });
                 return;
             }
             await loadEmailContacts();
         } catch (error) {
             console.error('Error deleting email contact:', error);
-            alert('Could not delete that contact.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't remove contact", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
 

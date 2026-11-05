@@ -130,20 +130,17 @@ function addShowtime() {
     
     // Validate inputs
     if (!date) {
-        alert('Please select a date');
-        dateInput.focus();
+        UIDialogs.fieldError(dateInput, 'Choose a date.');
         return;
     }
     
     if (!time) {
-        alert('Please select a time');
-        timeInput.focus();
+        UIDialogs.fieldError(timeInput, 'Choose a time.');
         return;
     }
     
     if (!location) {
-        alert('Please select a location');
-        locationSelect.focus();
+        UIDialogs.fieldError(locationSelect, 'Choose a location.');
         return;
     }
     
@@ -156,7 +153,7 @@ function addShowtime() {
     
     // Check for duplicates
     if (showtimes.some(st => st.formatted === formatted)) {
-        alert('This showtime already exists');
+        UIDialogs.fieldError(dateInput, 'That showtime is already in the list.');
         return;
     }
     
@@ -219,13 +216,13 @@ function handlePosterUpload(event) {
     
     // Validate file type
     if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        UIDialogs.fieldError(event.target, 'Choose an image file.');
         return;
     }
     
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-        alert('Image file is too large. Maximum size is 5MB.');
+        UIDialogs.fieldError(event.target, 'That image is over 5 MB. Choose a smaller one.');
         return;
     }
     
@@ -351,9 +348,11 @@ async function handleEventFormSubmit(event) {
     const genre = document.getElementById('event-genre').value.trim();
     const description = document.getElementById('event-description').value.trim();
     
-    if (!title || !description) {
-        alert('Please fill in all required fields');
-        return;
+    if (!title) {
+        return UIDialogs.fieldError(document.getElementById('event-title'), 'Enter the event title.');
+    }
+    if (!description) {
+        return UIDialogs.fieldError(document.getElementById('event-description'), 'Enter a description.');
     }
     
     // Upload poster to S3 if one was selected (same as movie system)
@@ -362,7 +361,7 @@ async function handleEventFormSubmit(event) {
         try {
             posterUrl = await uploadCustomPosterToS3();
         } catch (error) {
-            alert('Failed to upload poster. Continuing without poster.');
+            await UIDialogs.showMessage({ type: 'warning', title: "Poster didn't upload", message: 'The event will continue without a poster. You can add one in Square later.', details: error.message });
             console.error(error);
         }
     }
@@ -429,12 +428,12 @@ function updateCopyFormats() {
 // Create event item in Square
 async function createSquareItem() {
     if (!currentEventData) {
-        alert('No event data available');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't create item", message: 'The event details are missing. Go back and fill in the event form.' });
         return;
     }
     
     if (showtimes.length === 0) {
-        alert('Please add at least one showtime before creating the item in Square');
+        UIDialogs.fieldError(document.getElementById('showtime-date'), 'Add at least one showtime before creating the item in Square.');
         return;
     }
     
@@ -485,24 +484,21 @@ async function createSquareItem() {
         
         console.log('Square item created successfully:', data);
         
-        // Show success message with link
-        const message = data.message || 'Event item created successfully!';
-        const squareUrl = data.squareUrl;
-        
+        // Show success message with link.
         // Square's API can't set Square Online fulfillment, so it's a manual step.
-        let alertMessage = `${message}\n\nOne more step: in Square, set this item's fulfillment to Pickup only (turn off Shipping and Delivery).`;
-        if (squareUrl) {
-            alertMessage += `\n\nView in Square: ${squareUrl}`;
-        }
-        
-        alert(alertMessage);
+        UIDialogs.showMessage({
+            type: 'success',
+            title: 'Event created in Square',
+            message: `${data.message || 'The event item was created.'}\n\nOne more step: in Square, set this item's fulfillment to Pickup only (turn off Shipping and Delivery).`,
+            link: data.squareUrl ? { href: data.squareUrl, text: 'View in Square' } : undefined
+        });
         
         // Reset form
         resetForm();
         
     } catch (error) {
         console.error('Error creating Square item:', error);
-        alert('Failed to create item in Square: ' + error.message);
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't create item in Square", message: error.message });
     } finally {
         // Re-enable button
         createButton.disabled = false;
@@ -575,7 +571,7 @@ function copyToClipboard(elementId) {
         }
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy to clipboard');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't copy", message: 'Your browser blocked copying to the clipboard. Select the text and copy it yourself.' });
     });
 }
 

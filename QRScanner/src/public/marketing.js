@@ -99,11 +99,17 @@
     async function saveAsPreset(channel) {
         const offsets = collectOffsets(channel);
         if (offsets.length === 0) {
-            alert('Add at least one posting day before saving a preset.');
+            UIDialogs.fieldError(document.getElementById(`offsets-${channel}`), 'Add at least one posting day before saving a preset.');
             return;
         }
-        const name = prompt('Name this preset (e.g. "Standard 4-week ramp"):');
-        if (!name || !name.trim()) return;
+        const name = await UIDialogs.showPrompt({
+            title: 'Save as preset',
+            label: 'Preset name',
+            placeholder: 'e.g. Standard 4-week ramp',
+            confirmText: 'Save Preset',
+            requiredMessage: 'Enter a name for the preset.'
+        });
+        if (!name) return;
 
         try {
             const response = await fetch(`${API_URL}/api/marketing/custom-presets`, {
@@ -113,14 +119,14 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Could not save preset.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't save preset", message: data.message || 'The preset could not be saved.' });
                 return;
             }
             customPresets = data.presets || [];
             refreshPresetDropdowns();
         } catch (error) {
             console.error('Error saving custom preset:', error);
-            alert('Could not save preset.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't save preset", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
 
@@ -128,11 +134,11 @@
         const select = document.getElementById(`preset-select-${channel}`);
         const value = select.value;
         if (!value.startsWith('custom:')) {
-            alert('Only custom presets can be deleted -- the built-in ones are always available.');
+            UIDialogs.fieldError(select, 'Only presets you saved can be deleted. The built-in ones are always available.');
             return;
         }
         const name = value.slice('custom:'.length);
-        if (!confirm(`Delete the "${name}" preset? This can't be undone.`)) return;
+        if (!await UIDialogs.showConfirm({ title: 'Delete preset?', message: `Delete the "${name}" preset? This can't be undone.`, confirmText: 'Delete Preset', danger: true })) return;
 
         try {
             const response = await fetch(`${API_URL}/api/marketing/custom-presets?name=${encodeURIComponent(name)}`, {
@@ -141,14 +147,14 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Could not delete preset.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't delete preset", message: data.message || 'The preset could not be deleted.' });
                 return;
             }
             customPresets = data.presets || [];
             refreshPresetDropdowns();
         } catch (error) {
             console.error('Error deleting custom preset:', error);
-            alert('Could not delete preset.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't delete preset", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
 
@@ -247,7 +253,7 @@
         if (!file) return;
 
         if (!file.type.startsWith('image/')) {
-            alert('Please select an image file');
+            UIDialogs.fieldError(event.target, 'Choose an image file.');
             event.target.value = '';
             return;
         }
@@ -255,7 +261,7 @@
         // this is base64-encoded into the JSON body, which inflates size
         // ~33% and needs to stay under the Lambda Function URL's 6MB limit.
         if (file.size > 4 * 1024 * 1024) {
-            alert('Image file is too large. Maximum size is 4MB.');
+            UIDialogs.fieldError(event.target, 'That image is over 4 MB. Choose a smaller one.');
             event.target.value = '';
             return;
         }
@@ -356,7 +362,7 @@
     // this item in one shot. Distinct from the per-channel "Remove" buttons
     // inside the Edit Schedule modal.
     async function deleteItemSchedule(squareItemId, itemName) {
-        if (!confirm(`Delete the entire marketing schedule for "${itemName}" (all channels)? Already-sent posts stay in the history below.`)) return;
+        if (!await UIDialogs.showConfirm({ title: 'Delete schedule?', message: `Delete the entire marketing schedule for "${itemName}" (all channels)? Posts already sent stay in the history below.`, confirmText: 'Delete Schedule', danger: true })) return;
 
         try {
             const response = await fetch(`${API_URL}/api/marketing/schedules/${encodeURIComponent(squareItemId)}`, {
@@ -365,13 +371,13 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Could not delete that schedule.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't delete schedule", message: data.message || 'The schedule could not be deleted.' });
                 return;
             }
             await loadMarketingItems();
         } catch (error) {
             console.error('Error deleting item schedule:', error);
-            alert('Could not delete that schedule.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't delete schedule", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
 
@@ -462,7 +468,7 @@
 
     // presetValue is "builtin:<key>" or "custom:<name>" -- see
     // presetSelectOptionsHtml.
-    function applyPreset(channel, presetValue) {
+    async function applyPreset(channel, presetValue) {
         let preset = null;
         if (presetValue.startsWith('builtin:')) {
             preset = SCHEDULE_PRESETS[presetValue.slice('builtin:'.length)];
@@ -475,7 +481,7 @@
 
         const container = document.getElementById(`offsets-${channel}`);
         const hasExistingRows = container.querySelectorAll('.offset-row').length > 0;
-        if (hasExistingRows && !confirm(`Replace the current ${CHANNEL_LABELS[channel]} posting days with the "${preset.label}" preset? You can still edit or add/remove individual days afterward.`)) {
+        if (hasExistingRows && !await UIDialogs.showConfirm({ title: 'Replace posting days?', message: `Replace the current ${CHANNEL_LABELS[channel]} posting days with the "${preset.label}" preset? You can still edit, add or remove days afterward.`, confirmText: 'Replace' })) {
             return;
         }
 
@@ -639,7 +645,7 @@
     }
 
     async function deleteChannelSchedule(channel) {
-        if (!confirm(`Remove the ${CHANNEL_LABELS[channel]} schedule for this item? Already-sent posts stay in the history below.`)) return;
+        if (!await UIDialogs.showConfirm({ title: 'Remove schedule?', message: `Remove the ${CHANNEL_LABELS[channel]} schedule for this item? Posts already sent stay in the history below.`, confirmText: 'Remove Schedule', danger: true })) return;
 
         try {
             await fetch(`${API_URL}/api/marketing/schedules/${encodeURIComponent(currentItemId)}/${channel}`, {
@@ -731,7 +737,7 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Regeneration failed.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't regenerate caption", message: data.message || 'The caption could not be regenerated.' });
                 buttonEl.disabled = false;
                 buttonEl.textContent = 'Regenerate with AI';
                 return;
@@ -739,7 +745,7 @@
             await loadStatusTable();
         } catch (error) {
             console.error('Error regenerating caption:', error);
-            alert('Regeneration failed.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't regenerate caption", message: 'Something went wrong. Please try again.', details: error.message });
             buttonEl.disabled = false;
             buttonEl.textContent = 'Regenerate with AI';
         }
@@ -755,14 +761,14 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Could not approve that post.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't approve post", message: data.message || 'The post could not be approved.' });
                 buttonEl.disabled = false;
                 return;
             }
             await loadStatusTable();
         } catch (error) {
             console.error('Error approving post:', error);
-            alert('Could not approve that post.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't approve post", message: 'Something went wrong. Please try again.', details: error.message });
             buttonEl.disabled = false;
         }
     }
@@ -770,7 +776,7 @@
     // Real send -- email only for now. One message per active email
     // contact, fired right now rather than waiting on the automatic poller.
     async function sendPostNow(postId, buttonEl) {
-        if (!confirm('Send this email now to every active contact on your Email List? This sends real email immediately.')) return;
+        if (!await UIDialogs.showConfirm({ title: 'Send email now?', message: 'This sends the email right now to every active contact on your Email List.', confirmText: 'Send Now', danger: true })) return;
 
         buttonEl.disabled = true;
         buttonEl.textContent = 'Sending…';
@@ -781,16 +787,18 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Send failed.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't send email", message: data.message || 'The email could not be sent.' });
                 buttonEl.disabled = false;
                 buttonEl.textContent = 'Send Now';
                 return;
             }
-            alert(`Sent to ${data.sent} recipient(s).${data.failed ? ` ${data.failed} failed.` : ''}`);
+            UIDialogs.showMessage(data.failed
+                ? { type: 'warning', title: 'Email sent, with failures', message: `Sent to ${data.sent} recipient(s). ${data.failed} could not be sent.` }
+                : { type: 'success', title: 'Email sent', message: `Sent to ${data.sent} recipient(s).` });
             await loadStatusTable();
         } catch (error) {
             console.error('Error sending post:', error);
-            alert('Send failed.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't send email", message: 'Something went wrong. Check the post history before trying again, in case some emails went out.', details: error.message });
             buttonEl.disabled = false;
             buttonEl.textContent = 'Send Now';
         }
@@ -835,7 +843,7 @@
         if (!file) return;
 
         if (!file.type.startsWith('image/')) {
-            alert('Please select an image file');
+            UIDialogs.fieldError(event.target, 'Choose an image file.');
             event.target.value = '';
             return;
         }
@@ -844,7 +852,7 @@
         // sharp), and base64 inflates size ~33%. 4MB keeps the encoded
         // payload safely under the Lambda Function URL's 6MB request limit.
         if (file.size > 4 * 1024 * 1024) {
-            alert('Image file is too large. Maximum size is 4MB.');
+            UIDialogs.fieldError(event.target, 'That image is over 4 MB. Choose a smaller one.');
             event.target.value = '';
             return;
         }
@@ -894,7 +902,7 @@
     }
 
     async function deletePost(postId) {
-        if (!confirm('Delete this post? This cannot be undone.')) return;
+        if (!await UIDialogs.showConfirm({ title: 'Delete post?', message: "Delete this post? This can't be undone.", confirmText: 'Delete Post', danger: true })) return;
 
         try {
             const response = await fetch(`${API_URL}/api/marketing/posts/${postId}`, {
@@ -903,13 +911,13 @@
             });
             const data = await response.json();
             if (!data.success) {
-                alert(data.message || 'Could not delete that post.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't delete post", message: data.message || 'The post could not be deleted.' });
                 return;
             }
             await loadStatusTable();
         } catch (error) {
             console.error('Error deleting post:', error);
-            alert('Could not delete that post.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't delete post", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
 

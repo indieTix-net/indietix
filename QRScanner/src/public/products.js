@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function downloadTicket(qrCode) {
         if (!qrCode) {
-            alert('No QR code found for this ticket. Cannot download.');
+            UIDialogs.showMessage({ type: 'error', title: 'Couldn\'t download ticket', message: "This ticket has no QR code." });
             return;
         }
 
@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             console.error('Error downloading ticket:', error);
-            alert(`Failed to download ticket: ${error.message}`);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't download ticket", message: error.message });
         }
     }
     
@@ -455,7 +455,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             console.error('Error printing ticket:', error);
-            alert(`Failed to print ticket: ${error.message}\n\nCheck that the print agent is running and reachable on this computer's network.`);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't print ticket", message: "Check that the box office computer running the print agent is on, and that the printer is on and has labels.", details: error.message });
         } finally {
             if (buttonEl) {
                 buttonEl.disabled = false;
@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function handlePrintTicketClick(qrCode, eventName, buttonEl) {
         if (!qrCode) {
-            alert('No QR code found for this ticket. Cannot print.');
+            UIDialogs.showMessage({ type: 'error', title: 'Couldn\'t print ticket', message: "This ticket has no QR code." });
             return;
         }
         console.log('Print ticket clicked for:', eventName, 'QR Code:', qrCode);
@@ -873,7 +873,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Confirm check-in button click
     confirmCheckinButton.addEventListener('click', function() {
         if (!currentQrCode) {
-            alert('No QR code found for this event. Cannot check in.');
+            UIDialogs.showMessage({ type: 'error', title: 'Couldn\'t check in', message: "This ticket has no QR code." });
             return;
         }
         
@@ -884,37 +884,30 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: getAuthHeaders(),
             body: JSON.stringify({ qrCode: currentQrCode })
         })
-        .then(response => {
-            // 401/403 handling now automatic via auth-helper
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            
-            return response.json();
-        })
+        .then(response => UIDialogs.readJson(response))  // 401/403 handling is automatic via auth-helper
         .then(data => {
             console.log("Check-in response:", data);
             checkinModal.hide();
             
             if (data.returnStatus === 'successful_checkin') {
-                alert('Event checked in successfully!');
+                UIDialogs.showMessage({ type: 'success', title: 'Checked in', message: 'The ticket is checked in.' });
             } else if (data.returnStatus === 'failed_already_checked_in') {
-                alert('This event has already been checked in.');
+                UIDialogs.showMessage({ type: 'warning', title: 'Already checked in', message: 'This ticket was already checked in.' });
             } else if (data.returnStatus === 'failed_expired_qrcode') {
-                alert('This QR code has expired.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'This ticket has expired.' });
             } else if (data.returnStatus === 'failed_no_QRCode') {
-                alert('QR code not found in the system.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'This ticket was not found.' });
             } else if (data.returnStatus === 'failed_ticket_not_valid') {
-                alert(`This ticket is not valid (${data.ticketStatus}) and can't be checked in.`);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: `This ticket is ${data.ticketStatus || 'not valid'}, so it can't be checked in.` });
             } else {
-                alert(`Check-in status: ${data.returnStatus}`);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: data.message || 'The ticket could not be checked in.', details: data.returnStatus });
             }
             
             loadEvents(searchInput.value, startDateInput.value, endDateInput.value);
         })
         .catch(error => {
             console.error('Error checking in event:', error);
-            alert('Failed to check in event. Please try again.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'Something went wrong. Please try again.', details: error.message });
             checkinModal.hide();
         });
     });
@@ -922,7 +915,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Confirm check-out button click
     confirmCheckoutButton.addEventListener('click', function() {
         if (!currentQrCode) {
-            alert('No QR code found for this event. Cannot check out.');
+            UIDialogs.showMessage({ type: 'error', title: 'Couldn\'t check out', message: "This ticket has no QR code." });
             return;
         }
         
@@ -933,35 +926,28 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: getAuthHeaders(),
             body: JSON.stringify({ qrCode: currentQrCode })
         })
-        .then(response => {
-            // 401/403 handling now automatic via auth-helper
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            
-            return response.json();
-        })
+        .then(response => UIDialogs.readJson(response))  // 401/403 handling is automatic via auth-helper
         .then(data => {
             console.log("Check-out response:", data);
             checkoutModal.hide();
             
             if (data.returnStatus === 'successful_checkout') {
-                alert('Event checked out successfully!');
+                UIDialogs.showMessage({ type: 'success', title: 'Checked out', message: 'The ticket is no longer checked in.' });
             } else if (data.returnStatus === 'failed_already_checked_out') {
-                alert('This event has already been checked out.');
+                UIDialogs.showMessage({ type: 'warning', title: 'Not checked in', message: "This ticket wasn't checked in." });
             } else if (data.returnStatus === 'failed_expired_qrcode') {
-                alert('This QR code has expired.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't check out", message: 'This ticket has expired.' });
             } else if (data.returnStatus === 'failed_no_QRCode') {
-                alert('QR code not found in the system.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't check out", message: 'This ticket was not found.' });
             } else {
-                alert(`Check-out status: ${data.returnStatus}`);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't check out", message: data.message || 'The ticket could not be checked out.', details: data.returnStatus });
             }
             
             loadEvents(searchInput.value, startDateInput.value, endDateInput.value);
         })
         .catch(error => {
             console.error('Error checking out event:', error);
-            alert('Failed to check out event. Please try again.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't check out", message: 'Something went wrong. Please try again.', details: error.message });
             checkoutModal.hide();
         });
     });
@@ -969,7 +955,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Confirm refund toggle button click
     confirmRefundButton.addEventListener('click', function() {
         if (!currentProductId) {
-            alert('No product ID found. Cannot change status.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't change ticket", message: 'No ticket is selected. Reload the page and try again.' });
             return;
         }
         
@@ -979,31 +965,28 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             headers: getAuthHeaders()
         })
-        .then(response => {
-            // 401/403 handling now automatic via auth-helper
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            
-            return response.json();
-        })
+        .then(response => UIDialogs.readJson(response))  // 401/403 handling is automatic via auth-helper
         .then(data => {
             console.log("Refund toggle response:", data);
             refundModal.hide();
             
             if (data.returnStatus === 'successful_refund_toggle') {
-                alert(`Status changed to ${data.newStatus} successfully!`);
+                UIDialogs.showMessage(data.newStatus === 'valid'
+                    ? { type: 'success', title: 'Ticket marked valid', message: 'The ticket will scan at the door again.' }
+                    : { type: 'success', title: 'Ticket marked invalid', message: "The ticket won't scan at the door." });
+            } else if (data.returnStatus === 'failed_order_refunded') {
+                UIDialogs.showMessage({ type: 'warning', title: "Can't mark valid", message: data.message || 'This ticket was refunded with its order.' });
             } else if (data.returnStatus === 'failed_no_product') {
-                alert('Product not found in the system.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't change ticket", message: 'This ticket was not found.' });
             } else {
-                alert(`Status change result: ${data.returnStatus}`);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't change ticket", message: data.message || 'The ticket could not be changed.', details: data.returnStatus });
             }
             
             loadEvents(searchInput.value, startDateInput.value, endDateInput.value);
         })
         .catch(error => {
             console.error('Error toggling refund status:', error);
-            alert('Failed to change status. Please try again.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't change ticket", message: 'Something went wrong. Please try again.', details: error.message });
             refundModal.hide();
         });
     });
@@ -1011,13 +994,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Confirm transfer button click
     confirmTransferButton.addEventListener('click', function() {
         if (!currentProductId) {
-            alert('No ticket selected. Cannot transfer.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't transfer ticket", message: 'No ticket is selected. Reload the page and try again.' });
             return;
         }
 
         const recipientEmail = transferEmailInput.value.trim();
         if (!recipientEmail || !recipientEmail.includes('@')) {
-            alert('A valid recipient email address is required.');
+            UIDialogs.fieldError(transferEmailInput, "Enter the recipient's email address.");
             return;
         }
 
@@ -1039,25 +1022,23 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify(payload)
         })
-        .then(response => response.json().then(data => ({ ok: response.ok, data })))
-        .then(({ ok, data }) => {
+        .then(response => UIDialogs.readJson(response))
+        .then(data => {
             transferModal.hide();
 
             if (data.returnStatus === 'successful_transfer') {
-                alert('Ticket transferred successfully. The new ticket has been emailed to the recipient.');
+                UIDialogs.showMessage({ type: 'success', title: 'Ticket transferred', message: `The new ticket was emailed to ${recipientEmail}. The old ticket no longer scans.` });
             } else if (data.returnStatus === 'successful_transfer_email_failed') {
-                alert('Ticket transferred, but the email to the recipient failed to send. Please follow up manually.');
-            } else if (!ok) {
-                alert(`Transfer failed: ${data.message || data.returnStatus}`);
+                UIDialogs.showMessage({ type: 'warning', title: 'Transferred, but not emailed', message: `The ticket was transferred, but the email to ${recipientEmail} didn't send. Please follow up with them directly.` });
             } else {
-                alert(`Transfer result: ${data.returnStatus}`);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't transfer ticket", message: data.message || 'The ticket could not be transferred.', details: data.returnStatus });
             }
 
             loadEvents(searchInput.value, startDateInput.value, endDateInput.value);
         })
         .catch(error => {
             console.error('Error transferring ticket:', error);
-            alert('Failed to transfer ticket. Please try again.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't transfer ticket", message: 'Something went wrong. Please try again.', details: error.message });
             transferModal.hide();
         })
         .finally(() => {

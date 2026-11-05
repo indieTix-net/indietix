@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
             userModal.show();
         } catch (error) {
             console.error('Error loading user for edit:', error);
-            alert('Failed to load user details');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't load user", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
     
@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Delete a user
      */
     async function deleteUser(userId, username) {
-        if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+        if (!await UIDialogs.showConfirm({ title: 'Delete user?', message: `Delete the user "${username}"? They won't be able to sign in.`, confirmText: 'Delete User', danger: true })) {
             return;
         }
         
@@ -242,14 +242,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.success) {
-                alert('User deleted successfully');
+                UIDialogs.showMessage({ type: 'success', title: 'User deleted', message: `"${username}" can no longer sign in.` });
                 loadUsers();
             } else {
-                alert('Failed to delete user: ' + data.message);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't delete user", message: data.message || 'The user could not be deleted.' });
             }
         } catch (error) {
             console.error('Error deleting user:', error);
-            alert('Error deleting user');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't delete user", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
     
@@ -347,7 +347,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Validate at least one permission is selected
         if (!permissions.view && !permissions.edit && !permissions.checkIn && !permissions.marketing && !permissions.admin) {
-            alert('Please select at least one permission.');
+            // Error goes under the whole group of permission checkboxes
+            UIDialogs.fieldError(document.getElementById('admin-permission').closest('.form-check').parentElement, 'Choose at least one permission.');
             return;
         }
         
@@ -411,15 +412,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.success) {
-                alert(userId ? 'User updated successfully' : 'User created successfully');
                 closeModal();
+                UIDialogs.showMessage({ type: 'success', title: userId ? 'User updated' : 'User created', message: userId ? 'The changes apply the next time they sign in.' : 'They can sign in now.' });
                 loadUsers();
             } else {
-                alert('Failed to save user: ' + data.message);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't save user", message: data.message || 'The user could not be saved.' });
             }
         } catch (error) {
             console.error('Error saving user:', error);
-            alert('Error saving user');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't save user", message: 'Something went wrong. Please try again.', details: error.message });
         }
     }
     

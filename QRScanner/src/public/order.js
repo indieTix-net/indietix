@@ -537,7 +537,7 @@ function handleRefundOrderClick(orderId, orderID, customerName, emailAddress, or
     const paymentId = extractPaymentId(orderMetaData);
 
     if (!paymentId) {
-        alert('Cannot refund: Payment ID not found in order data. This order may not have been processed through Square.');
+        UIDialogs.showMessage({ type: 'error', title: "Can't refund this order", message: "This order has no Square payment ID, so it may not have been paid through Square." });
         return;
     }
 
@@ -1111,7 +1111,7 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
     // Confirm resend email button click
     confirmResendEmailButton.addEventListener('click', function() {
         if (!currentOrderId || !currentEmailAddress) {
-            alert('Missing order information. Cannot resend email.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't resend email", message: 'The order details are missing. Reload the page and try again.' });
             return;
         }
         
@@ -1125,49 +1125,41 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
                 emailAddress: currentEmailAddress 
             })
         })
-        .then(response => {
-            // 401/403 handling now automatic via auth-helper
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            
-            return response.json();
-        })
+        .then(response => UIDialogs.readJson(response))  // 401/403 handling is automatic via auth-helper
         .then(data => {
             console.log("Resend email response:", data);
             resendEmailModal.hide();
             
             if (data.returnStatus === 'successful_resend') {
-                alert('Email resent successfully!');
+                UIDialogs.showMessage({ type: 'success', title: 'Email sent', message: `The tickets were emailed again to ${currentEmailAddress}.` });
             } else if (data.returnStatus === 'failed_invalid_email') {
-                alert('Invalid email address provided.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't resend email", message: "The order's email address isn't valid. Edit the order to fix it, then try again." });
             } else if (data.returnStatus === 'failed_no_order') {
-                alert('Order not found in the system.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't resend email", message: 'This order was not found.' });
             } else if (data.returnStatus === 'failed_email_service') {
-                alert('Email service error. Please try again later.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't resend email", message: 'The email service had a problem. Please try again later.' });
             } else {
-                alert(`Resend email status: ${data.returnStatus}`);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't resend email", message: data.message || 'The email could not be sent.', details: data.returnStatus });
             }
             
             loadOrders(searchInput.value, startDateInput.value, endDateInput.value);
         })
         .catch(error => {
             console.error('Error resending email:', error);
-            alert('Failed to resend email. Please try again.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't resend email", message: 'Something went wrong. Please try again.', details: error.message });
             resendEmailModal.hide();
         });
     });
 confirmEditOrderButton.addEventListener('click', function() {
     if (!currentEditOrderId) {
-        alert('Missing order information. Cannot update order.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't update order", message: 'The order details are missing. Reload the page and try again.' });
         return;
     }
     
     // Validate email
     const emailValue = editEmailAddress.value.trim();
     if (!emailValue || !emailValue.includes('@')) {
-        alert('Please enter a valid email address.');
-        editEmailAddress.focus();
+        UIDialogs.fieldError(editEmailAddress, 'Enter a valid email address.');
         return;
     }
     
@@ -1188,24 +1180,19 @@ confirmEditOrderButton.addEventListener('click', function() {
         },
         body: JSON.stringify(updateData)
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
+    .then(response => UIDialogs.readJson(response))
     .then(data => {
         console.log("Edit order response:", data);
         editOrderModal.hide();
         
         if (data.returnStatus === 'successful_update') {
-            alert('Order updated successfully!');
+            UIDialogs.showMessage({ type: 'success', title: 'Order updated', message: "The order and its tickets have the new contact details." });
         } else if (data.returnStatus === 'failed_no_order') {
-            alert('Order not found in the system.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't update order", message: 'This order was not found.' });
         } else if (data.returnStatus === 'failed_validation') {
-            alert('Invalid data provided: ' + data.message);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't update order", message: data.message || 'Some of the details are not valid.' });
         } else {
-            alert(`Update status: ${data.returnStatus}`);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't update order", message: data.message || 'The order could not be updated.', details: data.returnStatus });
         }
         
         // Reload orders to show updated data
@@ -1213,7 +1200,7 @@ confirmEditOrderButton.addEventListener('click', function() {
     })
     .catch(error => {
         console.error('Error updating order:', error);
-        alert('Failed to update order. Please try again.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't update order", message: 'Something went wrong. Please try again.', details: error.message });
         editOrderModal.hide();
     });
 });
@@ -1221,7 +1208,7 @@ confirmEditOrderButton.addEventListener('click', function() {
 // Confirm refund order button click
 confirmRefundOrderButton.addEventListener('click', function() {
     if (!currentRefundOrderId || !currentRefundPaymentId) {
-        alert('Missing order or payment information. Cannot process refund.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't refund order", message: 'The order or payment details are missing. Reload the page and try again.' });
         return;
     }
 
@@ -1231,13 +1218,11 @@ confirmRefundOrderButton.addEventListener('click', function() {
     const enteredAmount = parseFloat(refundModalAmountInput.value);
     const orderTotalDollars = currentRefundOrderTotalCents / 100;
     if (isNaN(enteredAmount) || enteredAmount <= 0) {
-        alert('Please enter a valid refund amount greater than $0.');
-        refundModalAmountInput.focus();
+        UIDialogs.fieldError(refundModalAmountInput, 'Enter an amount greater than $0.');
         return;
     }
     if (enteredAmount > orderTotalDollars) {
-        alert(`Refund amount cannot exceed the order total of ${formatAmount(currentRefundOrderTotalCents)}.`);
-        refundModalAmountInput.focus();
+        UIDialogs.fieldError(refundModalAmountInput, `The refund can't be more than the order total of ${formatAmount(currentRefundOrderTotalCents)}.`);
         return;
     }
     const refundAmountCents = Math.round(enteredAmount * 100);
@@ -1245,16 +1230,14 @@ confirmRefundOrderButton.addEventListener('click', function() {
     // Validate processed by
     const refundedBy = refundProcessedBySelect.value.trim();
     if (!refundedBy) {
-        alert('Please select who is processing this refund.');
-        refundProcessedBySelect.focus();
+        UIDialogs.fieldError(refundProcessedBySelect, 'Choose who is processing this refund.');
         return;
     }
 
     // Validate refund reason
     const refundReason = refundReasonTextarea.value.trim();
     if (!refundReason) {
-        alert('Please provide a reason for the refund.');
-        refundReasonTextarea.focus();
+        UIDialogs.fieldError(refundReasonTextarea, 'Enter a reason for the refund.');
         return;
     }
 
@@ -1285,33 +1268,33 @@ confirmRefundOrderButton.addEventListener('click', function() {
             ticketIds: ticketIds
         })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
+    .then(response => UIDialogs.readJson(response))
     .then(data => {
         console.log("Refund order response:", data);
         refundOrderModal.hide();
         
         // Re-enable button
         confirmRefundOrderButton.disabled = false;
-        confirmRefundOrderButton.innerHTML = '<i class="fas fa-undo"></i> Process Refund';
+        confirmRefundOrderButton.textContent = 'Process Refund';
         
         if (data.returnStatus === 'successful_refund') {
             const amountLabel = formatAmount(data.amount) + (data.partial ? ' (partial)' : '');
-            alert(`Refund processed successfully!\n\nAmount refunded: ${amountLabel}\nRefund ID: ${data.refundId || 'N/A'}\nTickets invalidated: ${data.ticketsInvalidated || 0}`);
+            UIDialogs.showMessage({
+                type: 'success',
+                title: 'Order refunded',
+                message: `Amount refunded: ${amountLabel}\nTickets invalidated: ${data.ticketsInvalidated || 0}`,
+                details: data.refundId ? `Square refund ID: ${data.refundId}` : undefined
+            });
         } else if (data.returnStatus === 'failed_no_order') {
-            alert('Order not found in the system.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't refund order", message: 'This order was not found.' });
         } else if (data.returnStatus === 'failed_no_payment_id') {
-            alert('Payment ID not found. Cannot process refund.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't refund order", message: 'This order has no Square payment ID.' });
         } else if (data.returnStatus === 'failed_square_api') {
-            alert('Square refund failed: ' + (data.message || 'Unknown error'));
+            UIDialogs.showMessage({ type: 'error', title: 'Square refused the refund', message: data.message || 'Square returned an error.' });
         } else if (data.returnStatus === 'failed_already_refunded') {
-            alert('This order has already been refunded.');
+            UIDialogs.showMessage({ type: 'warning', title: 'Already refunded', message: 'This order has already been refunded.' });
         } else {
-            alert(`Refund status: ${data.returnStatus}\n${data.message || ''}`);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't refund order", message: data.message || 'The refund could not be processed.', details: data.returnStatus });
         }
         
         // Reload orders to show updated data
@@ -1319,35 +1302,33 @@ confirmRefundOrderButton.addEventListener('click', function() {
     })
     .catch(error => {
         console.error('Error processing refund:', error);
-        alert('Failed to process refund. Please try again.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't refund order", message: 'Something went wrong. Check the order in Square before trying again, in case the refund went through.', details: error.message });
         refundOrderModal.hide();
         
         // Re-enable button
         confirmRefundOrderButton.disabled = false;
-        confirmRefundOrderButton.innerHTML = '<i class="fas fa-undo"></i> Process Refund';
+        confirmRefundOrderButton.textContent = 'Process Refund';
     });
 });
 
 // Confirm cancel order button click
 confirmCancelOrderButton.addEventListener('click', function() {
     if (!currentCancelOrderId) {
-        alert('Missing order information. Cannot cancel order.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't cancel order", message: 'The order details are missing. Reload the page and try again.' });
         return;
     }
     
     // Validate cancelled by
     const cancelledBy = cancelProcessedBySelect.value.trim();
     if (!cancelledBy) {
-        alert('Please select who is cancelling this order.');
-        cancelProcessedBySelect.focus();
+        UIDialogs.fieldError(cancelProcessedBySelect, 'Choose who is cancelling this order.');
         return;
     }
     
     // Validate cancel reason
     const cancelReason = cancelReasonTextarea.value.trim();
     if (!cancelReason) {
-        alert('Please provide a reason for the cancellation.');
-        cancelReasonTextarea.focus();
+        UIDialogs.fieldError(cancelReasonTextarea, 'Enter a reason for the cancellation.');
         return;
     }
     
@@ -1369,24 +1350,19 @@ confirmCancelOrderButton.addEventListener('click', function() {
             cancelReason: cancelReason
         })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
+    .then(response => UIDialogs.readJson(response))
     .then(data => {
         console.log("Cancel order response:", data);
         cancelOrderModal.hide();
         
         // Re-enable button
         confirmCancelOrderButton.disabled = false;
-        confirmCancelOrderButton.innerHTML = '<i class="fas fa-ban"></i> Cancel Order';
+        confirmCancelOrderButton.textContent = 'Cancel Order';
         
         if (data.success) {
-            alert(`Order cancelled successfully!\n\nOrder ID: ${data.orderId || 'N/A'}`);
+            UIDialogs.showMessage({ type: 'success', title: 'Order cancelled', message: "The order is cancelled and its tickets won't scan.", details: data.orderId ? `Order ID: ${data.orderId}` : undefined });
         } else {
-            alert(`Failed to cancel order: ${data.message || 'Unknown error'}`);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't cancel order", message: data.message || 'The order could not be cancelled.', details: data.returnStatus });
         }
         
         // Reload orders to show updated data
@@ -1394,35 +1370,33 @@ confirmCancelOrderButton.addEventListener('click', function() {
     })
     .catch(error => {
         console.error('Error cancelling order:', error);
-        alert('Failed to cancel order. Please try again.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't cancel order", message: 'Something went wrong. Please try again.', details: error.message });
         cancelOrderModal.hide();
         
         // Re-enable button
         confirmCancelOrderButton.disabled = false;
-        confirmCancelOrderButton.innerHTML = '<i class="fas fa-ban"></i> Cancel Order';
+        confirmCancelOrderButton.textContent = 'Cancel Order';
     });
 });
 
 // Confirm delete order button click
 confirmDeleteOrderButton.addEventListener('click', function() {
     if (!currentDeleteOrderId) {
-        alert('Missing order information. Cannot delete order.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't delete order", message: 'The order details are missing. Reload the page and try again.' });
         return;
     }
     
     // Validate deleted by
     const deletedBy = deleteProcessedBySelect.value.trim();
     if (!deletedBy) {
-        alert('Please select who is deleting this order.');
-        deleteProcessedBySelect.focus();
+        UIDialogs.fieldError(deleteProcessedBySelect, 'Choose who is deleting this order.');
         return;
     }
     
     // Validate delete reason
     const deleteReason = deleteReasonTextarea.value.trim();
     if (!deleteReason) {
-        alert('Please provide a reason for the deletion.');
-        deleteReasonTextarea.focus();
+        UIDialogs.fieldError(deleteReasonTextarea, 'Enter a reason for the deletion.');
         return;
     }
     
@@ -1444,24 +1418,19 @@ confirmDeleteOrderButton.addEventListener('click', function() {
             deleteReason: deleteReason
         })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
+    .then(response => UIDialogs.readJson(response))
     .then(data => {
         console.log("Delete order response:", data);
         deleteOrderModal.hide();
         
         // Re-enable button
         confirmDeleteOrderButton.disabled = false;
-        confirmDeleteOrderButton.innerHTML = '<i class="fas fa-trash"></i> Delete Order';
+        confirmDeleteOrderButton.textContent = 'Delete Order';
         
         if (data.success) {
-            alert(`Order deleted successfully!\n\nOrder ID: ${data.orderId || 'N/A'}`);
+            UIDialogs.showMessage({ type: 'success', title: 'Order deleted', message: 'The order is deleted and its tickets won\'t scan.', details: data.orderId ? `Order ID: ${data.orderId}` : undefined });
         } else {
-            alert(`Failed to delete order: ${data.message || 'Unknown error'}`);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't delete order", message: data.message || 'The order could not be deleted.', details: data.returnStatus });
         }
         
         // Reload orders to show updated data
@@ -1469,12 +1438,12 @@ confirmDeleteOrderButton.addEventListener('click', function() {
     })
     .catch(error => {
         console.error('Error deleting order:', error);
-        alert('Failed to delete order. Please try again.');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't delete order", message: 'Something went wrong. Please try again.', details: error.message });
         deleteOrderModal.hide();
         
         // Re-enable button
         confirmDeleteOrderButton.disabled = false;
-        confirmDeleteOrderButton.innerHTML = '<i class="fas fa-trash"></i> Delete Order';
+        confirmDeleteOrderButton.textContent = 'Delete Order';
     });
 });
 });

@@ -161,13 +161,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const locationName = newLocationInput.value.trim();
         
         if (!locationName) {
-            alert('Please enter a location name');
+            UIDialogs.fieldError(newLocationInput, 'Enter a location name.');
             return;
         }
         
         // Check for duplicates
         if (eventLocations.includes(locationName)) {
-            alert('This location already exists');
+            UIDialogs.fieldError(newLocationInput, 'That location is already in the list.');
             return;
         }
         
@@ -182,8 +182,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Remove location function (globally accessible)
-    window.removeLocation = function(index) {
-        if (confirm('Are you sure you want to remove this location?')) {
+    window.removeLocation = async function(index) {
+        if (await UIDialogs.showConfirm({ title: 'Remove location?', message: `Remove "${eventLocations[index]}" from the list? The change is kept when you save your settings.`, confirmText: 'Remove', danger: true })) {
             eventLocations.splice(index, 1);
             renderLocationsList();
         }
@@ -253,13 +253,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const descriptorName = newDescriptorInput.value.trim();
         
         if (!descriptorName) {
-            alert('Please enter a descriptor name');
+            UIDialogs.fieldError(newDescriptorInput, 'Enter a descriptor name.');
             return;
         }
         
         // Check for duplicates
         if (eventDescriptors.includes(descriptorName)) {
-            alert('This descriptor already exists');
+            UIDialogs.fieldError(newDescriptorInput, 'That descriptor is already in the list.');
             return;
         }
         
@@ -274,8 +274,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Remove descriptor function (globally accessible)
-    window.removeDescriptor = function(index) {
-        if (confirm('Are you sure you want to remove this descriptor?')) {
+    window.removeDescriptor = async function(index) {
+        if (await UIDialogs.showConfirm({ title: 'Remove descriptor?', message: `Remove "${eventDescriptors[index]}" from the list? The change is kept when you save your settings.`, confirmText: 'Remove', danger: true })) {
             eventDescriptors.splice(index, 1);
             renderDescriptorsList();
         }
@@ -311,13 +311,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const userName = newUserNameInput.value.trim();
         
         if (!userName) {
-            alert('Please enter a user name');
+            UIDialogs.fieldError(newUserNameInput, 'Enter a user name.');
             return;
         }
         
         // Check for duplicates
         if (userNames.includes(userName)) {
-            alert('This user name already exists');
+            UIDialogs.fieldError(newUserNameInput, 'That user name is already in the list.');
             return;
         }
         
@@ -332,8 +332,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Remove user name function (globally accessible)
-    window.removeUserName = function(index) {
-        if (confirm('Are you sure you want to remove this user?')) {
+    window.removeUserName = async function(index) {
+        if (await UIDialogs.showConfirm({ title: 'Remove user name?', message: `Remove "${userNames[index]}" from the list? The change is kept when you save your settings.`, confirmText: 'Remove', danger: true })) {
             userNames.splice(index, 1);
             renderUserNamesList();
         }
@@ -359,7 +359,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Success modal
-    const successModal = new bootstrap.Modal(document.getElementById('success-modal'));
 
     // ---- CONNECT SQUARE ----
     // Shown only when this deployment has a Square app (GET
@@ -424,7 +423,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 squareConnectBtn.disabled = false;
-                alert(error.message);
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't connect Square", message: error.message });
             });
     });
 
@@ -488,27 +487,27 @@ document.addEventListener('DOMContentLoaded', function() {
     logoUploadBtn.addEventListener('click', function() {
         const file = logoUploadFile.files[0];
         if (!file) {
-            alert('Choose an image first.');
+            UIDialogs.fieldError(logoUploadFile, 'Choose an image first.');
             return;
         }
         if (file.size > LOGO_MAX_BYTES) {
-            alert('That image is over 4 MB. Choose a smaller one.');
+            UIDialogs.fieldError(logoUploadFile, 'That image is over 4 MB. Choose a smaller one.');
             return;
         }
         const reader = new FileReader();
         reader.onload = () => {
             sendLogoRequest('POST', { dataUrl: reader.result })
                 .then(data => logoSaved(data.logoFile, 'Logo uploaded and saved.'))
-                .catch(error => alert(error.message));
+                .catch(error => UIDialogs.showMessage({ type: 'error', title: "Couldn't upload logo", message: error.message }));
         };
-        reader.onerror = () => alert('That file could not be read.');
+        reader.onerror = () => UIDialogs.fieldError(logoUploadFile, 'That file could not be read.');
         reader.readAsDataURL(file);
     });
 
     logoResetBtn.addEventListener('click', function() {
         sendLogoRequest('DELETE')
             .then(data => logoSaved(data.logoFile, 'Back to the default logo.'))
-            .catch(error => alert(error.message));
+            .catch(error => UIDialogs.showMessage({ type: 'error', title: "Couldn't reset logo", message: error.message }));
     });
     // ---- END VENUE LOGO UPLOAD ----
 
@@ -650,7 +649,7 @@ document.addEventListener('DOMContentLoaded', function() {
             clientForm.style.display = 'block';
 
             if (!silent) {
-                alert('Error loading client settings: ' + error.message + '. Please try refreshing the page.');
+                UIDialogs.showMessage({ type: 'error', title: "Couldn't load settings", message: 'Please refresh the page to try again.', details: error.message });
             }
         });
     }
@@ -926,7 +925,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (data.success) {
                 console.log('Client settings saved successfully');
-                successModal.show();
+                UIDialogs.showMessage({ type: 'success', title: 'Settings saved', message: 'Your client settings have been updated.' });
 
                 // Quiet refresh to pick up the server-merged configuration
                 // (see loadClientData's silent param) -- no overlay, no
@@ -947,15 +946,7 @@ document.addEventListener('DOMContentLoaded', function() {
             saveButton.disabled = false;
             saveButton.querySelector('.spinner-border').classList.add('d-none');
             
-            let errorMessage = 'Failed to save client settings. Please try again.';
-            
-            if (error.message.includes('validation')) {
-                errorMessage = 'Please check your input and try again.';
-            } else if (error.message.includes('email')) {
-                errorMessage = 'Please enter a valid email address.';
-            }
-            
-            alert('Error: ' + errorMessage);
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't save settings", message: error.message || 'Something went wrong. Please try again.' });
         });
     });
     
@@ -1141,24 +1132,20 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Validation
         if (!qrCode) {
-            alert('Please enter a QR code value');
-            return;
+            return UIDialogs.fieldError(document.getElementById('sk-qrcode'), 'Enter a QR code value.');
         }
         
         if (!type) {
-            alert('Please select a key type');
-            return;
+            return UIDialogs.fieldError(document.getElementById('sk-type'), 'Choose a key type.');
         }
         
         if (!description) {
-            alert('Please enter a description');
-            return;
+            return UIDialogs.fieldError(document.getElementById('sk-description'), 'Enter a description.');
         }
         
         // Check for duplicates
         if (skeletonKeys.find(k => k.qrCode === qrCode)) {
-            alert('A skeleton key with this QR code already exists');
-            return;
+            return UIDialogs.fieldError(document.getElementById('sk-qrcode'), 'A skeleton key with this QR code already exists.');
         }
         
         const keyData = {
@@ -1199,10 +1186,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reload keys
             await loadSkeletonKeys();
             
-            alert('Skeleton key created successfully!');
+            UIDialogs.showMessage({ type: 'success', title: 'Skeleton key created', message: `The key "${description}" is ready to use.` });
         } catch (error) {
             console.error('Error creating skeleton key:', error);
-            alert('Failed to create skeleton key. Please try again.');
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't create skeleton key", message: 'Something went wrong. Please try again.', details: error.message });
         }
     });
     
@@ -1286,7 +1273,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const action = newStatus ? 'activate' : 'deactivate';
         
-        if (!confirm(`Are you sure you want to ${action} this skeleton key?`)) {
+        if (!await UIDialogs.showConfirm(newStatus
+            ? { title: 'Activate skeleton key?', message: 'This key will scan at the door again.', confirmText: 'Activate' }
+            : { title: 'Deactivate skeleton key?', message: "This key won't scan at the door until you activate it again.", confirmText: 'Deactivate', danger: true })) {
             return;
         }
         
@@ -1307,10 +1296,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reload keys
             await loadSkeletonKeys();
             
-            alert(`Skeleton key ${action}d successfully!`);
+            UIDialogs.showMessage({ type: 'success', title: `Skeleton key ${action}d`, message: newStatus ? 'The key scans at the door again.' : "The key won't scan at the door." });
         } catch (error) {
             console.error('Error updating skeleton key:', error);
-            alert(`Failed to ${action} skeleton key. Please try again.`);
+            UIDialogs.showMessage({ type: 'error', title: `Couldn't ${action} skeleton key`, message: 'Something went wrong. Please try again.', details: error.message });
         }
     };
     

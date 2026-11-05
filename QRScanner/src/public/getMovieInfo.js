@@ -132,10 +132,9 @@ function addShowtime() {
     const location = locationSelect.value;
     
     // Validate inputs
-    if (!date || !time || !location) {
-        alert('Please fill in all showtime fields (date, time, and location)');
-        return;
-    }
+    if (!date) return UIDialogs.fieldError(dateInput, 'Choose a date.');
+    if (!time) return UIDialogs.fieldError(timeInput, 'Choose a time.');
+    if (!location) return UIDialogs.fieldError(locationSelect, 'Choose a location.');
     
     // Get selected descriptors (optional)
     const descriptorCheckboxes = document.querySelectorAll('#descriptors-checkboxes input[type="checkbox"]:checked');
@@ -387,13 +386,13 @@ function handleCustomPosterUpload(event) {
     
     // Validate file type
     if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        UIDialogs.fieldError(event.target, 'Choose an image file.');
         return;
     }
     
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-        alert('Image file is too large. Maximum size is 5MB.');
+        UIDialogs.fieldError(event.target, 'That image is over 5 MB. Choose a smaller one.');
         return;
     }
     
@@ -710,7 +709,7 @@ function showError(message) {
 // Download poster function
 async function downloadPoster() {
     if (!currentMovieData || !currentMovieData.Poster || currentMovieData.Poster === 'N/A') {
-        alert('No poster available for this movie');
+        UIDialogs.showMessage({ type: 'info', title: 'No poster', message: "OMDb doesn't have a poster for this movie." });
         return;
     }
     
@@ -719,7 +718,7 @@ async function downloadPoster() {
         window.open(currentMovieData.Poster, '_blank');
     } catch (error) {
         console.error('Error opening poster:', error);
-        alert('Failed to open poster');
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't open poster", message: error.message });
     }
 }
 
@@ -786,7 +785,7 @@ async function createSquareItem() {
                     console.warn('Continuing without a poster');
                 } else {
                     // Custom file failed - ask the user how to proceed
-                    if (!confirm(`Failed to process custom poster: ${cropOrUploadError.message}\n\nContinue with the OMDb poster instead?`)) {
+                    if (!await UIDialogs.showConfirm({ title: "Your poster didn't process", message: 'Use the OMDb poster for this movie instead?', details: cropOrUploadError.message, confirmText: 'Use OMDb Poster', cancelText: 'Stop' })) {
                         throw cropOrUploadError;
                     }
                     const fallbackPoster = currentMovieData.imdbID ? await fetchOmdbPosterBlob(currentMovieData.imdbID) : null;
@@ -870,7 +869,12 @@ async function createSquareItem() {
         }
         
         // Square's API can't set Square Online fulfillment, so it's a manual step.
-        alert(`Success! ${data.message}\n\nOne more step: in Square, set this item's fulfillment to Pickup only (turn off Shipping and Delivery).\n\nView in Square: ${data.squareUrl}`);
+        UIDialogs.showMessage({
+            type: 'success',
+            title: 'Movie created in Square',
+            message: `${data.message || 'The movie item was created.'}\n\nOne more step: in Square, set this item's fulfillment to Pickup only (turn off Shipping and Delivery).`,
+            link: data.squareUrl ? { href: data.squareUrl, text: 'View in Square' } : undefined
+        });
         
         // Clear showtimes after successful creation
         showtimes = [];
@@ -882,7 +886,7 @@ async function createSquareItem() {
         
     } catch (error) {
         console.error('Error creating Square item:', error);
-        alert(`Error: ${error.message}`);
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't create item in Square", message: error.message });
     } finally {
         createBtn.disabled = false;
         btnText.style.display = 'inline';
@@ -1390,10 +1394,9 @@ function findNextAvailable() {
     const timeInput = document.getElementById('showtime-time');
     const locationSelect = document.getElementById('showtime-location');
     
-    if (!dateInput.value || !locationSelect.value || !currentMovieData) {
-        alert('Please select a date and location first');
-        return;
-    }
+    if (!dateInput.value) return UIDialogs.fieldError(dateInput, 'Choose a date first.');
+    if (!locationSelect.value) return UIDialogs.fieldError(locationSelect, 'Choose a location first.');
+    if (!currentMovieData) return;
     
     const runtime = extractRuntimeFromMovie(currentMovieData) || 120;
     const location = locationSelect.value;
@@ -1452,7 +1455,7 @@ function addToEndOfDay() {
     const timeInput = document.getElementById('showtime-time');
     
     if (!currentMovieData || existingShowtimes.length === 0) {
-        alert('No existing showtimes to add after');
+        UIDialogs.fieldError(dateInput, 'There are no showtimes on this date and location to add after.');
         return;
     }
     
