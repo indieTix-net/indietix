@@ -1,0 +1,295 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  IndieTix error alarms: emails when ticket orders, the webhook, the
+  operator app or a scheduled job starts failing, and again when it
+  recovers. Only CloudWatch alarms, log metric filters and one SNS topic;
+  it changes nothing about the functions themselves. Thresholds come from
+  two weeks of Liberty Hall production (2026-10-22 to 11-05): zero Lambda
+  errors, about one logged error a week. Function names are parameters
+  because production's functions were made by hand, not by bootstrap.
+
+Parameters:
+  AlarmPrefix:
+    Type: String
+    Default: indietix-prod
+    Description: Prefix for the topic and alarm names
+  AlertEmail:
+    Type: String
+    Description: Where alarm emails go (the subscription must be confirmed from the first email)
+  GetSquareOrdersFunction:
+    Type: String
+    Default: getSquareOrders
+  QueueForwarderFunction:
+    Type: String
+    Default: square-queue-forwarder
+  QRScannerFunction:
+    Type: String
+    Default: QRScanner
+  InboundSmsFunction:
+    Type: String
+    Default: textingOpt_In-Opt_Out
+  ExpireModifiersFunction:
+    Type: String
+    Default: expireQRCodeSquareModifiers
+  DailyReportFunction:
+    Type: String
+    Default: DailyPgQueryAndSftp
+  MarketingEngineFunction:
+    Type: String
+    Default: marketingEngine
+  MailForwarderFunction:
+    Type: String
+    Default: indietix-net-mail-forwarder
+  WebhookQueueName:
+    Type: String
+    Default: webhook_square_processing.fifo
+  WebhookApiName:
+    Type: String
+    Default: getSquareOrders
+  WebhookApiStage:
+    Type: String
+    Default: prod
+
+Resources:
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AlarmPrefix}-alarms'
+      DisplayName: IndieTix alarms
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  # ---- Ticket orders (the money path) ----
+
+  # getSquareOrders catches most failures and logs them with console.error,
+  # so its Lambda Errors metric stays at zero. Count ERROR log lines instead.
+  OrderErrorLogFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${GetSquareOrdersFunction}'
+      FilterPattern: '"ERROR"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-ErrorLogs'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  OrderErrorLogAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-ticket-orders-logged-errors'
+      AlarmDescription: getSquareOrders logged an error while processing a Square order. A buyer may not have received their tickets. Check its CloudWatch log.
+      Namespace: IndieTix
+      MetricName: !Sub '${GetSquareOrdersFunction}-ErrorLogs'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  OrderCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-ticket-orders-crashed'
+      AlarmDescription: getSquareOrders crashed or timed out. Orders wait in the queue and retry, but tickets aren't going out while this lasts.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref GetSquareOrdersFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  # Orders sitting in the queue for 5+ minutes means nothing is processing them
+  OrderQueueStuckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-ticket-orders-stuck-in-queue'
+      AlarmDescription: A Square order has waited in the webhook queue for over 5 minutes. getSquareOrders isn't keeping up or isn't running.
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions: [{ Name: QueueName, Value: !Ref WebhookQueueName }]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 300
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  WebhookForwarderCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-square-webhook-receiver-crashed'
+      AlarmDescription: square-queue-forwarder failed. Square's order webhooks aren't reaching the queue (Square retries for up to 72 hours).
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref QueueForwarderFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  WebhookApi5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-square-webhook-endpoint-errors'
+      AlarmDescription: The Square webhook endpoint (API Gateway) returned server errors. Square will retry, but orders are delayed.
+      Namespace: AWS/ApiGateway
+      MetricName: 5XXError
+      Dimensions:
+        - { Name: ApiName, Value: !Ref WebhookApiName }
+        - { Name: Stage, Value: !Ref WebhookApiStage }
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  # ---- Operator app and door scanner ----
+
+  # QRScanner's Express routes catch errors and answer 500, so watch the
+  # Function URL's 5xx count rather than Lambda Errors. Two in 5 minutes,
+  # since a single stray 500 shows up about once every two weeks.
+  QRScanner5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-qrscanner-server-errors'
+      AlarmDescription: QRScanner (operator pages, door scanning, opt-in page) answered with server errors. Staff may be unable to scan or look up tickets.
+      Namespace: AWS/Lambda
+      MetricName: Url5xxCount
+      Dimensions: [{ Name: FunctionName, Value: !Ref QRScannerFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  QRScannerCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-qrscanner-crashed'
+      AlarmDescription: QRScanner crashed or timed out.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref QRScannerFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  # ---- Background jobs: any crash or timeout ----
+
+  InboundSmsCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-inbound-sms-crashed'
+      AlarmDescription: The inbound SMS handler failed. A STOP or START text may not have been recorded in the venue's database.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref InboundSmsFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  ExpireModifiersCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-expire-showtimes-crashed'
+      AlarmDescription: The job that expires past showtimes in Square failed. Past showtimes may still be for sale.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref ExpireModifiersFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  # DailyPg already emails the venue when an upload fails; this catches a
+  # crash before it gets that far.
+  DailyReportCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-daily-box-office-report-crashed'
+      AlarmDescription: The nightly box-office report job crashed or timed out. Reports may not have reached the FTP servers.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref DailyReportFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  MarketingEngineCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-marquee-engine-crashed'
+      AlarmDescription: The Marquee Engine (marketing posts) crashed or timed out.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref MarketingEngineFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  MailForwarderCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AlarmPrefix}-indietix-mail-forwarder-crashed'
+      AlarmDescription: The indietix.net mail forwarder failed. Mail to indietix@, privacy@ or support@ may not have reached Gmail.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref MailForwarderFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+Outputs:
+  AlarmTopicArn:
+    Value: !Ref AlarmTopic

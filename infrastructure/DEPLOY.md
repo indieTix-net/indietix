@@ -57,6 +57,24 @@ The user deploys exclusively via the AWS Console/CLI by hand, never `serverless 
 - No automatic EventBridge/schedule management — those are set up directly via `aws events put-rule`/`put-targets` when needed (e.g. `marketingEngine-poller`), not tracked by this script.
 - No secrets handling — `Client.configuration` and Secrets Manager are read directly via `aws` CLI/psql when needed, never touched by this script.
 
+## Production error alarms (`alarms/template.yaml`)
+
+Separate from this script: one CloudFormation stack, `indietix-prod-alarms` (us-east-2), holding only CloudWatch alarms, one log metric filter and the SNS topic that emails them. It's the one piece of production made by IaC, because alarms touch nothing a function runs on. It emails when an alarm fires and again when it clears:
+
+- ticket orders: getSquareOrders logs an `ERROR` line, crashes, or an order waits in `webhook_square_processing.fifo` over 5 minutes
+- the Square webhook: square-queue-forwarder crashes, or the `getSquareOrders/prod` API returns 5xx
+- QRScanner: 2+ server errors (Function URL 5xx) in 5 minutes, or a crash
+- any crash of the inbound SMS handler, expireQRCodeSquareModifiers, DailyPgQueryAndSftp, marketingEngine or the indietix.net mail forwarder
+
+Update it (after editing the template):
+
+```
+aws cloudformation deploy --region us-east-2 --stack-name indietix-prod-alarms \
+  --template-file alarms/template.yaml --parameter-overrides AlertEmail=<address>
+```
+
+A new `AlertEmail` must click the AWS confirmation email before anything arrives. Test delivery with `aws cloudwatch set-alarm-state --region us-east-2 --alarm-name indietix-prod-qrscanner-crashed --state-value ALARM --state-reason test` (it flips back to OK by itself at the next evaluation). Function names are template parameters, since production's functions were made by hand.
+
 ## Broader context
 
 For the platform this script deploys — architecture, multi-tenancy model, per-repo details — see README at the workspace root (one level up from this repo).
