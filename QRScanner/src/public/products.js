@@ -48,6 +48,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalCustomerName = document.getElementById('modal-customer-name');
     const modalPhone = document.getElementById('modal-phone');
     const confirmCheckinButton = document.getElementById('confirm-checkin');
+    // "Confirm Check-in & Print": only when this venue has a print agent
+    const confirmCheckinPrintButton = document.getElementById('confirm-checkin-print');
+    confirmCheckinPrintButton.hidden = !PRINT_AGENT_URL;
     
     // Check-out modal elements
     const checkoutModal = new bootstrap.Modal(document.getElementById('checkout-modal'));
@@ -430,6 +433,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // "printer" repo) -- one agent instance on the venue's LAN, reached
     // by its LAN address (PRINT_AGENT_URL), not through the Lambda
     // backend (which has no network path to a printer on-site).
+    // Throws on failure; shared by Print Ticket and Confirm Check-in & Print
+    async function sendTicketToPrinter(qrCode) {
+        const pdfUrl = await getPresignedTicketUrl(qrCode);
+
+        const response = await fetch(`${PRINT_AGENT_URL}/print`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdfUrl })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Print agent returned ${response.status}`);
+        }
+    }
+
     async function printTicket(qrCode, buttonEl) {
         const originalText = buttonEl ? buttonEl.textContent : null;
         if (buttonEl) {
@@ -438,19 +457,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            const pdfUrl = await getPresignedTicketUrl(qrCode);
-
-            const response = await fetch(`${PRINT_AGENT_URL}/print`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pdfUrl })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Print agent returned ${response.status}`);
-            }
-
+            await sendTicketToPrinter(qrCode);
             console.log('Ticket sent to printer successfully');
 
         } catch (error) {
@@ -870,37 +877,57 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Confirm check-in button click
-    confirmCheckinButton.addEventListener('click', function() {
+    // Confirm check-in button click; "Confirm Check-in & Print" also prints
+    // the ticket, only after a successful check-in.
+    confirmCheckinButton.addEventListener('click', () => confirmCheckin(false));
+    confirmCheckinPrintButton.addEventListener('click', () => confirmCheckin(true));
+
+    function confirmCheckin(alsoPrint) {
         if (!currentQrCode) {
             UIDialogs.showMessage({ type: 'error', title: 'Couldn\'t check in', message: "This ticket has no QR code." });
             return;
         }
+        const qrCode = currentQrCode;
         
-        console.log("Checking in event with QR Code:", currentQrCode);
+        console.log("Checking in event with QR Code:", qrCode, alsoPrint ? '(and printing)' : '');
+        confirmCheckinButton.disabled = true;
+        confirmCheckinPrintButton.disabled = true;
         
         fetch(`${API_URL}/api/checkin`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ qrCode: currentQrCode })
+            body: JSON.stringify({ qrCode })
         })
         .then(response => UIDialogs.readJson(response))  // 401/403 handling is automatic via auth-helper
-        .then(data => {
+        .then(async data => {
             console.log("Check-in response:", data);
-            checkinModal.hide();
             
-            if (data.returnStatus === 'successful_checkin') {
+            if (data.returnStatus === 'successful_checkin' && alsoPrint) {
+                try {
+                    await sendTicketToPrinter(qrCode);
+                    checkinModal.hide();
+                    UIDialogs.showMessage({ type: 'success', title: 'Checked in and printed', message: 'The ticket is checked in and was sent to the printer.' });
+                } catch (error) {
+                    console.error('Error printing ticket after check-in:', error);
+                    checkinModal.hide();
+                    UIDialogs.showMessage({ type: 'warning', title: "Checked in, but couldn't print", message: "The ticket is checked in. Check that the box office computer running the print agent is on, and that the printer is on and has labels, then use Print Ticket.", details: error.message });
+                }
+            } else if (data.returnStatus === 'successful_checkin') {
+                checkinModal.hide();
                 UIDialogs.showMessage({ type: 'success', title: 'Checked in', message: 'The ticket is checked in.' });
-            } else if (data.returnStatus === 'failed_already_checked_in') {
-                UIDialogs.showMessage({ type: 'warning', title: 'Already checked in', message: 'This ticket was already checked in.' });
-            } else if (data.returnStatus === 'failed_expired_qrcode') {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'This ticket has expired.' });
-            } else if (data.returnStatus === 'failed_no_QRCode') {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'This ticket was not found.' });
-            } else if (data.returnStatus === 'failed_ticket_not_valid') {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: `This ticket is ${data.ticketStatus || 'not valid'}, so it can't be checked in.` });
             } else {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: data.message || 'The ticket could not be checked in.', details: data.returnStatus });
+                checkinModal.hide();
+                if (data.returnStatus === 'failed_already_checked_in') {
+                    UIDialogs.showMessage({ type: 'warning', title: 'Already checked in', message: 'This ticket was already checked in.' });
+                } else if (data.returnStatus === 'failed_expired_qrcode') {
+                    UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'This ticket has expired.' });
+                } else if (data.returnStatus === 'failed_no_QRCode') {
+                    UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'This ticket was not found.' });
+                } else if (data.returnStatus === 'failed_ticket_not_valid') {
+                    UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: `This ticket is ${data.ticketStatus || 'not valid'}, so it can't be checked in.` });
+                } else {
+                    UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: data.message || 'The ticket could not be checked in.', details: data.returnStatus });
+                }
             }
             
             loadEvents(searchInput.value, startDateInput.value, endDateInput.value);
@@ -909,8 +936,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error checking in event:', error);
             UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'Something went wrong. Please try again.', details: error.message });
             checkinModal.hide();
+        })
+        .finally(() => {
+            confirmCheckinButton.disabled = false;
+            confirmCheckinPrintButton.disabled = false;
         });
-    });
+    }
     
     // Confirm check-out button click
     confirmCheckoutButton.addEventListener('click', function() {
