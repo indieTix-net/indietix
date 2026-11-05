@@ -27,6 +27,14 @@ PRIVATE_SUBNET_B_CIDR="172.31.48.0/20"  # See PRIVATE_SUBNET_A_CIDR.
 # ---- Database cost (aurora-poc) ----
 AURORA_MIN_CAPACITY="0.5"       # 0.5 = always warm (use this for a real venue). 0 = an idle sandbox pauses itself after 5 min with no connections and resumes automatically on the next one (first request waits ~15s). Cuts the always-on database cost (~$2/day) to near zero -- good for a sandbox you only use now and then.
 
+# ---- Error alarms and status page ----
+# CloudWatch alarms (alarms/template.yaml) email ALARM_EMAIL when ticket
+# orders, the Square webhook, QRScanner or a background job starts failing,
+# and again when it recovers. The public status page (status.html) shows
+# their state. Blank uses OPERATOR_ALERT_EMAIL, then BUDGET_ALERT_EMAIL; all
+# blank skips both. AWS emails a subscription confirmation first.
+ALARM_EMAIL=""                   # e.g. you@example.com
+
 # ---- Cost guard (optional) ----
 # Deploys the cost-guard stack: AWS Budgets that email BUDGET_ALERT_EMAIL
 # when daily spend goes over BUDGET_DAILY_USD, or monthly spend passes 80%

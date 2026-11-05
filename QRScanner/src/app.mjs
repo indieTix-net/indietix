@@ -9,6 +9,7 @@ import jwt from 'jsonwebtoken';
 import AWS from 'aws-sdk';
 import { SecretsManagerClient, GetSecretValueCommand, PutSecretValueCommand, CreateSecretCommand } from '@aws-sdk/client-secrets-manager';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+import { CloudWatchClient, DescribeAlarmsCommand } from '@aws-sdk/client-cloudwatch';
 import mailcomposer from 'mailcomposer';
 import { calendar } from '@googleapis/calendar';
 import { GoogleAuth } from 'google-auth-library';
@@ -3222,6 +3223,67 @@ app.post('/api/public/signup/set-password', async (req, res) => {
   }
 });
 // ---- END HOSTED SIGNUP ----
+
+// ---- PUBLIC STATUS PAGE ----
+// GET /api/public/status powers status.html: one line per part of IndieTix,
+// "operational" or "problem", read from this environment's error alarms
+// (infrastructure/alarms; STATUS_ALARM_PREFIX is their name prefix, e.g.
+// "indietix-prod"). Only the component names below are ever sent, never
+// alarm names, reasons or numbers. A component is listed only if at least
+// one of its alarms exists here. The "ticket-orders-logged-errors" alarm
+// is left out on purpose: one stray error line (a bogus webhook) trips it,
+// which is worth an operator email but not a public "problem". Cached for
+// a minute so a busy status page can't run up CloudWatch calls.
+const STATUS_COMPONENTS = [
+  { name: 'Ticket sales and delivery', alarms: ['ticket-orders-crashed', 'ticket-orders-stuck-in-queue', 'square-webhook-receiver-crashed', 'square-webhook-endpoint-errors'] },
+  { name: 'Box office pages and door scanning', alarms: ['qrscanner-server-errors', 'qrscanner-crashed'] },
+  { name: 'Text messages', alarms: ['inbound-sms-crashed'] },
+  { name: 'Square connection', alarms: ['square-token-refresher-crashed'] },
+  { name: 'Showtime updates in Square', alarms: ['expire-showtimes-crashed'] },
+  { name: 'Nightly box-office reports', alarms: ['daily-box-office-report-crashed'] },
+  { name: 'Marketing posts', alarms: ['marquee-engine-crashed'] }
+];
+const STATUS_CACHE_MS = 60 * 1000;
+let statusCache = { prefix: null, at: 0, body: null };
+const cloudWatchClient = new CloudWatchClient({});
+
+app.get('/api/public/status', async (req, res) => {
+  const prefix = process.env.STATUS_ALARM_PREFIX;
+  if (!prefix) return res.json({ enabled: false });
+  res.set('Cache-Control', 'public, max-age=30');
+  if (statusCache.body && statusCache.prefix === prefix && Date.now() - statusCache.at < STATUS_CACHE_MS) {
+    return res.json(statusCache.body);
+  }
+  try {
+    const states = new Map(); // alarm name without the prefix -> state
+    let NextToken;
+    do {
+      const page = await cloudWatchClient.send(new DescribeAlarmsCommand({
+        AlarmNamePrefix: `${prefix}-`, AlarmTypes: ['MetricAlarm'], NextToken
+      }));
+      for (const alarm of page.MetricAlarms || []) {
+        states.set(alarm.AlarmName.slice(prefix.length + 1), alarm.StateValue);
+      }
+      NextToken = page.NextToken;
+    } while (NextToken);
+
+    const components = STATUS_COMPONENTS
+      .filter(c => c.alarms.some(a => states.has(a)))
+      .map(c => ({ name: c.name, status: c.alarms.some(a => states.get(a) === 'ALARM') ? 'problem' : 'operational' }));
+    const body = {
+      enabled: true,
+      checkedAt: new Date().toISOString(),
+      overall: components.some(c => c.status === 'problem') ? 'problem' : 'operational',
+      components
+    };
+    statusCache = { prefix, at: Date.now(), body };
+    return res.json(body);
+  } catch (error) {
+    console.error('GET /api/public/status error:', error.message);
+    return res.status(503).json({ enabled: true, message: 'Status is unavailable right now' });
+  }
+});
+// ---- END PUBLIC STATUS PAGE ----
 
 // ---- CLIENT UI CONFIG ----
 // The handful of non-sensitive Client.configuration keys that operator pages

@@ -184,6 +184,9 @@ BUDGET_ALERT_EMAIL="${BUDGET_ALERT_EMAIL:-}"
 BUDGET_DAILY_USD="${BUDGET_DAILY_USD:-5}"
 BUDGET_MONTHLY_USD="${BUDGET_MONTHLY_USD:-120}"
 BUDGET_BREAKER="${BUDGET_BREAKER:-false}"
+# Error alarms (alarms/template.yaml): where they email. Blank falls back to
+# OPERATOR_ALERT_EMAIL, then BUDGET_ALERT_EMAIL; all blank skips the stack.
+ALARM_EMAIL="${ALARM_EMAIL:-${OPERATOR_ALERT_EMAIL:-$BUDGET_ALERT_EMAIL}}"
 
 # Every Lambda an environment has (as ${ENV_PREFIX}-<suffix>). block/
 # unblock/breaker-status act on exactly these -- never a ${ENV_PREFIX}-*
@@ -269,6 +272,49 @@ else:
   rm -f "$env_file"
   echo "$result"
 }
+
+# ---- ERROR ALARMS ----
+# deploy_alarms -- the same alarms/template.yaml production uses, with this
+# environment's function names, emailed to ALARM_EMAIL. Then points
+# QRScanner's public status page (status.html) at them via
+# STATUS_ALARM_PREFIX. Skipped, with the status page left off, when no
+# alarm email is configured.
+deploy_alarms() {
+  local qrscanner="${ENV_PREFIX}-qrscanner"
+  if [ -z "$ALARM_EMAIL" ]; then
+    echo "(ALARM_EMAIL, OPERATOR_ALERT_EMAIL and BUDGET_ALERT_EMAIL are all blank -- skipping the error alarms and status page)"
+    echo
+    merge_lambda_env "$qrscanner" '{}' STATUS_ALARM_PREFIX >/dev/null
+    return 0
+  fi
+  # The order-error metric filter needs getSquareOrders' log group, which
+  # Lambda only creates on the first invocation.
+  aws logs create-log-group --log-group-name "/aws/lambda/${ENV_PREFIX}-get-square-orders" \
+    "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null || true
+  # The webhook is an HTTP API here (production's is a REST API); its ID
+  # is the first label of the endpoint's host name.
+  local api_id
+  api_id="$(stack_output square-queue-forwarder ApiEndpoint | sed -E 's#^https://([^.]+)\..*#\1#')"
+  deploy_stack "alarms" "alarms" \
+    "AlertEmail=${ALARM_EMAIL}" \
+    "GetSquareOrdersFunction=${ENV_PREFIX}-get-square-orders" \
+    "QueueForwarderFunction=${ENV_PREFIX}-square-queue-forwarder" \
+    "QRScannerFunction=${qrscanner}" \
+    "InboundSmsFunction=${ENV_PREFIX}-sms-inbound" \
+    "ExpireModifiersFunction=${ENV_PREFIX}-expire-modifiers" \
+    "DailyReportFunction=${ENV_PREFIX}-daily-pg-sftp" \
+    "MarketingEngineFunction=${ENV_PREFIX}-marketing-engine" \
+    "MailForwarderFunction=none" \
+    "TokenRefresherFunction=${ENV_PREFIX}-square-token-refresher" \
+    "WebhookQueueName=${ENV_PREFIX}-square-webhook-queue.fifo" \
+    "WebhookApiName=none" \
+    "WebhookHttpApiId=${api_id:-none}"
+  merge_lambda_env "$qrscanner" "{\"STATUS_ALARM_PREFIX\": \"${ENV_PREFIX}\"}" >/dev/null
+  echo "Error alarms email ${ALARM_EMAIL} (confirm AWS's subscription email first)."
+  echo "Status page: https://${STATIC_SITE_DOMAIN:-$(stack_output static-site DistributionDomainName)}/status.html"
+  echo
+}
+# ---- END ERROR ALARMS ----
 
 # set_square_api_base -- points each Square-calling Lambda at this
 # environment's Square (SQUARE_ENVIRONMENT): sets SQUARE_API_BASE for
@@ -754,6 +800,10 @@ cmd_up() {
     echo
   fi
 
+  # 5c. Error alarms, emailed to ALARM_EMAIL, and the status page that
+  # reads them.
+  deploy_alarms
+
   # 6. Onboard the first client. Payload shape is client-setup-teardown's
   # real handler input (clientSetup-Teardown/src/index.js's exports.handler
   # -- username/clientSecret/contactName/clientEmail/square_access_token/
@@ -1127,6 +1177,7 @@ cmd_down() {
   # 4. Reverse dependency order. cost-guard first, so its breaker can't
   # fire mid-teardown.
   delete_stack "cost-guard"
+  delete_stack "alarms"
   # The API edge lives in us-east-1 whatever the environment's region.
   if AWS_REGION=us-east-1 stack_output api-edge ApiUrl | grep -q .; then
     ( AWS_REGION=us-east-1; SAM_ARGS=("${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1); delete_stack "api-edge" )

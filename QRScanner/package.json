@@ -15,6 +15,7 @@
   "comment:node-version": "Must run under Node 22 (matching production's actual Lambda runtime), not whatever 'node' happens to resolve to -- jsonwebtoken's transitive dependency buffer-equal-constant-time uses the legacy SlowBuffer API, which Node 25 removed outright (confirmed: fails identically with no symlinks involved, a real version incompatibility, not a test-setup bug). CI pins this via actions/setup-node. Locally, make sure Node 22 is the active version on PATH (nvm/Volta/`brew install node@22` + manual PATH) before running `npm test`.",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "~3.1155.0",
     "@aws-sdk/client-lambda": "^3.873.0",
     "@aws-sdk/client-pinpoint-sms-voice-v2": "^3.1068.0",
     "@aws-sdk/client-s3": "^3.1090.0",

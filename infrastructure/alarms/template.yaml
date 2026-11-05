@@ -6,13 +6,16 @@ Description: >
   it changes nothing about the functions themselves. Thresholds come from
   two weeks of Liberty Hall production (2026-10-22 to 11-05): zero Lambda
   errors, about one logged error a week. Function names are parameters
-  because production's functions were made by hand, not by bootstrap.
+  because production's functions were made by hand; bootstrap.sh passes
+  its own ${EnvPrefix}-* names. An optional function set to "none" gets
+  no alarm. QRScanner's public status page (STATUS_ALARM_PREFIX) reads
+  these alarms' states, so keep the names' suffixes stable.
 
 Parameters:
-  AlarmPrefix:
+  EnvPrefix:
     Type: String
     Default: indietix-prod
-    Description: Prefix for the topic and alarm names
+    Description: Prefix for the topic and alarm names (production's is indietix-prod)
   AlertEmail:
     Type: String
     Description: Where alarm emails go (the subscription must be confirmed from the first email)
@@ -28,33 +31,57 @@ Parameters:
   InboundSmsFunction:
     Type: String
     Default: textingOpt_In-Opt_Out
+    Description: '\"none\" skips this alarm'
   ExpireModifiersFunction:
     Type: String
     Default: expireQRCodeSquareModifiers
+    Description: '\"none\" skips this alarm'
   DailyReportFunction:
     Type: String
     Default: DailyPgQueryAndSftp
+    Description: '\"none\" skips this alarm'
   MarketingEngineFunction:
     Type: String
     Default: marketingEngine
+    Description: '\"none\" skips this alarm'
   MailForwarderFunction:
     Type: String
     Default: indietix-net-mail-forwarder
+    Description: '\"none\" skips this alarm'
   WebhookQueueName:
     Type: String
     Default: webhook_square_processing.fifo
+  TokenRefresherFunction:
+    Type: String
+    Default: none
+    Description: 'Daily Square token refresher (bootstrap environments only); "none" skips it'
   WebhookApiName:
     Type: String
     Default: getSquareOrders
+    Description: 'Production''s REST API for the Square webhook; "none" when the webhook is an HTTP API (bootstrap)'
   WebhookApiStage:
     Type: String
     Default: prod
+  WebhookHttpApiId:
+    Type: String
+    Default: none
+    Description: 'Bootstrap''s HTTP API ID for the Square webhook; "none" in production'
+
+Conditions:
+  HasInboundSms: !Not [!Equals [!Ref InboundSmsFunction, none]]
+  HasExpireModifiers: !Not [!Equals [!Ref ExpireModifiersFunction, none]]
+  HasDailyReport: !Not [!Equals [!Ref DailyReportFunction, none]]
+  HasMarketingEngine: !Not [!Equals [!Ref MarketingEngineFunction, none]]
+  HasMailForwarder: !Not [!Equals [!Ref MailForwarderFunction, none]]
+  HasTokenRefresher: !Not [!Equals [!Ref TokenRefresherFunction, none]]
+  HasWebhookRestApi: !Not [!Equals [!Ref WebhookApiName, none]]
+  HasWebhookHttpApi: !Not [!Equals [!Ref WebhookHttpApiId, none]]
 
 Resources:
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Sub '${AlarmPrefix}-alarms'
+      TopicName: !Sub '${EnvPrefix}-alarms'
       DisplayName: IndieTix alarms
       Subscription:
         - Protocol: email
@@ -78,7 +105,7 @@ Resources:
   OrderErrorLogAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-ticket-orders-logged-errors'
+      AlarmName: !Sub '${EnvPrefix}-ticket-orders-logged-errors'
       AlarmDescription: getSquareOrders logged an error while processing a Square order. A buyer may not have received their tickets. Check its CloudWatch log.
       Namespace: IndieTix
       MetricName: !Sub '${GetSquareOrdersFunction}-ErrorLogs'
@@ -94,7 +121,7 @@ Resources:
   OrderCrashAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-ticket-orders-crashed'
+      AlarmName: !Sub '${EnvPrefix}-ticket-orders-crashed'
       AlarmDescription: getSquareOrders crashed or timed out. Orders wait in the queue and retry, but tickets aren't going out while this lasts.
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -112,7 +139,7 @@ Resources:
   OrderQueueStuckAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-ticket-orders-stuck-in-queue'
+      AlarmName: !Sub '${EnvPrefix}-ticket-orders-stuck-in-queue'
       AlarmDescription: A Square order has waited in the webhook queue for over 5 minutes. getSquareOrders isn't keeping up or isn't running.
       Namespace: AWS/SQS
       MetricName: ApproximateAgeOfOldestMessage
@@ -129,7 +156,7 @@ Resources:
   WebhookForwarderCrashAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-square-webhook-receiver-crashed'
+      AlarmName: !Sub '${EnvPrefix}-square-webhook-receiver-crashed'
       AlarmDescription: square-queue-forwarder failed. Square's order webhooks aren't reaching the queue (Square retries for up to 72 hours).
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -145,14 +172,33 @@ Resources:
 
   WebhookApi5xxAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasWebhookRestApi
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-square-webhook-endpoint-errors'
+      AlarmName: !Sub '${EnvPrefix}-square-webhook-endpoint-errors'
       AlarmDescription: The Square webhook endpoint (API Gateway) returned server errors. Square will retry, but orders are delayed.
       Namespace: AWS/ApiGateway
       MetricName: 5XXError
       Dimensions:
         - { Name: ApiName, Value: !Ref WebhookApiName }
         - { Name: Stage, Value: !Ref WebhookApiStage }
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  WebhookHttpApi5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasWebhookHttpApi
+    Properties:
+      AlarmName: !Sub '${EnvPrefix}-square-webhook-endpoint-errors'
+      AlarmDescription: The Square webhook endpoint (API Gateway) returned server errors. Square will retry, but orders are delayed.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions: [{ Name: ApiId, Value: !Ref WebhookHttpApiId }]
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
@@ -170,7 +216,7 @@ Resources:
   QRScanner5xxAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-qrscanner-server-errors'
+      AlarmName: !Sub '${EnvPrefix}-qrscanner-server-errors'
       AlarmDescription: QRScanner (operator pages, door scanning, opt-in page) answered with server errors. Staff may be unable to scan or look up tickets.
       Namespace: AWS/Lambda
       MetricName: Url5xxCount
@@ -187,7 +233,7 @@ Resources:
   QRScannerCrashAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-qrscanner-crashed'
+      AlarmName: !Sub '${EnvPrefix}-qrscanner-crashed'
       AlarmDescription: QRScanner crashed or timed out.
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -205,8 +251,9 @@ Resources:
 
   InboundSmsCrashAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasInboundSms
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-inbound-sms-crashed'
+      AlarmName: !Sub '${EnvPrefix}-inbound-sms-crashed'
       AlarmDescription: The inbound SMS handler failed. A STOP or START text may not have been recorded in the venue's database.
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -222,8 +269,9 @@ Resources:
 
   ExpireModifiersCrashAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasExpireModifiers
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-expire-showtimes-crashed'
+      AlarmName: !Sub '${EnvPrefix}-expire-showtimes-crashed'
       AlarmDescription: The job that expires past showtimes in Square failed. Past showtimes may still be for sale.
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -241,8 +289,9 @@ Resources:
   # crash before it gets that far.
   DailyReportCrashAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasDailyReport
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-daily-box-office-report-crashed'
+      AlarmName: !Sub '${EnvPrefix}-daily-box-office-report-crashed'
       AlarmDescription: The nightly box-office report job crashed or timed out. Reports may not have reached the FTP servers.
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -258,8 +307,9 @@ Resources:
 
   MarketingEngineCrashAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasMarketingEngine
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-marquee-engine-crashed'
+      AlarmName: !Sub '${EnvPrefix}-marquee-engine-crashed'
       AlarmDescription: The Marquee Engine (marketing posts) crashed or timed out.
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -275,12 +325,31 @@ Resources:
 
   MailForwarderCrashAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: HasMailForwarder
     Properties:
-      AlarmName: !Sub '${AlarmPrefix}-indietix-mail-forwarder-crashed'
+      AlarmName: !Sub '${EnvPrefix}-indietix-mail-forwarder-crashed'
       AlarmDescription: The indietix.net mail forwarder failed. Mail to indietix@, privacy@ or support@ may not have reached Gmail.
       Namespace: AWS/Lambda
       MetricName: Errors
       Dimensions: [{ Name: FunctionName, Value: !Ref MailForwarderFunction }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  TokenRefresherCrashAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: HasTokenRefresher
+    Properties:
+      AlarmName: !Sub '${EnvPrefix}-square-token-refresher-crashed'
+      AlarmDescription: The daily Square token refresher crashed or timed out. Connect Square venues' tokens may not have been renewed.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref TokenRefresherFunction }]
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1

@@ -140,6 +140,52 @@ test('sendSms: a per-client SMS_SPEND_LIMIT_PER_5MIN override is honored', async
   assert.deepEqual(result, { sent: false, reason: 'spend_limit_exceeded' });
 });
 
+test('sendSms: the daily cap stops sends once the last 24 hours reach the default 1,000', async () => {
+  smsMock.reset();
+  const pool = new FakePool([
+    { rows: [{ ID: 1 }] },                    // active consent
+    { rows: [{ cnt: 0, day_cnt: 1000 }] }     // quiet 5 minutes, full day
+  ]);
+  const result = await sendSms({
+    toPhone: '9135551234', body: 'hi',
+    clientConfig: baseClientConfig,
+    pool
+  });
+  assert.deepEqual(result, { sent: false, reason: 'daily_limit_exceeded' });
+  assert.equal(smsMock.calls().length, 0);
+  assert.match(pool.calls[1].sql, /INTERVAL '24 hours'/);
+});
+
+test('sendSms: under the daily cap still sends', async () => {
+  smsMock.reset();
+  smsMock.on(SendTextMessageCommand).resolves({ MessageId: 'msg-under-cap' });
+  const pool = new FakePool([
+    { rows: [{ ID: 1 }] },
+    { rows: [{ cnt: 0, day_cnt: 999 }] },
+    { rows: [] }                              // SmsOutboundLog insert
+  ]);
+  const result = await sendSms({
+    toPhone: '9135551234', body: 'hi',
+    clientConfig: baseClientConfig,
+    pool
+  });
+  assert.equal(result.sent, true);
+});
+
+test('sendSms: a per-client SMS_DAILY_LIMIT override is honored', async () => {
+  smsMock.reset();
+  const pool = new FakePool([
+    { rows: [{ ID: 1 }] },
+    { rows: [{ cnt: 0, day_cnt: 50 }] }
+  ]);
+  const result = await sendSms({
+    toPhone: '9135551234', body: 'hi',
+    clientConfig: { ...baseClientConfig, SMS_DAILY_LIMIT: 50 },
+    pool
+  });
+  assert.deepEqual(result, { sent: false, reason: 'daily_limit_exceeded' });
+});
+
 test('sendSms: spend-limit check query failing fails OPEN (still sends)', async () => {
   smsMock.reset();
   smsMock.on(SendTextMessageCommand).resolves({ MessageId: 'msg-failopen' });

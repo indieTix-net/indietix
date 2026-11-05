@@ -1099,6 +1099,7 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       "SMS_SENDER_BRAND": "IndieTix",                         // brand shown in SMS body
       "SMS_OPT_OUT_LIST_NAME": "",                            // AWS opt-out list associated with this client's number; leave empty to skip defensive removal on START
       "SMS_SPEND_LIMIT_PER_5MIN": 300,                        // Spend circuit breaker: max successful SMS in any 5-minute window per client. Set 0 or unset to fall back to code default (300).
+      "SMS_DAILY_LIMIT": 1000,                                // Daily cap: max successful SMS in any rolling 24 hours per client. Not user-definable on purpose (IndieTix sets it, the venue can't raise it). 0 or unset falls back to the code default (1000).
       "SMS_LOG_RETENTION_DAYS": 30,                           // Days of SmsOutboundLog rows to keep. Older rows pruned probabilistically by utils/sms.mjs. Set 0 or unset to fall back to code default (30).
       "INDIETIX_PRIVACY_URL": "https://indietix.com/privacy",
       "INDIETIX_TERMS_URL": "https://indietix.com/terms",

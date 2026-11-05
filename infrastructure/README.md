@@ -252,6 +252,10 @@ Venues then see **Connect Square** in Client Settings. What happens behind it:
 
 It costs about $10 a month, and always deploys in us-east-1 (stack `<ENV_PREFIX>-api-edge`), where CloudFront firewalls live. CloudFront adds a secret header (kept in Secrets Manager, `indieTix/edge/<ENV_PREFIX>`, us-east-1), and QRScanner refuses requests without it, so nothing can go around the firewall to the Function URL. `up` prints the new **API address**: put it in `config.js` (`INDIETIX_API_URL`). With Connect Square on, it's also the OAuth redirect URL's base, so register the new redirect URL with Square.
 
+### Error alarms and status page
+
+With an alert email set (`ALARM_EMAIL`, else `OPERATOR_ALERT_EMAIL` or `BUDGET_ALERT_EMAIL`), `up` deploys `<ENV_PREFIX>-alarms`: CloudWatch alarms that email you when ticket orders fail or back up in the queue, the Square webhook or QRScanner returns errors, or a background job crashes, and again when each recovers. Click the confirmation link AWS emails first. The same alarms drive the public **status page**, `status.html` on the static site, which shows each part of IndieTix as working or having a problem (never alarm names or details). Alarms cost about $0.10 each a month.
+
 ### Connecting Google Calendar
 
 Optional — pushes a calendar event for every showtime when you add a movie or event.

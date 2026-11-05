@@ -73,7 +73,7 @@ aws cloudformation deploy --region us-east-2 --stack-name indietix-prod-alarms \
   --template-file alarms/template.yaml --parameter-overrides AlertEmail=<address>
 ```
 
-A new `AlertEmail` must click the AWS confirmation email before anything arrives. Test delivery with `aws cloudwatch set-alarm-state --region us-east-2 --alarm-name indietix-prod-qrscanner-crashed --state-value ALARM --state-reason test` (it flips back to OK by itself at the next evaluation). Function names are template parameters, since production's functions were made by hand.
+A new `AlertEmail` must click the AWS confirmation email before anything arrives. Test delivery with `aws cloudwatch set-alarm-state --region us-east-2 --alarm-name indietix-prod-qrscanner-crashed --state-value ALARM --state-reason test` (it flips back to OK by itself at the next evaluation). Function names are template parameters, since production's functions were made by hand; `bootstrap.sh` deploys the same template for its environments (`deploy_alarms`). QRScanner's public status page (`status.html`, `GET /api/public/status`) reads these alarms when QRScanner has `STATUS_ALARM_PREFIX=indietix-prod` and its role allows `cloudwatch:DescribeAlarms`.
 
 ## Broader context
 

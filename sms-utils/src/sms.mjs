@@ -27,6 +27,14 @@ const smsClient = new PinpointSMSVoiceV2Client({ region: 'us-east-2' });
 // client via clientConfig.SMS_SPEND_LIMIT_PER_5MIN.
 const DEFAULT_SPEND_LIMIT_PER_5MIN = 300;
 
+// Daily cap: successful SMS in any rolling 24 hours, per client. A ceiling on
+// the day's bill (about $10 at 1,000 texts) rather than a burst detector --
+// Liberty Hall's busiest 24 hours through 2026-11-05 was 33 texts, so 1,000 is
+// far above a sold-out day. Overridable per client via
+// clientConfig.SMS_DAILY_LIMIT, which is deliberately NOT a Client Settings
+// key: the venue can't raise its own ceiling; IndieTix sets it.
+const DEFAULT_DAILY_LIMIT = 1000;
+
 // SmsOutboundLog retention. Pruning runs probabilistically (~1% of successful
 // sends) to keep the table bounded without new infrastructure. At Liberty
 // Hall's expected volume, 30 days = ~7 MB. Overridable per client via
@@ -45,6 +53,7 @@ const PRUNE_PROBABILITY = 0.01;
  *   'no_consent'              -- no active SmsConsent row for this number
  *   'missing_origination'     -- client config missing SMS_ORIGINATION_NUMBER
  *   'spend_limit_exceeded'    -- circuit breaker: too many sends in last 5 min
+ *   'daily_limit_exceeded'    -- daily cap: too many sends in the last 24 hours
  *   'aws_error'               -- AWS API call failed; check `error` field
  */
 
@@ -104,8 +113,9 @@ export async function sendSms({ toPhone, body, clientConfig, pool, bypassConsent
     }
   }
 
-  // 5. Spend circuit breaker. Counts successful sends in the last 5 minutes
-  //    from this client's SmsOutboundLog. Fails-open on infrastructure errors:
+  // 5. Spend circuit breaker and daily cap. One query counts successful sends
+  //    in the last 5 minutes and the last 24 hours from this client's
+  //    SmsOutboundLog (indexed on SentAt). Fails-open on infrastructure errors:
   //    if the count query fails, log the failure and proceed. The rationale
   //    is that if the DB is broken enough that this query fails, the consent
   //    check at step 4 would have failed too and we wouldn't be here -- so
@@ -114,12 +124,27 @@ export async function sendSms({ toPhone, body, clientConfig, pool, bypassConsent
   const spendLimit = Number.isFinite(configLimit) && configLimit > 0
     ? configLimit
     : DEFAULT_SPEND_LIMIT_PER_5MIN;
+  const configDailyLimit = Number(clientConfig.SMS_DAILY_LIMIT);
+  const dailyLimit = Number.isFinite(configDailyLimit) && configDailyLimit > 0
+    ? configDailyLimit
+    : DEFAULT_DAILY_LIMIT;
   try {
     const countResult = await pool.query(
-      `SELECT COUNT(*)::int AS cnt FROM "SmsOutboundLog"
-       WHERE "SentAt" >= CURRENT_TIMESTAMP - INTERVAL '5 minutes'`
+      `SELECT COUNT(*) FILTER (WHERE "SentAt" >= CURRENT_TIMESTAMP - INTERVAL '5 minutes')::int AS cnt,
+              COUNT(*)::int AS day_cnt
+       FROM "SmsOutboundLog"
+       WHERE "SentAt" >= CURRENT_TIMESTAMP - INTERVAL '24 hours'`
     );
     const recentCount = countResult.rows[0].cnt;
+    const dayCount = Number(countResult.rows[0].day_cnt) || 0;
+    if (dayCount >= dailyLimit) {
+      console.error(
+        `sendSms: DAILY SMS CAP REACHED - ${dayCount} sends in the last 24 hours ` +
+        `meets the limit ${dailyLimit}. Refusing to send to ${normalizedPhone}. ` +
+        `If this is expected traffic, raise SMS_DAILY_LIMIT in this client's configuration.`
+      );
+      return { sent: false, reason: 'daily_limit_exceeded' };
+    }
     if (recentCount >= spendLimit) {
       console.error(
         `sendSms: CIRCUIT BREAKER TRIPPED - ${recentCount} sends in last 5 min ` +
