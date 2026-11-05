@@ -431,13 +431,15 @@
     transition: filter 0.15s ease;
 }
 
-/* Resend & Edit — neutral */
+/* Resend, Print & Edit — neutral */
 .action-dropdown-item.action-resend,
+.action-dropdown-item.action-print,
 .action-dropdown-item.action-edit {
     background-color: transparent;
     color: var(--lh-text, #333333);
 }
 .action-dropdown-item.action-resend:hover,
+.action-dropdown-item.action-print:hover,
 .action-dropdown-item.action-edit:hover {
     background-color: rgba(255, 255, 255, 0.08);
     color: var(--lh-text, #333333);

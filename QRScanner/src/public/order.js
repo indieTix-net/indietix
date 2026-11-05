@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Bootstrap available:', typeof bootstrap !== 'undefined');
     
     const API_URL = window.INDIETIX_API_URL;
+    // Local print agent, same as products.js: unset means this venue has no
+    // ticket printer, so "Print Tickets" is hidden.
+    const PRINT_AGENT_URL = window.INDIETIX_PRINT_AGENT_URL;
     
     // Get elements
     const searchInput = document.getElementById('search-input');
@@ -642,6 +645,69 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
     
     deleteOrderModal.show();
 }
+
+// ---- PRINT ALL TICKETS IN AN ORDER ----
+// Sends every valid ticket on the order to the local print agent, one at a
+// time and in order (the agent prints each before answering). Refunded,
+// cancelled or transferred tickets are skipped. No confirmation popup.
+const ordersBeingPrinted = new Set();
+
+async function getPresignedTicketUrl(qrCode) {
+    const response = await fetch(`${API_URL}/api/presigned-download`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ qrCode })
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to get ticket: ${response.status}`);
+    }
+    return (await response.json()).downloadUrl;
+}
+
+async function handlePrintOrderTicketsClick(orderId, orderID) {
+    if (ordersBeingPrinted.has(orderId)) return;
+    ordersBeingPrinted.add(orderId);
+
+    let printed = 0;
+    let tickets = [];
+    try {
+        const response = await fetch(`${API_URL}/api/orders/${orderId}/tickets`, { headers: getAuthHeaders() });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Failed to load tickets: ${response.status}`);
+        }
+        tickets = ((await response.json()).tickets || []).filter(t => t.Status === 'valid' && t.QRCode);
+
+        if (tickets.length === 0) {
+            UIDialogs.showMessage({ type: 'warning', title: 'Nothing to print', message: `Order ${orderID} has no valid tickets.` });
+            return;
+        }
+
+        for (const ticket of tickets) {
+            const pdfUrl = await getPresignedTicketUrl(ticket.QRCode);
+            const printResponse = await fetch(`${PRINT_AGENT_URL}/print`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pdfUrl })
+            });
+            if (!printResponse.ok) {
+                const errorData = await printResponse.json().catch(() => ({}));
+                throw new Error(errorData.message || `Print agent returned ${printResponse.status}`);
+            }
+            printed++;
+        }
+        console.log(`Printed ${printed} ticket(s) for order ${orderID}`);
+
+    } catch (error) {
+        console.error('Error printing order tickets:', error);
+        const progress = tickets.length ? ` ${printed} of ${tickets.length} tickets printed before the problem.` : '';
+        UIDialogs.showMessage({ type: 'error', title: "Couldn't print tickets", message: `Check that the box office computer running the print agent is on, and that the printer is on and has labels.${progress}`, details: error.message });
+    } finally {
+        ordersBeingPrinted.delete(orderId);
+    }
+}
+// ---- END PRINT ALL TICKETS IN AN ORDER ----
     
     // Apply column visibility after table is populated
     function applyColumnVisibility() {
@@ -834,6 +900,13 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
                             data-created-date="${createdDate}">
                     Resend Email
                 </button></li>
+                ${PRINT_AGENT_URL ? `
+                <li><button class="dropdown-item action-dropdown-item action-print"
+                            data-action="print-order-tickets"
+                            data-id="${id}"
+                            data-order-id="${orderID}">
+                    Print Tickets
+                </button></li>` : ''}
                 <li><button class="dropdown-item action-dropdown-item action-edit"
                             data-action="edit-order"
                             data-id="${id}"
@@ -950,6 +1023,13 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
                                 data-created-date="${createdDate}">
                         Resend Email
                     </button></li>
+                    ${PRINT_AGENT_URL ? `
+                    <li><button class="dropdown-item action-dropdown-item action-print"
+                                data-action="print-order-tickets"
+                                data-id="${id}"
+                                data-order-id="${orderID}">
+                        Print Tickets
+                    </button></li>` : ''}
                     <li><button class="dropdown-item action-dropdown-item action-edit"
                                 data-action="edit-order"
                                 data-id="${id}"
@@ -1076,6 +1156,8 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
             const emailAddress = this.getAttribute('data-email');
             
             handleCancelOrderClick(orderId, orderID, customerName, emailAddress);
+        } else if (action === 'print-order-tickets') {
+            handlePrintOrderTicketsClick(this.getAttribute('data-id'), this.getAttribute('data-order-id'));
         } else if (action === 'delete-order') {
             const orderId = this.getAttribute('data-id');
             const orderID = this.getAttribute('data-order-id');
