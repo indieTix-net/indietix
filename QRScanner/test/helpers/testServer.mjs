@@ -84,7 +84,9 @@ function defaultS3Handlers() {
     deleteObject: async () => ({}),
     deleteObjects: async () => ({ Deleted: [] }),
     copyObject: async () => ({}),
-    headObject: async () => ({ ContentLength: 0 })
+    headObject: async () => ({ ContentLength: 0 }),
+    getBucketCors: async () => ({ CORSRules: [] }),
+    putBucketCors: async () => ({})
   };
 }
 

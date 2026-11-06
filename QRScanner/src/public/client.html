@@ -129,6 +129,18 @@
                         <p class="text-muted">Configure your Square payment integration</p>
                     </div>
 
+                    <!-- The venue's own web address (<name>.<domain>); shown only where the site offers them, to the client login -->
+                    <div id="site-address" class="mb-3" hidden>
+                        <label for="site-address-name" class="form-label">Your IndieTix web address</label>
+                        <div class="input-group">
+                            <span class="input-group-text">https://</span>
+                            <input type="text" class="form-control" id="site-address-name" autocomplete="off" maxlength="30" placeholder="yourvenue" spellcheck="false">
+                            <span class="input-group-text" id="site-address-domain"></span>
+                            <button type="button" class="btn btn-primary" id="site-address-save">Save Address</button>
+                        </div>
+                        <div class="form-text" id="site-address-status">Your staff log in here, and links in ticket emails and texts use it. Letters, numbers and hyphens.</div>
+                    </div>
+
                     <!-- Connect Square (OAuth); shown only where the deployment has a Square app -->
                     <div id="square-connect" class="alert alert-secondary mb-3" hidden>
                         <div id="square-connect-status" class="mb-2"></div>

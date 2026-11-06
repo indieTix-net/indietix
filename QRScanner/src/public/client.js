@@ -511,6 +511,105 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     // ---- END VENUE LOGO UPLOAD ----
 
+    // ---- VENUE WEB ADDRESS ----
+    // The venue picks <name>.<domain> (GET/PUT /api/client/site-address,
+    // client login only). Saved right away, separately from the form's Save.
+    const siteAddress = document.getElementById('site-address');
+    const siteAddressName = document.getElementById('site-address-name');
+    const siteAddressDomain = document.getElementById('site-address-domain');
+    const siteAddressSave = document.getElementById('site-address-save');
+    const siteAddressStatus = document.getElementById('site-address-status');
+    let savedSiteName = null;
+    let siteCheckTimer = null;
+
+    function showSiteAddress(url) {
+        siteAddressStatus.textContent = '';
+        const lead = document.createTextNode('Your box office is at ');
+        const link = document.createElement('a');
+        link.href = `${url}/login.html`;
+        link.textContent = url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        siteAddressStatus.append(lead, link, document.createTextNode('. Links in new ticket emails and texts use it.'));
+    }
+
+    function loadSiteAddress() {
+        fetch(`${API_URL}/api/client/site-address`, { headers: getAuthHeaders() })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success || !data.enabled) return;
+                siteAddress.hidden = false;
+                siteAddressDomain.textContent = `.${data.domain}`;
+                savedSiteName = data.subdomain;
+                if (data.subdomain) {
+                    siteAddressName.value = data.subdomain;
+                    showSiteAddress(data.url);
+                }
+            })
+            .catch(error => console.error('Web address unavailable:', error));
+    }
+
+    siteAddressName.addEventListener('input', function() {
+        clearTimeout(siteCheckTimer);
+        const name = siteAddressName.value.trim().toLowerCase();
+        if (!name || name === savedSiteName) return;
+        siteCheckTimer = setTimeout(() => {
+            fetch(`${API_URL}/api/client/site-address/check?name=${encodeURIComponent(name)}`, { headers: getAuthHeaders() })
+                .then(response => response.json())
+                .then(data => {
+                    if (siteAddressName.value.trim().toLowerCase() !== name) return;
+                    if (data.available) siteAddressStatus.textContent = `${name}${siteAddressDomain.textContent} is available.`;
+                    else UIDialogs.fieldError(siteAddressName, data.message || 'That address is not available.');
+                })
+                .catch(() => {});
+        }, 400);
+    });
+
+    siteAddressSave.addEventListener('click', async function() {
+        const name = siteAddressName.value.trim().toLowerCase();
+        if (!name) {
+            UIDialogs.fieldError(siteAddressName, 'Type the address you want.');
+            return;
+        }
+        if (name === savedSiteName) return;
+        if (savedSiteName) {
+            const ok = await UIDialogs.showConfirm({
+                title: 'Change your web address?',
+                message: `${savedSiteName}${siteAddressDomain.textContent} will stop working, including links in emails and texts already sent. Staff will need the new address.`,
+                confirmText: 'Change Address'
+            });
+            if (!ok) return;
+        }
+        siteAddressSave.disabled = true;
+        try {
+            const response = await fetch(`${API_URL}/api/client/site-address`, {
+                method: 'PUT',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            const data = await UIDialogs.readJson(response);
+            if (!response.ok || !data.success) {
+                UIDialogs.fieldError(siteAddressName, data.message || 'That address could not be saved.');
+                return;
+            }
+            savedSiteName = data.subdomain;
+            siteAddressName.value = data.subdomain;
+            showSiteAddress(data.url);
+            UIDialogs.showMessage({
+                type: 'success',
+                title: 'Web address saved',
+                message: `Your box office is now at ${data.url}. Bookmark it, and log in there once.${data.uploadsUpdated === false ? ' Poster uploads from the new address may need support to finish setting up.' : ''}`
+            });
+        } catch (error) {
+            UIDialogs.showMessage({ type: 'error', title: "Couldn't save the address", message: 'Something went wrong. Please try again.', details: error.message });
+        } finally {
+            siteAddressSave.disabled = false;
+        }
+    });
+
+    if (isClientLogin) loadSiteAddress();
+    // ---- END VENUE WEB ADDRESS ----
+
     let originalClientData = null;
     
     console.log('DOM Elements found:', {

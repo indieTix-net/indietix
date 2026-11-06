@@ -11,3 +11,10 @@ window.INDIETIX_API_URL = 'REPLACE_WITH_YOUR_LAMBDA_FUNCTION_URL';
 // unless this specific computer IS the one running the agent. Optional:
 // leave blank/unset if this venue doesn't use ticket printing.
 window.INDIETIX_PRINT_AGENT_URL = 'REPLACE_WITH_YOUR_PRINT_AGENT_LAN_URL';
+
+// Optional: the domain venues' own web addresses live under, for example
+// 'indietix.net' for thunderbeaver.indietix.net (needs a wildcard DNS record
+// and CloudFront alias, and VENUE_SITE_DOMAIN on QRScanner; see
+// infrastructure/DEPLOY.md). The login page then fills in the venue's
+// Client ID. Leave blank if venues use the site's own address.
+window.INDIETIX_VENUE_SITE_DOMAIN = '';

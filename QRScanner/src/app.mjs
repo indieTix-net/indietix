@@ -2555,6 +2555,8 @@ app.put('/api/client', requireAuth, requireClientAuth, async (req, res) => {
     
     // Update the client
     await client.update(updateData);
+    // Its own web address's legal pages and login details follow the settings
+    await refreshVenueSite(req.user.username, updateData.configuration);
     
     console.log(`Client updated successfully: ${req.user.username}`);
     
@@ -2598,10 +2600,9 @@ async function setVenueLogoFile(req, logoFile) {
   const client = await Client.findOne({ where: { clientID: req.user.username } });
   if (!client) return null;
   const previous = (client.configuration || {}).LOGO_FILE || '';
-  await client.update({
-    configuration: { ...(client.configuration || {}), LOGO_FILE: logoFile },
-    updatedDate: new Date()
-  });
+  const configuration = { ...(client.configuration || {}), LOGO_FILE: logoFile };
+  await client.update({ configuration, updatedDate: new Date() });
+  await refreshVenueSite(req.user.username, configuration);
   // Only ever delete this venue's own earlier upload.
   if (previous !== logoFile && previous.startsWith(venueLogoFolder(req.user.username))) {
     try {
@@ -2669,6 +2670,218 @@ app.delete('/api/client/logo', requireAuth, requireClientAuth, async (req, res) 
   }
 });
 // ---- END VENUE LOGO UPLOAD ----
+
+// ---- VENUE WEB ADDRESS ----
+// Each venue can pick its own <name>.<VENUE_SITE_DOMAIN> address (for
+// example thunderbeaver.indietix.net). Every name reaches the environment's
+// one static site (a wildcard DNS record and CloudFront alias); what makes
+// it the venue's is a small public folder on that site, venue-sites/<name>/:
+//   site.json     {clientId, venueName, logoFile}. The login page reads it to
+//                 fill in the Client ID. The clientId in it owns the name, so
+//                 the folder is the reservation: no shared table, the same
+//                 per-venue-folder pattern as venue-logos/.
+//   privacy.html, terms.html  the venue's own legal pages, rendered from its
+//                 LEGAL_* settings. A CloudFront Function serves them as
+//                 <name>.<domain>/privacy.html and /terms.html, the plain URLs
+//                 a 10DLC campaign registers.
+// The venue's configuration keeps SITE_SUBDOMAIN, and STATIC_WEBSITE_URL
+// follows it, so emails and texts link to the venue's own address.
+// Off unless VENUE_SITE_DOMAIN and STATIC_SITE_BUCKET are both set.
+const venueSiteDomain = () => String(process.env.VENUE_SITE_DOMAIN || '').trim().toLowerCase();
+const venueSitesEnabled = () => !!(venueSiteDomain() && staticSiteBucket());
+const SITE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
+const RESERVED_SITE_NAMES = new Set([
+  'www', 'mail', 'email', 'smtp', 'imap', 'pop', 'mx', 'ftp', 'sftp', 'api', 'app', 'apps', 'admin',
+  'administrator', 'root', 'status', 'support', 'help', 'docs', 'blog', 'signup', 'login', 'account',
+  'accounts', 'billing', 'dashboard', 'static', 'assets', 'cdn', 'media', 'img', 'images', 'test',
+  'staging', 'dev', 'demo', 'sandbox', 'indietix', 'square', 'security', 'abuse', 'postmaster',
+  'hostmaster', 'webmaster', 'noreply', 'no-reply', 'privacy', 'legal', 'terms', 'tickets'
+]);
+const venueSiteFolder = (name) => `venue-sites/${name}/`;
+const venueSiteUrl = (name) => `https://${name}.${venueSiteDomain()}`;
+
+// Returns { name } or { error } (a message the page can show).
+function checkSiteName(raw) {
+  const name = String(raw || '').trim().toLowerCase();
+  if (!SITE_NAME_PATTERN.test(name)) {
+    return { error: 'Use 3 to 30 lowercase letters, numbers or hyphens, starting and ending with a letter or number' };
+  }
+  if (name.includes('--')) return { error: 'Use single hyphens only' };
+  if (RESERVED_SITE_NAMES.has(name)) return { error: 'That address is reserved. Please pick another.' };
+  return { name };
+}
+
+// The clientId that owns a name, or null if nobody does.
+async function siteNameOwner(name) {
+  try {
+    const object = await s3.getObject({ Bucket: staticSiteBucket(), Key: `${venueSiteFolder(name)}site.json` }).promise();
+    return JSON.parse(object.Body.toString('utf8')).clientId || null;
+  } catch (error) {
+    if (error.code === 'NoSuchKey' || error.code === 'NotFound') return null;
+    throw error;
+  }
+}
+
+async function siteNameAvailability(name, clientId) {
+  const owner = await siteNameOwner(name);
+  if (owner && owner !== clientId) return { available: false, message: 'That address is taken. Please pick another.' };
+  return { available: true };
+}
+
+// Writes the venue's public folder: site.json plus its legal pages.
+async function publishVenueSite(name, clientId, config = {}) {
+  const Bucket = staticSiteBucket();
+  const folder = venueSiteFolder(name);
+  await s3.putObject({
+    Bucket,
+    Key: `${folder}site.json`,
+    Body: JSON.stringify({
+      clientId,
+      venueName: config.WEB_HEADER_COMPANY || config.THEATER_NAME || '',
+      logoFile: config.LOGO_FILE || DEFAULT_LOGO_FILE
+    }),
+    ContentType: 'application/json',
+    CacheControl: 'public, max-age=60'
+  }).promise();
+  for (const page of LEGAL_PAGES) {
+    await s3.putObject({
+      Bucket,
+      Key: `${folder}${page}.html`,
+      Body: renderLegalPage(page, config),
+      ContentType: 'text/html; charset=utf-8',
+      CacheControl: 'public, max-age=300'
+    }).promise();
+  }
+}
+
+// Removes a name's folder, only if this venue owns it.
+async function releaseVenueSite(name, clientId) {
+  if (await siteNameOwner(name) !== clientId) return;
+  const folder = venueSiteFolder(name);
+  await s3.deleteObjects({
+    Bucket: staticSiteBucket(),
+    Delete: { Objects: ['site.json', ...LEGAL_PAGES.map(page => `${page}.html`)].map(file => ({ Key: `${folder}${file}` })) }
+  }).promise();
+}
+
+// Custom poster uploads go straight from the browser to the venue's own
+// bucket, so its CORS rules must allow the address staff use. Adds the new
+// address, drops the old one, and keeps every other origin.
+async function updateVenueBucketOrigins(clientId, config, addOrigin, removeOrigin) {
+  if (!config.S3_BUCKET_PREFIX) return false;
+  const Bucket = config.S3_BUCKET_PREFIX + clientId.toLowerCase();
+  try {
+    let rules = [];
+    try {
+      rules = (await s3.getBucketCors({ Bucket }).promise()).CORSRules || [];
+    } catch (error) {
+      if (error.code !== 'NoSuchCORSConfiguration') throw error;
+    }
+    if (!rules.length) {
+      rules = [{ AllowedHeaders: ['*'], AllowedMethods: ['PUT', 'POST', 'GET'], AllowedOrigins: [], ExposeHeaders: ['ETag'], MaxAgeSeconds: 3000 }];
+    }
+    const origins = (rules[0].AllowedOrigins || []).filter(origin => origin !== removeOrigin);
+    if (!origins.includes(addOrigin)) origins.push(addOrigin);
+    rules[0] = { ...rules[0], AllowedOrigins: origins };
+    await s3.putBucketCors({ Bucket, CORSConfiguration: { CORSRules: rules } }).promise();
+    return true;
+  } catch (error) {
+    console.warn(`Could not update upload origins on ${Bucket}: ${error.message}`);
+    return false;
+  }
+}
+
+// Re-publishes after a settings or logo change (the legal pages and the
+// login page's venue name and logo come from them). Never fails the save.
+async function refreshVenueSite(clientId, config) {
+  if (!venueSitesEnabled() || !config || !config.SITE_SUBDOMAIN) return;
+  try {
+    if (await siteNameOwner(config.SITE_SUBDOMAIN) !== clientId) return;
+    await publishVenueSite(config.SITE_SUBDOMAIN, clientId, config);
+  } catch (error) {
+    console.warn(`Could not refresh venue site ${config.SITE_SUBDOMAIN}: ${error.message}`);
+  }
+}
+
+app.get('/api/client/site-address', requireAuth, requireClientAuth, async (req, res) => {
+  if (!venueSitesEnabled()) return res.json({ success: true, enabled: false });
+  try {
+    const dbCredentials = await getDatabaseCredentials(req.user.dbName);
+    const { Client } = await initializeClientModel(req.user.dbName, dbCredentials);
+    const client = await Client.findOne({ where: { clientID: req.user.username } });
+    if (!client) return res.status(404).json({ success: false, message: 'Client not found' });
+    const name = (client.configuration || {}).SITE_SUBDOMAIN || null;
+    return res.json({ success: true, enabled: true, domain: venueSiteDomain(), subdomain: name, url: name ? venueSiteUrl(name) : null });
+  } catch (error) {
+    console.error('Site address lookup failed:', error);
+    return res.status(500).json({ success: false, message: 'Could not load the web address' });
+  }
+});
+
+app.get('/api/client/site-address/check', requireAuth, requireClientAuth, async (req, res) => {
+  if (!venueSitesEnabled()) return res.status(503).json({ success: false, message: 'Web addresses are not set up for this site' });
+  const checked = checkSiteName(req.query.name);
+  if (checked.error) return res.json({ success: true, available: false, message: checked.error });
+  try {
+    return res.json({ success: true, name: checked.name, ...(await siteNameAvailability(checked.name, req.user.username)) });
+  } catch (error) {
+    console.error('Site address check failed:', error);
+    return res.status(500).json({ success: false, message: 'Could not check that address' });
+  }
+});
+
+app.put('/api/client/site-address', requireAuth, requireClientAuth, async (req, res) => {
+  if (!venueSitesEnabled()) return res.status(503).json({ success: false, message: 'Web addresses are not set up for this site' });
+  const checked = checkSiteName(req.body?.name);
+  if (checked.error) return res.status(400).json({ success: false, message: checked.error });
+  const name = checked.name;
+  const clientId = req.user.username;
+  try {
+    const dbCredentials = await getDatabaseCredentials(req.user.dbName);
+    const { Client } = await initializeClientModel(req.user.dbName, dbCredentials);
+    const client = await Client.findOne({ where: { clientID: clientId } });
+    if (!client) return res.status(404).json({ success: false, message: 'Client not found' });
+
+    const availability = await siteNameAvailability(name, clientId);
+    if (!availability.available) return res.status(409).json({ success: false, message: availability.message });
+
+    const current = client.configuration || {};
+    const oldName = current.SITE_SUBDOMAIN || null;
+    const url = venueSiteUrl(name);
+    const configuration = { ...current, SITE_SUBDOMAIN: name, STATIC_WEBSITE_URL: url };
+    // Publishing first claims the name before anything points at it.
+    await publishVenueSite(name, clientId, configuration);
+    await client.update({ configuration, updatedDate: new Date() });
+    const uploadsUpdated = await updateVenueBucketOrigins(clientId, configuration, url, oldName && oldName !== name ? venueSiteUrl(oldName) : null);
+    if (oldName && oldName !== name) {
+      try {
+        await releaseVenueSite(oldName, clientId);
+      } catch (error) {
+        console.warn(`Could not release old venue site ${oldName}: ${error.message}`);
+      }
+    }
+    console.log(`Venue ${clientId} web address set to ${url}${oldName && oldName !== name ? ` (was ${oldName})` : ''}`);
+    return res.json({ success: true, subdomain: name, url, uploadsUpdated });
+  } catch (error) {
+    console.error('Setting the site address failed:', error);
+    return res.status(500).json({ success: false, message: 'Could not save the web address' });
+  }
+});
+
+// The signup page checks a name before the venue exists.
+app.get('/api/public/site-address/check', async (req, res) => {
+  if (!venueSitesEnabled()) return res.status(404).json({ success: false, message: 'Web addresses are not set up for this site' });
+  if (signupRateLimited(req, 120)) return res.status(429).json({ success: false, message: 'Too many checks. Try again in an hour.' });
+  const checked = checkSiteName(req.query.name);
+  if (checked.error) return res.json({ success: true, available: false, message: checked.error });
+  try {
+    return res.json({ success: true, name: checked.name, ...(await siteNameAvailability(checked.name, null)) });
+  } catch (error) {
+    console.error('Public site address check failed:', error);
+    return res.status(500).json({ success: false, message: 'Could not check that address' });
+  }
+});
+// ---- END VENUE WEB ADDRESS ----
 
 // ---- SQUARE OAUTH ----
 // "Connect Square": a venue authorizes the IndieTix Square app (OAuth code
@@ -3000,6 +3213,8 @@ app.get('/api/public/signup/config', (req, res) => {
     sandbox: SQUARE_API_BASE.includes('squareupsandbox'),
     termsUrl: settings ? settings.termsUrl : null,
     privacyUrl: settings ? settings.privacyUrl : null,
+    // The optional "your web address" field (VENUE WEB ADDRESS)
+    siteDomain: settings && venueSitesEnabled() ? venueSiteDomain() : null,
     // support.html shows this whether or not signup is open.
     supportEmail: process.env.HOSTED_SUPPORT_EMAIL || null
   });
@@ -3022,10 +3237,24 @@ app.post('/api/public/signup/start', async (req, res) => {
   if (req.body.acceptTerms !== true) {
     return res.status(400).json({ success: false, message: 'Please accept the Terms of Service and Privacy Policy' });
   }
+  // Optional web address (see VENUE WEB ADDRESS); claimed in the callback.
+  let siteName = null;
+  if (venueSitesEnabled() && String(req.body.siteName || '').trim()) {
+    const checked = checkSiteName(req.body.siteName);
+    if (checked.error) return res.status(400).json({ success: false, message: checked.error });
+    try {
+      const availability = await siteNameAvailability(checked.name, null);
+      if (!availability.available) return res.status(409).json({ success: false, message: availability.message });
+    } catch (error) {
+      console.error('Hosted signup start: web address check failed:', error.message);
+      return res.status(500).json({ success: false, message: 'Could not check the web address' });
+    }
+    siteName = checked.name;
+  }
   try {
     const appSecret = await readSquareAppSecret(settings.oauth.secretId);
     const state = sealToken(
-      { p: 'signup', venueName, contactName, contactEmail, termsAcceptedAt: new Date().toISOString() },
+      { p: 'signup', venueName, contactName, contactEmail, siteName, termsAcceptedAt: new Date().toISOString() },
       signupKey(appSecret),
       SIGNUP_STATE_TTL
     );
@@ -3111,6 +3340,19 @@ async function handleSignupCallback(req, res) {
     }
 
     await saveSquareRefreshToken(clientId, tokens.refresh_token);
+    // Claim the chosen web address now; if someone took it meanwhile, the
+    // venue keeps the shared address and can pick another in Client Settings.
+    let siteName = null;
+    if (signup.siteName && venueSitesEnabled()) {
+      try {
+        if ((await siteNameAvailability(signup.siteName, clientId)).available) {
+          await publishVenueSite(signup.siteName, clientId, { WEB_HEADER_COMPANY: signup.venueName });
+          siteName = signup.siteName;
+        }
+      } catch (siteError) {
+        console.warn(`Hosted signup ${clientId}: could not claim ${signup.siteName} (${siteError.message})`);
+      }
+    }
     await lambdaClient.send(new InvokeCommand({
       FunctionName: settings.setupFunction,
       InvocationType: 'Event',
@@ -3130,14 +3372,14 @@ async function handleSignupCallback(req, res) {
         square_location_id: locationId,
         square_oauth: { merchant_id: clientId, expires_at: tokens.expires_at || null },
         settings: {
-          STATIC_WEBSITE_URL: settings.site,
+          STATIC_WEBSITE_URL: siteName ? venueSiteUrl(siteName) : settings.site,
           WEB_HEADER_COMPANY: signup.venueName,
           SENDER_EMAIL: settings.sender
         }
       }))
     }));
     console.log(`Hosted signup: creating venue ${clientId} (Terms accepted ${signup.termsAcceptedAt})`);
-    return back({ status: sealToken({ p: 'signup-status', clientId }, key, SIGNUP_STATUS_TTL) });
+    return back({ status: sealToken({ p: 'signup-status', clientId, siteName }, key, SIGNUP_STATUS_TTL) });
   } catch (signupError) {
     console.error('Hosted signup callback failed:', signupError.message);
     return back({ result: 'failed' });
@@ -3162,16 +3404,25 @@ app.get('/api/public/signup/status', async (req, res) => {
     pool = await createClientDbConnection(status.clientId);
     // The first poll that finds the venue sends the welcome email; the
     // conditional update makes sure only one ever does.
+    const welcomeFields = { SIGNUP_WELCOME_SENT_AT: new Date().toISOString() };
+    if (status.siteName && venueSitesEnabled()) welcomeFields.SITE_SUBDOMAIN = status.siteName;
     const claimed = await pool.query(
       `UPDATE "Client" SET "configuration" = "configuration"::jsonb || $1::jsonb, "updatedDate" = CURRENT_TIMESTAMP
        WHERE "clientID" = $2 AND NOT ("configuration"::jsonb ? 'SIGNUP_WELCOME_SENT_AT')
        RETURNING "contactName", "clientEmail", "configuration"`,
-      [JSON.stringify({ SIGNUP_WELCOME_SENT_AT: new Date().toISOString() }), status.clientId]
+      [JSON.stringify(welcomeFields), status.clientId]
     );
     if (claimed.rows.length) {
       const row = claimed.rows[0];
       const config = typeof row.configuration === 'string' ? JSON.parse(row.configuration) : row.configuration;
-      await sendSignupWelcome({ clientId: status.clientId, contactName: row.contactName, contactEmail: row.clientEmail, sender: config.SENDER_EMAIL || settings.sender, site: settings.site, key });
+      if (config.SITE_SUBDOMAIN) {
+        // Full settings now exist: publish the real legal pages, and let
+        // poster uploads work from the shared address too.
+        await refreshVenueSite(status.clientId, config);
+        await updateVenueBucketOrigins(status.clientId, config, new URL(settings.site).origin, null);
+      }
+      const site = config.SITE_SUBDOMAIN && config.STATIC_WEBSITE_URL ? String(config.STATIC_WEBSITE_URL).replace(/\/+$/, '') : settings.site;
+      await sendSignupWelcome({ clientId: status.clientId, contactName: row.contactName, contactEmail: row.clientEmail, sender: config.SENDER_EMAIL || settings.sender, site, key });
       console.log(`Hosted signup: ${status.clientId} is ready; welcome email sent`);
     }
     return res.json({ success: true, ready: true, clientId: status.clientId });
@@ -3207,14 +3458,16 @@ app.post('/api/public/signup/set-password', async (req, res) => {
     const updated = await pool.query(
       `UPDATE "Client" SET "clientSecret" = $1, "configuration" = "configuration"::jsonb || $2::jsonb, "updatedDate" = CURRENT_TIMESTAMP
        WHERE "clientID" = $3 AND NOT ("configuration"::jsonb ? 'SIGNUP_PASSWORD_SET_AT')
-       RETURNING "clientID"`,
+       RETURNING "clientID", "configuration"`,
       [hashed, JSON.stringify({ SIGNUP_PASSWORD_SET_AT: new Date().toISOString() }), target.clientId]
     );
     if (!updated.rows.length) {
       return res.status(409).json({ success: false, message: 'The password was already set. Log in, or use Forgot password.' });
     }
     console.log(`Hosted signup: ${target.clientId} set its password`);
-    return res.json({ success: true, clientId: target.clientId, loginUrl: `${settings.site}/login.html?client=${target.clientId}` });
+    const savedConfig = typeof updated.rows[0].configuration === 'string' ? JSON.parse(updated.rows[0].configuration) : (updated.rows[0].configuration || {});
+    const site = savedConfig.SITE_SUBDOMAIN && savedConfig.STATIC_WEBSITE_URL ? String(savedConfig.STATIC_WEBSITE_URL).replace(/\/+$/, '') : settings.site;
+    return res.json({ success: true, clientId: target.clientId, loginUrl: `${site}/login.html?client=${target.clientId}` });
   } catch (error) {
     console.error('Hosted signup set-password failed:', error.message);
     return res.status(500).json({ success: false, message: 'Could not set the password' });

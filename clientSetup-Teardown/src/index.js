@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-const { S3Client, CreateBucketCommand, DeleteBucketCommand, ListObjectsV2Command, DeleteObjectsCommand, CopyObjectCommand, PutObjectCommand, PutBucketPolicyCommand, PutBucketCorsCommand, PutPublicAccessBlockCommand } = require('@aws-sdk/client-s3');
+const { S3Client, CreateBucketCommand, DeleteBucketCommand, ListObjectsV2Command, DeleteObjectsCommand, GetObjectCommand, CopyObjectCommand, PutObjectCommand, PutBucketPolicyCommand, PutBucketCorsCommand, PutPublicAccessBlockCommand } = require('@aws-sdk/client-s3');
 const { SecretsManagerClient, GetSecretValueCommand, CreateSecretCommand, DeleteSecretCommand } = require('@aws-sdk/client-secrets-manager');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -242,6 +242,39 @@ async function deleteVenueLogos(clientUsername) {
     return deleted;
   } catch (error) {
     console.error(`Error deleting logos from ${bucket}/${prefix}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Frees the venue's own web address (venue-sites/<name>/ in the static site
+ * bucket, written by QRScanner's VENUE WEB ADDRESS), only if the folder's
+ * site.json names this venue, so another venue's address is never touched.
+ * @returns {Promise<number|'none'|'off'|false>} files deleted, 'none' (no
+ *   address), 'off' (STATIC_SITE_BUCKET unset), or false on error
+ */
+async function deleteVenueSite(clientUsername, siteName) {
+  const bucket = process.env.STATIC_SITE_BUCKET;
+  if (!bucket) return 'off';
+  if (!siteName || !/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(siteName)) return 'none';
+  const prefix = `venue-sites/${siteName}/`;
+  try {
+    const marker = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: `${prefix}site.json` }));
+    const owner = JSON.parse(await marker.Body.transformToString()).clientId;
+    if (owner !== clientUsername) {
+      console.log(`Web address ${siteName} belongs to ${owner}, not ${clientUsername}; left alone`);
+      return 'none';
+    }
+    const page = await s3Client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }));
+    const objects = (page.Contents || []).map(obj => ({ Key: obj.Key })).filter(obj => obj.Key.startsWith(prefix));
+    if (objects.length > 0) {
+      await s3Client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: objects } }));
+    }
+    console.log(`Freed web address ${siteName} (${objects.length} file(s))`);
+    return objects.length;
+  } catch (error) {
+    if (error.name === 'NoSuchKey') return 'none';
+    console.error(`Error freeing web address ${siteName}:`, error);
     return false;
   }
 }
@@ -1709,6 +1742,7 @@ async function deleteClient(dbConfig, clientUsername) {
     secretDeleted: false,
     squareSecretDeleted: false,
     logosDeleted: false,
+    siteDeleted: false,
     s3BucketsHandled: []
   };
   
@@ -1733,11 +1767,13 @@ async function deleteClient(dbConfig, clientUsername) {
       try {
         await clientDbClient.connect();
         const configResult = await clientDbClient.query(
-          `SELECT "configuration"->>'S3_BUCKET_PREFIX' AS prefix FROM "Client" LIMIT 1`
+          `SELECT "configuration"->>'S3_BUCKET_PREFIX' AS prefix, "configuration"->>'SITE_SUBDOMAIN' AS site FROM "Client" LIMIT 1`
         );
         if (configResult.rows[0]?.prefix) {
           bucketPrefix = configResult.rows[0].prefix;
         }
+        // Its own web address, if it picked one ('none' otherwise).
+        results.siteDeleted = await deleteVenueSite(clientUsername, configResult.rows[0]?.site);
       } finally {
         await clientDbClient.end();
       }
@@ -2046,5 +2082,6 @@ exports.handler = async (event, context) => {
 exports.createDatabaseObjects = createDatabaseObjects;
 exports.createS3Buckets = createS3Buckets;
 exports.deleteVenueLogos = deleteVenueLogos;
+exports.deleteVenueSite = deleteVenueSite;
 exports.deleteSquareRefreshSecret = deleteSquareRefreshSecret;
 exports.insertClientRecord = insertClientRecord;

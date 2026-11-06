@@ -75,6 +75,18 @@ aws cloudformation deploy --region us-east-2 --stack-name indietix-prod-alarms \
 
 A new `AlertEmail` must click the AWS confirmation email before anything arrives. Test delivery with `aws cloudwatch set-alarm-state --region us-east-2 --alarm-name indietix-prod-qrscanner-crashed --state-value ALARM --state-reason test` (it flips back to OK by itself at the next evaluation). Function names are template parameters, since production's functions were made by hand; `bootstrap.sh` deploys the same template for its environments (`deploy_alarms`). QRScanner's public status page (`status.html`, `GET /api/public/status`) reads these alarms when QRScanner has `STATUS_ALARM_PREFIX=indietix-prod` and its role allows `cloudwatch:DescribeAlarms`.
 
+## Venues' own web addresses (`<name>.indietix.net`)
+
+Each venue can pick a web address under one domain (QRScanner's `VENUE WEB ADDRESS`: Client Settings, or the signup form). Every name reaches the environment's one static site; QRScanner reserves a name by writing `venue-sites/<name>/` (`site.json`, `privacy.html`, `terms.html`) in the static site bucket, and sets the venue's `STATIC_WEBSITE_URL`. The login page reads `site.json` to fill in the Client ID. Teardown frees the name.
+
+Needs, once per environment (production: done for `indietix.net`, 2026-11-06):
+- a certificate for `*.<domain>` in us-east-1 (ACM, DNS-validated)
+- the `*.<domain>` alias on the static site's CloudFront distribution, with that certificate (`sni-only`; never `vip`, which is dedicated-IP SSL at about $600/month)
+- a wildcard DNS record (A and AAAA alias) pointing at the distribution
+- `static-site/venue-legal-pages.js` as a CloudFront Function (domain filled in), on viewer-request for two cache behaviors, `/privacy.html` and `/terms.html`, copied from the default behavior. Other hosts, including the distribution's own `*.cloudfront.net` address, pass through.
+- QRScanner env `VENUE_SITE_DOMAIN=<domain>` (bootstrap: `VENUE_SITE_DOMAIN` in the config) and `STATIC_SITE_BUCKET`; client-setup-teardown `STATIC_SITE_BUCKET` (to free names)
+- `window.INDIETIX_VENUE_SITE_DOMAIN = '<domain>'` in `config.js`
+
 ## Broader context
 
 For the platform this script deploys — architecture, multi-tenancy model, per-repo details — see README at the workspace root (one level up from this repo).

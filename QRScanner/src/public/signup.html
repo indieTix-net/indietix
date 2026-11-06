@@ -51,6 +51,16 @@
                     <input type="email" class="form-control" id="contact-email" required maxlength="254" placeholder="you@example.com">
                     <div class="form-text">Your login link and box-office notices go here.</div>
                 </div>
+                <!-- Optional own web address (VENUE WEB ADDRESS); shown when config.siteDomain is set -->
+                <div class="mb-3" id="site-name-group" hidden>
+                    <label for="site-name" class="form-label">Your web address (optional)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">https://</span>
+                        <input type="text" class="form-control" id="site-name" maxlength="30" placeholder="yourvenue" spellcheck="false">
+                        <span class="input-group-text" id="site-name-domain"></span>
+                    </div>
+                    <div class="form-text" id="site-name-status">Where your staff log in. Letters, numbers and hyphens. You can pick or change it later in Client Settings.</div>
+                </div>
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="accept-terms" required>
                     <label class="form-check-label" for="accept-terms" id="accept-terms-label">I agree to IndieTix's Terms of Service and Privacy Policy.</label>

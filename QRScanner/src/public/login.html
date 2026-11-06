@@ -146,8 +146,10 @@
 <body>
   <div class="login-container">
     <div class="logo">
-      <h2>IndieTix</h2>
+      <img id="venue-logo" alt="" style="max-width: 200px; max-height: 100px; margin-bottom: 8px;" hidden>
+      <h2 id="venue-name">IndieTix</h2>
     </div>
+    <p id="venue-site-note" class="help-text" style="text-align: center;" hidden></p>
     
     <h1>Login</h1>
     
@@ -275,6 +277,45 @@
       clientField.dataset.oldValue = linkedClient;
       document.getElementById('username').value = linkedClient;
     }
+
+    // ---- VENUE WEB ADDRESS ----
+    // On a venue's own address (<name>.<INDIETIX_VENUE_SITE_DOMAIN>), its
+    // public venue-sites/<name>/site.json names the venue, so staff don't
+    // type the Client ID. A ?client= link still wins.
+    (function () {
+      const domain = String(window.INDIETIX_VENUE_SITE_DOMAIN || '').toLowerCase();
+      const host = window.location.hostname.toLowerCase();
+      if (!domain || !host.endsWith(`.${domain}`)) return;
+      const name = host.slice(0, -(domain.length + 1));
+      if (!/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(name)) return;
+      fetch(`venue-sites/${name}/site.json`, { cache: 'no-cache' })
+        .then(response => (response.ok ? response.json() : null))
+        .then(site => {
+          if (!site || !/^[A-Za-z0-9]+$/.test(site.clientId || '')) {
+            const note = document.getElementById('venue-site-note');
+            note.textContent = "No box office uses this address yet. Log in with your Client ID.";
+            note.hidden = false;
+            return;
+          }
+          if (site.venueName) {
+            document.getElementById('venue-name').textContent = site.venueName;
+            document.title = `${site.venueName} - Login`;
+          }
+          if (site.logoFile && /^[A-Za-z0-9._\/-]+$/.test(site.logoFile) && !site.logoFile.includes('..')) {
+            const logo = document.getElementById('venue-logo');
+            logo.src = site.logoFile;
+            logo.hidden = false;
+          }
+          const clientField = document.getElementById('clientId');
+          if (!linkedClient) {
+            clientField.value = site.clientId;
+            clientField.dataset.oldValue = site.clientId;
+            document.getElementById('username').value = site.clientId;
+          }
+        })
+        .catch(() => {});
+    })();
+    // ---- END VENUE WEB ADDRESS ----
   </script>
 </body>
 </html>

@@ -127,6 +127,18 @@ HOSTED_TERMS_URL=""     # Your hosted service's Terms of Service (https://), lin
 HOSTED_PRIVACY_URL=""   # Its Privacy Policy (https://); required unless SQUARE_ENVIRONMENT="sandbox"
 HOSTED_SUPPORT_EMAIL="" # Shown on support.html, e.g. support@yourdomain (must reach a person)
 
+# ---- Venues' own web addresses (optional) ----
+# A domain each venue can pick a name under, e.g. "indietix.net" for
+# thunderbeaver.indietix.net (Client Settings, and the signup form). `up`
+# only tells QRScanner the domain; the DNS side is by hand, once: a wildcard
+# certificate in us-east-1, the *.<domain> alias on the static site's
+# CloudFront distribution, a wildcard DNS record pointing at it, and the
+# static-site/venue-legal-pages.js function on /privacy.html and /terms.html
+# (DEPLOY.md, "Venues' own web addresses"). Also set
+# window.INDIETIX_VENUE_SITE_DOMAIN in config.js. Leave blank to use the
+# static site's own address for every venue.
+VENUE_SITE_DOMAIN=""
+
 # ---- First client's other Client Settings (optional) ----
 # Path to a JSON file of initial Client Settings for the first client --
 # OMDB, Google Calendar, FTP reporting, API keys, social media, and so on.

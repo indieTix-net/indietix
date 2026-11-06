@@ -345,6 +345,11 @@ set_static_site_bucket() {
     [ "$(merge_lambda_env "${ENV_PREFIX}-${suffix}" "{\"STATIC_SITE_BUCKET\": \"$bucket\"}")" = "changed" ] \
       && echo "  ${ENV_PREFIX}-${suffix}: venue logos in $bucket"
   done
+  # Venues' own web addresses (QRScanner's VENUE WEB ADDRESS) live in the same bucket
+  if [ -n "${VENUE_SITE_DOMAIN:-}" ]; then
+    [ "$(merge_lambda_env "${ENV_PREFIX}-qrscanner" "{\"VENUE_SITE_DOMAIN\": \"$VENUE_SITE_DOMAIN\"}")" = "changed" ] \
+      && echo "  ${ENV_PREFIX}-qrscanner: venue web addresses under $VENUE_SITE_DOMAIN"
+  fi
   return 0
 }
 

@@ -98,9 +98,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (config.privacyUrl) label.appendChild(link(config.privacyUrl, 'Privacy Policy'));
                 label.appendChild(document.createTextNode('.'));
             }
+            if (config.siteDomain) {
+                document.getElementById('site-name-domain').textContent = `.${config.siteDomain}`;
+                document.getElementById('site-name-group').hidden = false;
+            }
             show('form');
         })
         .catch(() => show('closed'));
+
+    // Availability, checked as the venue types
+    const siteName = document.getElementById('site-name');
+    const siteNameStatus = document.getElementById('site-name-status');
+    let siteCheckTimer = null;
+    siteName.addEventListener('input', function () {
+        clearTimeout(siteCheckTimer);
+        const name = siteName.value.trim().toLowerCase();
+        if (!name) return;
+        siteCheckTimer = setTimeout(() => {
+            fetch(`${API_URL}/api/public/site-address/check?name=${encodeURIComponent(name)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (siteName.value.trim().toLowerCase() !== name) return;
+                    siteNameStatus.textContent = data.available
+                        ? `${name}${document.getElementById('site-name-domain').textContent} is available.`
+                        : (data.message || 'That address is not available.');
+                })
+                .catch(() => {});
+        }, 400);
+    });
 
     document.getElementById('signup-form').addEventListener('submit', function (e) {
         e.preventDefault();
@@ -108,7 +133,8 @@ document.addEventListener('DOMContentLoaded', function () {
             venueName: document.getElementById('venue-name').value.trim(),
             contactName: document.getElementById('contact-name').value.trim(),
             contactEmail: document.getElementById('contact-email').value.trim(),
-            acceptTerms: document.getElementById('accept-terms').checked
+            acceptTerms: document.getElementById('accept-terms').checked,
+            siteName: document.getElementById('site-name').value.trim().toLowerCase()
         };
         if (!body.venueName || !body.contactName || !body.contactEmail) return message('warning', 'Please fill in every field.');
         if (!body.acceptTerms) return message('warning', 'Please accept the Terms of Service and Privacy Policy.');
