@@ -25,6 +25,7 @@ import { initializeModelForClient as initializeUserModel } from './models/user.m
 import { encryptPasswordResetToken, decryptPasswordResetToken, isPasswordResetTokenValid, sealToken, openToken } from './utils/crypto-utils.mjs';
 import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, eventContainsPattern } from './utils/data-filter-utils.mjs';
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
+import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
 // the "ticketPdfLib" Lambda layer at runtime, not this repo's own
@@ -7716,6 +7717,111 @@ app.get('/legal/:page', async (req, res) => {
   }
 });
 // ---- END LEGAL PAGES ----
+
+// ---- PRIVACY REQUESTS ----
+// A customer asks what the venue has about them (export) or to be erased
+// (redact). Client login only (privacy-requests.html). Redacting replaces
+// the personal details and keeps every record, so sales, refunds and
+// reports stay correct; see utils/privacy-requests.mjs for what changes
+// where. Every export and redaction is logged in "PrivacyRequest" with a
+// fingerprint of the person, never their email or phone. The venue is
+// the data controller: staff verify who's asking before acting.
+async function withPrivacyRequest(req, res, handler) {
+  const subject = normalizeSubject(req.body || {});
+  if (subject.error) return res.status(400).json({ success: false, message: subject.error });
+  let pool;
+  try {
+    pool = await createClientDbConnection(req.user.dbName);
+    return await handler(pool, subject);
+  } catch (error) {
+    console.error('Privacy request failed:', error.message);
+    return res.status(500).json({ success: false, message: 'The privacy request could not be completed' });
+  } finally {
+    if (pool) await pool.end().catch(() => {});
+  }
+}
+
+function privacyRequestDetails(body = {}) {
+  const verification = String(body.verification || '').trim();
+  if (verification.length < 5 || verification.length > 500) {
+    return { error: 'Say how you confirmed this request came from the person (5 to 500 characters)' };
+  }
+  const received = String(body.receivedDate || '').trim();
+  if (received && !/^\d{4}-\d{2}-\d{2}$/.test(received)) return { error: 'The received date should look like 2026-11-06' };
+  return { verification, receivedDate: received || null };
+}
+
+async function logPrivacyRequest(db, req, type, subject, details, matches) {
+  const result = await db.query(
+    `INSERT INTO "PrivacyRequest" ("RequestType", "SubjectFingerprint", "Verification", "RequestedBy", "ReceivedDate", "Matches")
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING "ID", "CreatedDate"`,
+    [type, subjectFingerprint(req.user.username, subject), details.verification, req.user.username, details.receivedDate, JSON.stringify(matches)]
+  );
+  return result.rows[0];
+}
+
+app.post('/api/privacy/search', requireAuth, requireClientAuth, (req, res) =>
+  withPrivacyRequest(req, res, async (pool, subject) => {
+    const records = await findSubjectRecords(pool, subject);
+    return res.json({ success: true, ...previewRecords(records) });
+  })
+);
+
+app.post('/api/privacy/export', requireAuth, requireClientAuth, (req, res) => {
+  const details = privacyRequestDetails(req.body);
+  if (details.error) return res.status(400).json({ success: false, message: details.error });
+  return withPrivacyRequest(req, res, async (pool, subject) => {
+    const records = await findSubjectRecords(pool, subject);
+    const logged = await logPrivacyRequest(pool, req, 'export', subject, details, summarizeRecords(records));
+    console.log(`Privacy export #${logged.ID} for ${req.user.username}`);
+    return res.json({ success: true, requestId: logged.ID, exportedAt: logged.CreatedDate, data: exportRecords(records) });
+  });
+});
+
+app.post('/api/privacy/redact', requireAuth, requireClientAuth, (req, res) => {
+  const details = privacyRequestDetails(req.body);
+  if (details.error) return res.status(400).json({ success: false, message: details.error });
+  if (req.body.confirm !== true) return res.status(400).json({ success: false, message: 'Confirm the redaction first' });
+  return withPrivacyRequest(req, res, async (pool, subject) => {
+    const db = await pool.connect();
+    try {
+      await db.query('BEGIN');
+      const records = await findSubjectRecords(db, subject);
+      if (!Object.values(records).some(rows => rows.length)) {
+        await db.query('ROLLBACK');
+        return res.status(404).json({ success: false, message: 'Nothing matches that email or phone' });
+      }
+      const result = await redactRecords(db, req.user.username, subject, records);
+      const logged = await logPrivacyRequest(db, req, 'redact', subject, details, result);
+      await db.query('COMMIT');
+      console.log(`Privacy redaction #${logged.ID} for ${req.user.username}: ${JSON.stringify(result)}`);
+      return res.json({ success: true, requestId: logged.ID, redacted: result });
+    } catch (error) {
+      await db.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      db.release();
+    }
+  });
+});
+
+app.get('/api/privacy/requests', requireAuth, requireClientAuth, async (req, res) => {
+  let pool;
+  try {
+    pool = await createClientDbConnection(req.user.dbName);
+    const result = await pool.query(
+      `SELECT "ID", "RequestType", "Verification", "RequestedBy", "ReceivedDate"::text AS "ReceivedDate", "Matches", "CreatedDate"
+       FROM "PrivacyRequest" ORDER BY "ID" DESC LIMIT 200`
+    );
+    return res.json({ success: true, requests: result.rows });
+  } catch (error) {
+    console.error('Privacy request log failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Could not load the privacy request log' });
+  } finally {
+    if (pool) await pool.end().catch(() => {});
+  }
+});
+// ---- END PRIVACY REQUESTS ----
 
 // ---- PUBLIC EMAIL SIGNUP / UNSUBSCRIBE ROUTES ----
 // Same shape as the existing /api/public/opt-in routes above: no JWT,

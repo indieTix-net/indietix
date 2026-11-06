@@ -102,7 +102,7 @@ load_config() {
     QRScanner)
       AWS_FN="QRScanner"
       SRC_DIR="$ROOT/QRScanner/src"
-      FILES=$'index.mjs\napp.mjs\nmodels/index.mjs\nmodels/client.mjs\nmodels/order.mjs\nmodels/product.mjs\nmodels/user.mjs\nutils/crypto-utils.mjs\nutils/data-filter-utils.mjs\nutils/legal.mjs\nlegal/terms.html\nlegal/privacy.html'
+      FILES=$'index.mjs\napp.mjs\nmodels/index.mjs\nmodels/client.mjs\nmodels/order.mjs\nmodels/product.mjs\nmodels/user.mjs\nutils/crypto-utils.mjs\nutils/data-filter-utils.mjs\nutils/legal.mjs\nutils/privacy-requests.mjs\nlegal/terms.html\nlegal/privacy.html'
       LAYER_NAME="qrscannerWebsite"
       LAYER_PKG_DIR="$ROOT/QRScanner/nodePackages"
       DEV_FN="indietix-sandbox-qrscanner"

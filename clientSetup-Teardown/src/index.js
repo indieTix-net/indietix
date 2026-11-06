@@ -806,6 +806,25 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
     console.log('ApiIdempotency table created');
     // ---- end PUBLIC API v1 TABLES ----
 
+    // 16. PrivacyRequest -- the log of customer privacy requests (export
+    // or redact) run from QRScanner's Privacy requests page. Holds no
+    // personal data itself: the person is a SHA-256 fingerprint of the
+    // email/phone searched, plus how staff verified them and what matched.
+    const createPrivacyRequestTable = `
+      CREATE TABLE public."PrivacyRequest" (
+        "ID" SERIAL PRIMARY KEY,
+        "RequestType" VARCHAR(20) NOT NULL,
+        "SubjectFingerprint" CHAR(64) NOT NULL,
+        "Verification" TEXT NOT NULL,
+        "RequestedBy" VARCHAR(100) NOT NULL,
+        "ReceivedDate" DATE,
+        "Matches" JSONB NOT NULL DEFAULT '{}',
+        "CreatedDate" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await pgClient.query(createPrivacyRequestTable);
+    console.log('PrivacyRequest table created');
+
     // ===========================================================
     // FUNCTIONS
     // ===========================================================

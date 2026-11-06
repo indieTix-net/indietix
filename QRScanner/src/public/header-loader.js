@@ -34,6 +34,7 @@
         '/email-list.html':        { perms: ['marketing'] },
         '/user-management.html':   { clientOnly: true },
         '/client.html':            { clientOnly: true },
+        '/privacy-requests.html':  { clientOnly: true },
         '/login.html':             { public: true },
         '/login':                  { public: true },
         '/reset-password.html':    { public: true }

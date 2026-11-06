@@ -1275,3 +1275,25 @@ $fn$;
 $sql$, theatre_id::integer, theatre_name, film_code_prefix);
 END
 $migration$;
+
+
+-- ============================================================
+-- 2026-11-06: PrivacyRequest -- log of customer privacy requests
+-- ============================================================
+-- Written by QRScanner's Privacy requests page (export and redact). No
+-- personal data: the person is a fingerprint. Must match
+-- createDatabaseObjects in src/index.js.
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public."PrivacyRequest" (
+  "ID" SERIAL PRIMARY KEY,
+  "RequestType" VARCHAR(20) NOT NULL,
+  "SubjectFingerprint" CHAR(64) NOT NULL,
+  "Verification" TEXT NOT NULL,
+  "RequestedBy" VARCHAR(100) NOT NULL,
+  "ReceivedDate" DATE,
+  "Matches" JSONB NOT NULL DEFAULT '{}',
+  "CreatedDate" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMIT;

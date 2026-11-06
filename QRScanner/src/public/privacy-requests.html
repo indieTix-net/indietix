@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Requests</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="client.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+        <div id="header-container">
+            <!-- Header will be injected here -->
+        </div>
+
+        <div class="client-form-container">
+
+            <div class="form-section">
+                <div class="section-header">
+                    <h4>Privacy Requests</h4>
+                    <p class="text-muted">When a customer asks what you have about them, or asks to be erased. Erasing (redacting) replaces their name, email and phone everywhere but keeps every order and ticket, so your sales, refunds and box-office reports stay correct. Their tickets keep working. Records of their consent to texts are kept as legal proof, and any texts to them stop.</p>
+                    <p class="text-muted small">Answer within 30 days (GDPR) or 45 days (California). Confirm the request really came from the person before you act, for example by replying to the email address on their order.</p>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-5">
+                        <label for="privacy-email" class="form-label">Their email address</label>
+                        <input type="email" class="form-control" id="privacy-email" autocomplete="off" placeholder="someone@example.com">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="privacy-phone" class="form-label">Their phone number</label>
+                        <input type="tel" class="form-control" id="privacy-phone" autocomplete="off" placeholder="(785) 555-0123">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="button" class="btn btn-primary w-100" id="privacy-search-btn">Find Their Data</button>
+                    </div>
+                </div>
+                <div class="form-text mb-3">Fill in either one, or both if they gave both.</div>
+
+                <div id="privacy-results" hidden>
+                    <h5>What we found</h5>
+                    <ul id="privacy-counts" class="mb-3"></ul>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm">
+                            <thead><tr><th>Order</th><th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Status</th></tr></thead>
+                            <tbody id="privacy-orders"></tbody>
+                        </table>
+                    </div>
+                    <p id="privacy-consent" class="text-muted small"></p>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-8">
+                            <label for="privacy-verification" class="form-label">How did you confirm it's them?</label>
+                            <input type="text" class="form-control" id="privacy-verification" maxlength="500" placeholder="e.g. They replied from the email on their order">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="privacy-received" class="form-label">Date the request came in</label>
+                            <input type="date" class="form-control" id="privacy-received">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="privacy-export-btn">Download Their Data</button>
+                    <button type="button" class="btn btn-danger" id="privacy-redact-btn">Erase Their Details</button>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="section-header">
+                    <h4>Request Log</h4>
+                    <p class="text-muted">Every download and erasure, kept as your record of handling requests. It never stores the person's email or phone.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead><tr><th>#</th><th>Done</th><th>Type</th><th>Received</th><th>Verified by</th><th>Found</th><th>By</th></tr></thead>
+                        <tbody id="privacy-log"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="ui-dialogs.js"></script>
+<script src="auth-helper.js"></script>
+<script src="privacy-requests.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        HeaderLoader.initializeHeader('header-container');
+    });
+</script>
+</body>
+</html>
