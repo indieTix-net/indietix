@@ -66,11 +66,14 @@ const PDF_DOC_INIT_PARAMS = {
  *   exactly (required by the die-cut print protocol). Omitted or
  *   continuous media falls back to the original "scale to width, let
  *   height float" behavior.
+ * @param {object} [timings] - optional; gets `pdfRenderMs` and `layoutMs`
+ *   added for printTicket.mjs's timing log line.
  * @returns {Promise<{width: number, height: number, data: Uint8Array}>}
  *   RawImageData shape expected by @thermal-label/brother-ql-node's
  *   print() / createPreviewOffline().
  */
-export async function renderTicketToRasterImage(pdfBytes, media) {
+export async function renderTicketToRasterImage(pdfBytes, media, timings = {}) {
+  const renderStart = performance.now();
   // scale: 2 gives enough source resolution that the QR code stays
   // sharp after the resize below -- the PDF's own "page size" isn't a
   // real-world physical size (see note above), so this is just "render
@@ -84,6 +87,8 @@ export async function renderTicketToRasterImage(pdfBytes, media) {
   await doc.destroy();
 
   const sourceImage = await loadImage(pageBuffer);
+  timings.pdfRenderMs = Math.round(performance.now() - renderStart);
+  const layoutStart = performance.now();
 
   // Step 1: rotate 90deg CW. The ticket is wide (landscape); the roll's
   // printable area is narrow and feeds along its length, so the
@@ -129,5 +134,8 @@ export async function renderTicketToRasterImage(pdfBytes, media) {
   finalCtx.drawImage(rotatedCanvas, drawX, drawY, drawWidth, drawHeight);
 
   const imageData = finalCtx.getImageData(0, 0, finalWidth, finalHeight);
+  timings.layoutMs = Math.round(performance.now() - layoutStart);
+  timings.sourcePx = `${sourceImage.width}x${sourceImage.height}`;
+  timings.labelPx = `${finalWidth}x${finalHeight}`;
   return { width: finalWidth, height: finalHeight, data: imageData.data };
 }

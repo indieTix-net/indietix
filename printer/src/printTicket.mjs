@@ -31,6 +31,10 @@ function findMedia() {
  * outside the operator's awareness, so it doesn't reintroduce the
  * hazard the no-retry decision above is about.
  *
+ * Logs one "Print timing" line per ticket (milliseconds per step), so a
+ * slow print can be traced to the download, the PDF render, the printer
+ * connection or the print itself.
+ *
  * @param {string} pdfUrl - presigned S3 URL for the ticket PDF.
  */
 export async function printTicket(pdfUrl) {
@@ -38,33 +42,72 @@ export async function printTicket(pdfUrl) {
     throw new Error('PRINTER_HOST is not configured. Set it in .env to the printer\'s LAN IP.');
   }
 
-  const response = await fetch(pdfUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ticket PDF: ${response.status}`);
-  }
-  const pdfBytes = Buffer.from(await response.arrayBuffer());
-
-  const media = findMedia();
-  const image = await renderTicketToRasterImage(pdfBytes, media);
-
+  const timings = {};
+  const start = performance.now();
+  let outcome = 'failed';
   try {
-    await sendToPrinter(image, media);
-  } catch (firstError) {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    try {
-      await sendToPrinter(image, media);
-    } catch {
-      throw firstError;
+    const downloadStart = performance.now();
+    const response = await fetch(pdfUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ticket PDF: ${response.status}`);
     }
+    const pdfBytes = Buffer.from(await response.arrayBuffer());
+    timings.downloadMs = Math.round(performance.now() - downloadStart);
+    timings.pdfKB = Math.round(pdfBytes.length / 1024);
+
+    const media = findMedia();
+    const image = await renderTicketToRasterImage(pdfBytes, media, timings);
+
+    try {
+      await sendToPrinter(image, media, timings, '');
+    } catch (firstError) {
+      timings.firstTryError = firstError.message;
+      const waitStart = performance.now();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      timings.retryWaitMs = Math.round(performance.now() - waitStart);
+      try {
+        await sendToPrinter(image, media, timings, 'retry');
+      } catch {
+        throw firstError;
+      }
+    }
+    outcome = 'printed';
+  } finally {
+    timings.totalMs = Math.round(performance.now() - start);
+    console.log(`Print timing (${outcome}):`, JSON.stringify(timings));
   }
 }
 
-async function sendToPrinter(image, media) {
+// `prefix` keeps a retry's step times separate from the first try's.
+async function sendToPrinter(image, media, timings = {}, prefix = '') {
+  const key = (name) => (prefix ? `${prefix}${name[0].toUpperCase()}${name.slice(1)}` : name);
+  let stepStart = performance.now();
   const printer = await discovery.openPrinter({ host: PRINTER_HOST, deviceKey: DEVICE_KEY });
+  timings[key('connectMs')] = Math.round(performance.now() - stepStart);
+  // The driver sends every job in 1 KB pieces with a 20 ms pause between
+  // them, which a USB printer needs and a network one doesn't. A ticket is
+  // about 113 KB, so that pacing alone cost 2.4 s on a Mac and more on the
+  // box office PC (Windows timers are coarser). Over the network, send the
+  // job in one write. printMs minus sendMs is the printer's own time plus
+  // the driver's page-counter check.
+  if (printer.transportType === 'tcp' && printer.transport && typeof printer.writeChunked === 'function') {
+    printer.writeChunked = async (bytes) => {
+      const sendStart = performance.now();
+      await printer.transport.write(bytes);
+      timings[key('sendMs')] = Math.round(performance.now() - sendStart);
+      timings.jobKB = Math.round(bytes.length / 1024);
+    };
+  }
+  stepStart = performance.now();
   try {
     await printer.print(image, media);
   } finally {
+    // print() includes the driver's page-counter confirmation, so this is
+    // recorded even when that check fails
+    timings[key('printMs')] = Math.round(performance.now() - stepStart);
+    stepStart = performance.now();
     await printer.close();
+    timings[key('closeMs')] = Math.round(performance.now() - stepStart);
   }
 }
 
