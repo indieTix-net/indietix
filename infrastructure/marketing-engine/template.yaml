@@ -7,7 +7,7 @@ Description: >
   clientReporting/expireQRCodeSquareModifiers. Includes the 5-minute
   EventBridge schedule as a proper SAM Schedule event -- production's own
   copy of this rule was created by hand via the CLI (`aws events put-rule`),
-  not from any IaC file (see marketingEngine/README); this bootstrap
+  not from any IaC file (see marketingEngine/README.md); this bootstrap
   gets a freshly-deployed environment the same live trigger without that
   manual step. Real sends require real Square/SES/social credentials set
   on a client's configuration after onboarding -- nothing here can

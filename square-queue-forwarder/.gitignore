@@ -18,5 +18,5 @@ node_modules/
 .env
 .env.local
 
-# Local notes -- not part of the distributed project.
+# Local working notes, not part of the distributed project.
 MEMORY.md

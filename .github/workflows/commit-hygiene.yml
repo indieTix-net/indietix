@@ -1,0 +1,46 @@
+# Keeps commit metadata to the project's own authors.
+#
+# A pull request fails when any of its commits carries a co-author trailer
+# ("Co-authored-by:"), or its description has a line starting "Generated
+# with" (an emoji or bullet before it still counts).
+# Commits and descriptions should credit only the people listed as authors.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  commit-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No co-author trailers in the PR's commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          found=0
+          for sha in $(git rev-list "$BASE_SHA..$HEAD_SHA"); do
+            if git log -1 --format=%B "$sha" | grep -qi '^co-authored-by:'; then
+              echo "::error::Commit $sha has a Co-authored-by trailer. Remove it (git commit --amend, or rebase) and push again."
+              found=1
+            fi
+          done
+          exit $found
+
+      - name: No "Generated with" line in the PR description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # A footer line: "Generated with ...", after any emoji or bullet
+          if printf '%s' "$PR_BODY" | grep -qiE '^[^[:alnum:]]*generated with'; then
+            echo "::error::The PR description has a \"Generated with\" line. Edit the description to remove it."
+            exit 1
+          fi

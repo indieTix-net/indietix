@@ -30,5 +30,5 @@ src/bdor_bad_showtimes.sql
 src/get_ebor_engagements_for_date.sql
 src/safe_to_timestamp.sql
 
-# Local notes -- not part of the distributed project.
+# Local working notes, not part of the distributed project.
 MEMORY.md

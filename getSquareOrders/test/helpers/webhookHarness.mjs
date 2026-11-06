@@ -21,8 +21,7 @@ import { createDatabaseObjects } from '../../../clientSetup-Teardown/src/index.j
 const { Client } = pg;
 
 // index.mjs's getClientPoolWithSecrets() creates a new pg.Pool per
-// invocation and, by deliberate design (see this repo's README --
-// pools are meant to outlive one invocation across warm Lambda
+// invocation and, by deliberate design (pools are meant to outlive one invocation across warm Lambda
 // containers), never calls .end() on it except in specific error paths.
 // In a real Lambda that's fine; in a test process it means every pool
 // from every processWebhook() call stays open past the test that created

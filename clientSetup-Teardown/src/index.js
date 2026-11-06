@@ -1140,15 +1140,15 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       // BAD_SHOWTIME_SNS_TOPIC_ARN: not created per-client by this Lambda today --
       // the live value observed in production is a single un-suffixed ARN, which
       // suggests this may actually be a shared resource across all clients (like
-      // the inbound SMS SNS topic and TICKET_SIGNER credentials documented in
-      // README's Multi-tenancy model section) rather than genuinely per-client.
+      // the inbound SMS SNS topic and TICKET_SIGNER credentials, the two
+      // documented multi-tenancy exceptions) rather than genuinely per-client.
       // Worth confirming before treating this as client-specific.
       "BAD_SHOWTIME_SNS_TOPIC_ARN": "",
 
       // ---- MARKETING ENGINE configuration ----
       // Master switch; the marketingEngine Lambda no-ops entirely for any
       // client where this isn't the string "true" (check both === true and
-      // === 'true', same as SEND_SMS -- see README conventions).
+      // === 'true', same as SEND_SMS).
       "MARKETING_ENGINE_ENABLED": "false",
       "DIGEST_ENABLED": "false",
       "DIGEST_DAY_OF_WEEK": "monday",

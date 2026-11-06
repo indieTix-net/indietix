@@ -71,8 +71,8 @@ Resources:
               - !Sub "${ClientMainBucket.Arn}/digest-backgrounds/*"
               - !Sub "${ClientMainBucket.Arn}/digest-generated/*"
           # tickets-out/* is deliberately absent here -- stays private,
-          # served only via TICKET_SIGNER_* presigned URLs (see workspace
-          # root README, multi-tenancy exceptions section).
+          # served only via TICKET_SIGNER_* presigned URLs (one of the two
+          # documented multi-tenancy exceptions).
 
   ClientBdorBucket:
     Type: AWS::S3::Bucket

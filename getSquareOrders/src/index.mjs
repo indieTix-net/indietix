@@ -1211,8 +1211,7 @@ export const handler = async (event) => {
     errors: []
   };
 
-  // Deliberate design choice (2026-10-21, after a real incident -- see
-  // getSquareOrders' README): this handler always reports the whole
+  // Deliberate design choice (2026-10-21, after a real incident): this handler always reports the whole
   // batch as successful, regardless of what happened to any individual
   // message, and never asks SQS to retry. Two reasons:
   //
@@ -1972,7 +1971,7 @@ console.log('customerId:', customerId);
         // explicit, well-formed result so the caller's success/failure
         // classification doesn't fall through to an implicit `undefined`
         // (that gap crashed the SQS handler and backed up the whole FIFO
-        // queue on 2026-10-21; see getSquareOrders' README).
+        // queue on 2026-10-21).
         console.log(`Order ${orderId} has no ticketed items -- nothing to process.`);
         return {
           statusCode: 200,

@@ -33,4 +33,4 @@ TikTok access tokens expire in roughly 24 hours, and TikTok's refresh tokens **r
 - The execution role is shared with `DailyPgQueryAndSftp`'s nightly job; email sending needed its own narrowly-scoped `ses:SendRawEmail` policy added to that shared role.
 - The EventBridge rule isn't defined in any IaC/template file in this repo — check the AWS console or `aws events describe-rule` for the live schedule rather than assuming this doc is current on timing.
 
-See the workspace-root README, if present, for the full platform architecture and multi-tenancy model.
+See the repository-root `README.md` for the full platform architecture and multi-tenancy model.

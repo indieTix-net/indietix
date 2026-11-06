@@ -38,5 +38,5 @@ libertyhall-db-key.pem
 # convention. Treat the DB password as compromised -- rotate it.
 joshTemplate.yml
 
-# Local notes -- not part of the distributed project.
+# Local working notes, not part of the distributed project.
 MEMORY.md

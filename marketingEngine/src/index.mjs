@@ -110,7 +110,7 @@ let currentClientConfig = {};
 
 // =====================================================================
 // CLIENT DISCOVERY -- copied verbatim from expireQRCodeSquareModifiers/
-// src/index.mjs:19-168 (this Lambda's third consumer; per README's
+// src/index.mjs:19-168 (this Lambda's third consumer; by the project's
 // stated policy, shared utilities get extracted to a real package once a
 // FOURTH consumer needs them -- not yet).
 // =====================================================================
@@ -1233,7 +1233,7 @@ async function generateDigestPost(pgClient, clientConfig, clientId) {
   // Per-field size/weight, same "check both true and 'true'" convention as
   // every other boolean config value in this platform (Postgres JSON
   // booleans and JSON strings are both possible depending on how the
-  // config was written -- see README). Times default to NOT bold
+  // config was written). Times default to NOT bold
   // (isTrue, opt-in); date/event/header/footer default to bold (isFalse,
   // opt-out) -- matches what the overlay already looked like before any
   // of this was configurable.

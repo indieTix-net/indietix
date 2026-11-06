@@ -23,5 +23,5 @@ node_modules/
 # Superseded draft, folded into migrations.sql
 src/sms-spend-limit-migration.sql
 
-# Local notes -- not part of the distributed project.
+# Local working notes, not part of the distributed project.
 MEMORY.md

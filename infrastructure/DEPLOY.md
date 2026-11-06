@@ -89,4 +89,4 @@ Needs, once per environment (production: done for `indietix.net`, 2026-11-06):
 
 ## Broader context
 
-For the platform this script deploys — architecture, multi-tenancy model, per-repo details — see README at the workspace root (one level up from this repo).
+For the platform this script deploys — architecture, multi-tenancy model, per-repo details — see `README.md` here and at the repository root.

@@ -6,7 +6,7 @@ Worked examples for the changes you'll actually make after the platform is runni
 
 ## Example 1: fix a bug in one Lambda, prove it in sandbox, ship it
 
-Say you found a bug in `getSquareOrders`. The code lives in the real `getSquareOrders` repo (a sibling of `infrastructure/`, not inside this repo — see this repo's own README for why, and the "one true source" note in `.gitignore` if you're curious about the history there).
+Say you found a bug in `getSquareOrders`. The code lives in the real `getSquareOrders` repo (a sibling of `infrastructure/`, not inside this repo — see this repo's own `README.md` for why, and the "one true source" note in `.gitignore` if you're curious about the history there).
 
 ```bash
 cd getSquareOrders

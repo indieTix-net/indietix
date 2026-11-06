@@ -27,5 +27,5 @@ libertyhall-db-key.pem
 # Stale code snapshot -- note: already tracked in git, this alone won't untrack it
 app.mjs.beforeIterateOverCatalogIDs
 
-# Local notes -- not part of the distributed project.
+# Local working notes, not part of the distributed project.
 MEMORY.md
