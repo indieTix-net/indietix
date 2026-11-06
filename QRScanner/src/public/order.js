@@ -647,9 +647,12 @@ function handleDeleteOrderClick(orderId, orderID, customerName, emailAddress) {
 }
 
 // ---- PRINT ALL TICKETS IN AN ORDER ----
-// Sends every valid ticket on the order to the local print agent, one at a
-// time and in order (the agent prints each before answering). Refunded,
-// cancelled or transferred tickets are skipped. No confirmation popup.
+// Sends every valid ticket on the order to the local print agent, in order.
+// The tickets' links are fetched together, then go to the agent's
+// /print-batch in one request, which prepares the next ticket while the
+// current one prints. An older agent without /print-batch gets them one
+// at a time instead. Refunded, cancelled or transferred tickets are
+// skipped. No confirmation popup.
 const ordersBeingPrinted = new Set();
 
 async function getPresignedTicketUrl(qrCode) {
@@ -663,6 +666,18 @@ async function getPresignedTicketUrl(qrCode) {
         throw new Error(errorData.message || `Failed to get ticket: ${response.status}`);
     }
     return (await response.json()).downloadUrl;
+}
+
+async function printOneTicket(pdfUrl) {
+    const printResponse = await fetch(`${PRINT_AGENT_URL}/print`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfUrl })
+    });
+    if (!printResponse.ok) {
+        const errorData = await printResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `Print agent returned ${printResponse.status}`);
+    }
 }
 
 async function handlePrintOrderTicketsClick(orderId, orderID) {
@@ -684,18 +699,30 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
             return;
         }
 
-        for (const ticket of tickets) {
-            const pdfUrl = await getPresignedTicketUrl(ticket.QRCode);
-            const printResponse = await fetch(`${PRINT_AGENT_URL}/print`, {
+        const pdfUrls = await Promise.all(tickets.map(ticket => getPresignedTicketUrl(ticket.QRCode)));
+
+        // The agent takes up to 50 tickets per request
+        for (let i = 0; i < pdfUrls.length; i += 50) {
+            const batch = pdfUrls.slice(i, i + 50);
+            const batchResponse = await fetch(`${PRINT_AGENT_URL}/print-batch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pdfUrl })
+                body: JSON.stringify({ pdfUrls: batch })
             });
-            if (!printResponse.ok) {
-                const errorData = await printResponse.json().catch(() => ({}));
-                throw new Error(errorData.message || `Print agent returned ${printResponse.status}`);
+            if (batchResponse.status === 404) {
+                // An older agent: one ticket per request
+                for (const pdfUrl of batch) {
+                    await printOneTicket(pdfUrl);
+                    printed++;
+                }
+                continue;
             }
-            printed++;
+            const result = await batchResponse.json().catch(() => ({}));
+            if (!batchResponse.ok || !result.success) {
+                printed += result.printed || 0;
+                throw new Error(result.message || `Print agent returned ${batchResponse.status}`);
+            }
+            printed += result.printed;
         }
         console.log(`Printed ${printed} ticket(s) for order ${orderID}`);
 

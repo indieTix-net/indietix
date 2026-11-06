@@ -38,43 +38,100 @@ function findMedia() {
  * @param {string} pdfUrl - presigned S3 URL for the ticket PDF.
  */
 export async function printTicket(pdfUrl) {
-  if (!PRINTER_HOST) {
-    throw new Error('PRINTER_HOST is not configured. Set it in .env to the printer\'s LAN IP.');
-  }
-
+  requirePrinterHost();
   const timings = {};
   const start = performance.now();
   let outcome = 'failed';
   try {
-    const downloadStart = performance.now();
-    const response = await fetch(pdfUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ticket PDF: ${response.status}`);
-    }
-    const pdfBytes = Buffer.from(await response.arrayBuffer());
-    timings.downloadMs = Math.round(performance.now() - downloadStart);
-    timings.pdfKB = Math.round(pdfBytes.length / 1024);
-
-    const media = findMedia();
-    const image = await renderTicketToRasterImage(pdfBytes, media, timings);
-
-    try {
-      await sendToPrinter(image, media, timings, '');
-    } catch (firstError) {
-      timings.firstTryError = firstError.message;
-      const waitStart = performance.now();
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      timings.retryWaitMs = Math.round(performance.now() - waitStart);
-      try {
-        await sendToPrinter(image, media, timings, 'retry');
-      } catch {
-        throw firstError;
-      }
-    }
+    const { image, media } = await prepareTicket(pdfUrl, timings);
+    await sendWithRetry(image, media, timings);
     outcome = 'printed';
   } finally {
-    timings.totalMs = Math.round(performance.now() - start);
-    console.log(`Print timing (${outcome}):`, JSON.stringify(timings));
+    logTiming(outcome, timings, start);
+  }
+}
+
+/**
+ * Prints several tickets in order (Print Tickets on the Orders page). The
+ * next ticket is downloaded and drawn while the current one prints, so the
+ * printer isn't left waiting between labels; tickets still go to the
+ * printer one at a time, in the order given. Stops at the first failure.
+ *
+ * @param {string[]} pdfUrls - presigned S3 URLs, in print order.
+ * @returns {Promise<number>} how many printed. A thrown error carries
+ *   `printed`, the count that made it out before the failure.
+ */
+export async function printTickets(pdfUrls) {
+  requirePrinterHost();
+  const prepare = (i) => {
+    const job = { timings: { batch: `${i + 1}/${pdfUrls.length}` }, start: performance.now() };
+    job.ready = prepareTicket(pdfUrls[i], job.timings);
+    // Awaited in turn below; this only stops an unhandled rejection when
+    // an earlier ticket fails and this one is never reached.
+    job.ready.catch(() => {});
+    return job;
+  };
+  let printed = 0;
+  let current = prepare(0);
+  for (let i = 0; i < pdfUrls.length; i++) {
+    const next = i + 1 < pdfUrls.length ? prepare(i + 1) : null;
+    let outcome = 'failed';
+    try {
+      const { image, media } = await current.ready;
+      await sendWithRetry(image, media, current.timings);
+      outcome = 'printed';
+      printed++;
+    } catch (error) {
+      error.printed = printed;
+      throw error;
+    } finally {
+      logTiming(outcome, current.timings, current.start);
+    }
+    current = next;
+  }
+  return printed;
+}
+
+function requirePrinterHost() {
+  if (!PRINTER_HOST) {
+    throw new Error('PRINTER_HOST is not configured. Set it in .env to the printer\'s LAN IP.');
+  }
+}
+
+function logTiming(outcome, timings, start) {
+  timings.totalMs = Math.round(performance.now() - start);
+  console.log(`Print timing (${outcome}):`, JSON.stringify(timings));
+}
+
+// Download and draw one ticket, ready to send.
+async function prepareTicket(pdfUrl, timings) {
+  const downloadStart = performance.now();
+  const response = await fetch(pdfUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ticket PDF: ${response.status}`);
+  }
+  const pdfBytes = Buffer.from(await response.arrayBuffer());
+  timings.downloadMs = Math.round(performance.now() - downloadStart);
+  timings.pdfKB = Math.round(pdfBytes.length / 1024);
+  const media = findMedia();
+  const image = await renderTicketToRasterImage(pdfBytes, media, timings);
+  return { image, media };
+}
+
+// One retry after 2 s, for the printer's power-save wake-up (see above).
+async function sendWithRetry(image, media, timings) {
+  try {
+    await sendToPrinter(image, media, timings, '');
+  } catch (firstError) {
+    timings.firstTryError = firstError.message;
+    const waitStart = performance.now();
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    timings.retryWaitMs = Math.round(performance.now() - waitStart);
+    try {
+      await sendToPrinter(image, media, timings, 'retry');
+    } catch {
+      throw firstError;
+    }
   }
 }
 

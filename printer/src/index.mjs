@@ -9,7 +9,7 @@
 import express from 'express';
 import cors from 'cors';
 import { PORT } from './config.mjs';
-import { printTicket, previewTicket } from './printTicket.mjs';
+import { printTicket, printTickets, previewTicket } from './printTicket.mjs';
 
 const app = express();
 app.use(cors());
@@ -31,6 +31,24 @@ app.post('/print', async (req, res) => {
   } catch (error) {
     console.error('Print failed:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Several tickets in order, e.g. a whole order (Print Tickets on the
+// Orders page). The next ticket is prepared while the current one prints.
+const MAX_BATCH = 50;
+app.post('/print-batch', async (req, res) => {
+  const { pdfUrls } = req.body;
+  if (!Array.isArray(pdfUrls) || pdfUrls.length === 0 || pdfUrls.length > MAX_BATCH || !pdfUrls.every((url) => typeof url === 'string' && url)) {
+    return res.status(400).json({ success: false, message: `pdfUrls must be a list of 1 to ${MAX_BATCH} ticket URLs` });
+  }
+
+  try {
+    const printed = await printTickets(pdfUrls);
+    res.json({ success: true, printed });
+  } catch (error) {
+    console.error('Batch print failed:', error);
+    res.status(500).json({ success: false, message: error.message, printed: error.printed || 0 });
   }
 });
 
