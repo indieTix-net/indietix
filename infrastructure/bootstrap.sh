@@ -353,6 +353,32 @@ set_static_site_bucket() {
   return 0
 }
 
+# set_log_retention -- makes every log group this environment writes to
+# expire after LOG_RETENTION_DAYS (default 30) instead of AWS's default of
+# never; logs can hold customers' emails and phone numbers. A function's log
+# group only appears on its first run, so each one is created here first.
+# Groups named for the environment (the Aurora cluster's, API logs) get the
+# same policy. Safe to re-run; costs nothing (shorter retention stores less).
+set_log_retention() {
+  local days="${LOG_RETENTION_DAYS:-30}" fn group count=0
+  case " 1 3 5 7 14 30 60 90 120 150 180 365 400 545 731 1096 1827 2192 2557 2922 3288 3653 " in
+    *" $days "*) ;;
+    *) echo "  LOG_RETENTION_DAYS=$days isn't a value CloudWatch accepts (1, 3, 5, 7, 14, 30, 60, 90, 180, 365, ...); logs left as they are" >&2; return 0 ;;
+  esac
+  for fn in $(aws lambda list-functions "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
+      --query "Functions[?starts_with(FunctionName, \`${ENV_PREFIX}-\`)].FunctionName" --output text); do
+    aws logs create-log-group --log-group-name "/aws/lambda/$fn" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null || true
+  done
+  for group in $(aws logs describe-log-groups "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" \
+      --query "logGroups[?contains(logGroupName, \`${ENV_PREFIX}\`)].logGroupName" --output text); do
+    aws logs put-retention-policy --log-group-name "$group" --retention-in-days "$days" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" && count=$((count + 1))
+  done
+  echo "  Logs: $count log group(s) expire after $days days"
+  return 0
+}
+
 # set_square_oauth <webhook-url> -- Connect Square (QRScanner's SQUARE
 # OAUTH section). With SQUARE_APP_ID set: stores, via a 0600 temp file, the
 # Secrets Manager secret indieTix/square/app/<ENV_PREFIX> = {"client_secret":
@@ -789,6 +815,7 @@ cmd_up() {
   set_static_site_bucket
   set_api_edge
   set_square_oauth "$webhook_url"
+  set_log_retention
   echo
 
   # 5b. Optional cost guard: budgets that email BUDGET_ALERT_EMAIL, plus

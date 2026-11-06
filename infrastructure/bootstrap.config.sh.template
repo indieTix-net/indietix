@@ -127,6 +127,12 @@ HOSTED_TERMS_URL=""     # Your hosted service's Terms of Service (https://), lin
 HOSTED_PRIVACY_URL=""   # Its Privacy Policy (https://); required unless SQUARE_ENVIRONMENT="sandbox"
 HOSTED_SUPPORT_EMAIL="" # Shown on support.html, e.g. support@yourdomain (must reach a person)
 
+# ---- Log retention ----
+# Days CloudWatch keeps this environment's logs (they can hold customers'
+# emails and phone numbers). AWS's default is forever. Allowed values:
+# 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, ...
+LOG_RETENTION_DAYS="30"
+
 # ---- Venues' own web addresses (optional) ----
 # A domain each venue can pick a name under, e.g. "indietix.net" for
 # thunderbeaver.indietix.net (Client Settings, and the signup form). `up`
