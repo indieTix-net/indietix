@@ -6271,6 +6271,104 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
 // app_mjs_insights_endpoint.js
 // Add this endpoint to your app.mjs file
 
+
+// ---- INSIGHTS DATABASE CONTEXT ----
+// What the Insights SQL-writing step knows about a venue's database. Kept
+// in step with the real schema (clientSetup-Teardown's
+// createDatabaseObjects); venue details come from its own settings, never
+// from code. Tables the guard below refuses are deliberately left out.
+const INSIGHTS_BLOCKED_PATTERN = /\b(users|client|apikey|apiidempotency|skeletonkey|optintoken|unsubscribetoken)\b/i;
+
+function insightsList(value) {
+  let list = value;
+  if (typeof list === 'string') {
+    try { list = JSON.parse(list); } catch { list = list.split(','); }
+  }
+  return Array.isArray(list) ? list.map(item => String(item).trim()).filter(Boolean).slice(0, 20) : [];
+}
+
+function buildInsightsContext(config = {}) {
+  const venueName = config.WEB_HEADER_COMPANY || config.THEATER_NAME || config.LEGAL_SHORT_NAME || 'the venue';
+  const address = config.LEGAL_ADDRESS ? ` at ${config.LEGAL_ADDRESS}` : '';
+  const rooms = insightsList(config.EVENT_LOCATIONS);
+  const roomsLine = rooms.length
+    ? `- Rooms (ProductVenue) currently in use: ${rooms.map(room => `"${room}"`).join(', ')}. Older tickets may spell rooms differently, so match rooms with ILIKE '%name%'.`
+    : `- Match rooms (ProductVenue) with ILIKE '%name%', since spellings vary.`;
+  return `
+You are writing PostgreSQL for the ticketing database of ${venueName}${address}, a cinema and live event venue.
+
+**BUSINESS CONTEXT:**
+- "QRCodeProduct" rows are TICKETS: one row per ticket for a movie showing or event.
+- Customers place Orders; an Order holds one or more tickets, linked through "QRCodeProductToOrder".
+- ProductType: 'Movie' (cinema), 'Live' (anything with a live performer: concerts, speakers, podcasts, fundraisers) and occasionally 'repertory'. A few old rows hold other text; ignore them unless asked.
+- ProductName is the film or event title, e.g. "The Godfather (1972)", "Trivia Night".
+- ProductSeatCode is the ticket TYPE (e.g. 'Adult', 'Senior', 'Child', 'Regular'), not a seat.
+${roomsLine}
+- ProductLocation is a Square location ID, not a room. Don't use it for rooms.
+- Distributor is the film's distributor (e.g. 'A24', 'Focus Features').
+
+**TIMES (important):**
+- "ProductDate" (showtime) is local wall-clock time in America/Chicago, stored without a time zone.
+- "CreatedDate" columns (when something was bought or created) are UTC. For local days and months, convert first:
+  ("CreatedDate" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chicago')
+  and compare with (now() AT TIME ZONE 'America/Chicago')::date, not CURRENT_DATE.
+
+**STATUS (important):**
+- Ticket "Status": 'valid', 'refunded', 'cancelled', 'deleted', 'transferred'. Sales, attendance and revenue count only "Status" = 'valid' unless the question is about refunds, cancellations or transfers.
+- "CheckedIn" (boolean) means the ticket was scanned at the door.
+- Order "Status": 'Valid', 'Refunded', 'Cancelled', 'Deleted' (capitalized).
+
+**TABLES** (all names are case-sensitive and must be double-quoted):
+
+"QRCodeProduct" (tickets): "ID", "QRCode", "ProductName", "ProductType", "ProductDate", "ProductVenue", "ProductSeatCode", "ProductPrice" (numeric dollars, tax included), "Status", "CheckedIn", "CreatedDate", "Distributor", "ProductDetails", "ProductID" (Square item), "CustomerID", "FirstName", "LastName", "EmailAddress", "PhoneNumber", "ExpirationDate", "LastEditedDate"
+
+"Order": "ID" (integer), "OrderID" (Square's order ID, text), "CreatedDate", "Status", "FirstName", "LastName", "EmailAddress", "PhoneNumber", "CustomerID", "OrderMetaData" (jsonb), "LastEditedDate"
+
+"QRCodeProductToOrder": "QRCodeProductID" -> "QRCodeProduct"."ID", "OrderID" (INTEGER) -> "Order"."ID" (not "Order"."OrderID")
+
+"Customer" (one row per phone number): "ID", "PhoneNumber", "Email", "FirstName", "LastName", "CreatedDate"
+
+"SmsConsent" (text-message opt-ins; append-only history): "ID", "CustomerID", "PhoneNumber", "Status" ('active' or 'revoked'), "OptInMethod", "ConsentTimestamp", "RevokedAt", "CreatedDate". Current subscribers = rows with "Status" = 'active'.
+
+"SmsOutboundLog" (ticket texts sent): "ID", "PhoneNumber", "SentAt" (UTC)
+
+"MarketingPost": "ID", "SquareItemID", "Channel" ('email', 'facebook', 'instagram', 'tiktok'), "PostType", "ScheduledFor", "Status", "CreatedDate"
+"MarketingSchedule": "ID", "SquareItemID", "Channel", "Enabled"
+"MarketingEmailContact" (email list): "ID", "Email", "Status", "CreatedDate"
+
+**JOIN PATTERN:**
+FROM "Order" o
+JOIN "QRCodeProductToOrder" pto ON pto."OrderID" = o."ID"
+JOIN "QRCodeProduct" t ON t."ID" = pto."QRCodeProductID"
+
+**EXAMPLES:**
+-- Movie tickets sold this month (local time):
+SELECT COUNT(*) FROM "QRCodeProduct"
+WHERE "ProductType" = 'Movie' AND "Status" = 'valid'
+AND ("CreatedDate" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chicago') >= date_trunc('month', now() AT TIME ZONE 'America/Chicago');
+
+-- Top 5 films by tickets sold:
+SELECT "ProductName", COUNT(*) AS tickets_sold FROM "QRCodeProduct"
+WHERE "ProductType" = 'Movie' AND "Status" = 'valid'
+GROUP BY "ProductName" ORDER BY tickets_sold DESC LIMIT 5;
+
+-- Tonight's showings by room, with attendance so far:
+SELECT "ProductVenue", "ProductName", "ProductDate", COUNT(*) AS sold, COUNT(*) FILTER (WHERE "CheckedIn") AS checked_in
+FROM "QRCodeProduct"
+WHERE "Status" = 'valid' AND "ProductDate"::date = (now() AT TIME ZONE 'America/Chicago')::date
+GROUP BY 1, 2, 3 ORDER BY 3;
+
+-- Senior tickets last month:
+SELECT COUNT(*) FROM "QRCodeProduct"
+WHERE "ProductSeatCode" ILIKE 'senior%' AND "Status" = 'valid'
+AND ("CreatedDate" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chicago') >= date_trunc('month', now() AT TIME ZONE 'America/Chicago') - interval '1 month'
+AND ("CreatedDate" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chicago') < date_trunc('month', now() AT TIME ZONE 'America/Chicago');
+
+**NEVER** query "Users", "Client", "ApiKey", "ApiIdempotency" or "SkeletonKey", or the "OptInToken" and "UnsubscribeToken" columns. Such queries are refused.
+`;
+}
+// ---- END INSIGHTS DATABASE CONTEXT ----
+
 // Insights endpoint - Text-to-SQL with Claude API
 app.post('/api/insights/query', requireAuth, requirePermission('admin'), async (req, res) => {
   const clientId = req.user.clientId;
@@ -6288,92 +6386,10 @@ app.post('/api/insights/query', requireAuth, requirePermission('admin'), async (
       // Get client database connection
       clientPool = await createClientDbConnection(req.user.dbName);
       
-      // Get database schema context for this client
-      const schemaContext = `
-You are analyzing a movie and live event ticketing and sales database for a movie theater and event venue. 
-
-**BUSINESS CONTEXT:**
-- The business is based in lawrence, kansas.  Please keep that in mind when searching the internet for things like weather patterns.  Location specific questions that users may have.
-- QRCodeProducts are TICKETS - each record represents a single ticket for a movie showing or event
-- Customers place Orders that contain one or more tickets (QRCodeProducts)
-- ProductType indicates what kind of ticket: "Live" for events like concerts or speakers or fundraisers... anything with a live performer, and "Movie" for cinema.
-- ProductName contains the movie title or event name (e.g., "The Godfather", "Trivia Night", "Tom Petty")
-- When someone buys tickets, an Order is created and linked to QRCodeProducts via QRCodeProductToOrder
-
-**COMMON QUERY PATTERNS:**
-- "How many movies sold" = COUNT tickets WHERE ProductType = 'Movie'
-- "Best selling movies" = GROUP BY ProductName and COUNT
-- "Revenue" = SUM of ProductPrice
-- "This month" = WHERE CreatedDate >= DATE_TRUNC('month', CURRENT_DATE)
-
-**DATABASE SCHEMA:**
-
-**Table: "Order"**
-Represents a customer purchase/transaction.
-- ID (serial, primary key)
-- OrderID (text, unique identifier like "ORD-12345")
-- CreatedDate (timestamp, when order was placed)
-- OrderMetaData (jsonb, additional order information)
-- PhoneNumber (text, customer phone)
-- LastName (text, customer last name)
-- FirstName (text, customer first name)
-- EmailAddress (text, customer email)
-
-**Table: "QRCodeProduct"**
-Represents individual tickets for movies and events. Each row = 1 ticket.
-- ID (serial, primary key)
-- QRCode (text, unique QR code for the ticket)
-- ProductName (text, **THE MOVIE TITLE OR EVENT NAME** - e.g., "The Godfather (1972)", "Trivia Night", "Tom Petty")
-- ProductDate (timestamp, date/time of the movie showing or event)
-- ProductLocation (text, venue location like "Main Auditorium", "Little Theater", "Spacement")
-- ProductPrice (numeric, ticket price in dollars)
-- ProductType (text, "Live" for speakers, podcasts, concerts, fundraisers... anything live, "Movie" = cinema )
-- CheckedIn (boolean, whether ticket has been scanned/used)
-- Status (text, "valid" = valid ticket, "refunded" = refunded, "cancelled" = cancelled)
-- CreatedDate (timestamp, when ticket was purchased)
-- TicketHolderName (text, optional name on ticket)
-
-**Table: "QRCodeProductToOrder"**
-Junction table linking tickets to orders (many-to-many relationship).
-- ID (serial, primary key)
-- QRCodeProductID (integer, foreign key to QRCodeProduct.ID)
-- OrderID (text, foreign key to Order.OrderID)
-
-**RELATIONSHIPS:**
-- One Order can contain many tickets (QRCodeProducts)
-- Each ticket (QRCodeProduct) belongs to exactly one Order
-- Join pattern: Order -> QRCodeProductToOrder -> QRCodeProduct
-
-**IMPORTANT NOTES:**
-- **All table/column names are CASE-SENSITIVE and must be quoted**: "Order", "QRCodeProduct", "ProductName"
-- To count movies sold: COUNT(*) FROM "QRCodeProduct" WHERE "ProductType" = 'Movie'
-- To get revenue: SUM("ProductPrice") FROM "QRCodeProduct" WHERE "Status" = 'valid'
-- ProductName contains the movie/event name - use this for grouping by movie
-- Always filter out refunded tickets: WHERE "Status" != 'refunded' (unless specifically asked about refunds)
-- Date filtering: Use CURRENT_DATE, DATE_TRUNC(), or explicit date comparisons
-- For "best selling" queries: GROUP BY "ProductName" and ORDER BY COUNT(*) DESC
-
-**EXAMPLE QUERIES:**
--- How many movie tickets sold this month:
-SELECT COUNT(*) FROM "QRCodeProduct" 
-WHERE "ProductType" = 'Movie' 
-AND "Status" = 'valid'
-AND "CreatedDate" >= DATE_TRUNC('month', CURRENT_DATE);
-
--- Top 5 best selling movies:
-SELECT "ProductName", COUNT(*) as tickets_sold
-FROM "QRCodeProduct" 
-WHERE "ProductType" = 'Movie' AND "Status" = 'valid'
-GROUP BY "ProductName" 
-ORDER BY tickets_sold DESC 
-LIMIT 5;
-
--- Total revenue this week:
-SELECT SUM("ProductPrice") as total_revenue
-FROM "QRCodeProduct"
-WHERE "Status" = 'valid'
-AND "CreatedDate" >= DATE_TRUNC('week', CURRENT_DATE);
-`;
+      // Database context for the SQL-writing step, with this venue's own
+      // name, address, rooms and ticket types from its settings.
+      const venueConfigResult = await clientPool.query(`SELECT "configuration" FROM "Client" LIMIT 1`);
+      const schemaContext = buildInsightsContext(venueConfigResult.rows[0]?.configuration || {});
 
       // Step 1: Call Claude API to generate SQL
       console.log('[Insights] Calling Claude API to generate SQL...');
@@ -6438,7 +6454,9 @@ Generate a PostgreSQL SELECT query to answer this question. Return ONLY the SQL 
       //   1. exactly one statement (no "SELECT 1; COMMIT; DELETE ..." to
       //      escape the read-only transaction),
       //   2. never the credential tables ("Users" password hashes,
-      //      "Client".clientSecret + configuration secrets),
+      //      "Client".clientSecret + configuration secrets, API keys,
+      //      skeleton-key codes) or the opt-in/unsubscribe link tokens
+      //      (INSIGHTS_BLOCKED_PATTERN),
       //   3. a READ ONLY transaction with a statement timeout, so Postgres
       //      rejects any write and kills runaway queries.
       const singleStatement = generatedSQL.replace(/;\s*$/, '');
@@ -6448,7 +6466,7 @@ Generate a PostgreSQL SELECT query to answer this question. Return ONLY the SQL 
               sql: generatedSQL 
           });
       }
-      if (/\b(users|client)\b/i.test(singleStatement)) {
+      if (INSIGHTS_BLOCKED_PATTERN.test(singleStatement)) {
           return res.status(400).json({ 
               error: 'That question needs account or configuration data, which Insights cannot access',
               sql: generatedSQL 

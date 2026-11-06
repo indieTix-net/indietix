@@ -142,6 +142,52 @@ test('POST /api/insights/query: queries touching the Users or Client tables are 
   }
 });
 
+test('POST /api/insights/query: API keys, skeleton keys and link tokens are refused too', async () => {
+  for (const sqlText of [
+    `SELECT "KeyHash" FROM "ApiKey"`,
+    `SELECT * FROM "ApiIdempotency"`,
+    `SELECT "QRCode" FROM "SkeletonKey"`,
+    `SELECT "OptInToken" FROM "Order"`,
+    `SELECT "UnsubscribeToken" FROM "MarketingEmailContact"`
+  ]) {
+    installAnthropicMock({ sqlText });
+    try {
+      const { status } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'secrets?' } });
+      assert.equal(status, 400, sqlText);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+});
+
+test("POST /api/insights/query: the SQL step is told about this venue's own name, address and rooms, and the real schema", async () => {
+  await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = "configuration"::jsonb || $1::jsonb`, [JSON.stringify({ LEGAL_ADDRESS: '1 Main St, Springfield, IL', EVENT_LOCATIONS: ['Big Room', 'Small Room'] })]);
+  let prompt = '';
+  globalThis.fetch = async (url, opts) => {
+    if (url === 'https://api.anthropic.com/v1/messages') {
+      const body = JSON.parse(opts.body);
+      if (!Array.isArray(body.tools)) {
+        prompt = JSON.stringify(body);
+        return { ok: true, status: 200, json: async () => ({ content: [{ text: 'SELECT 1' }] }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'ok' }] }) };
+    }
+    return originalFetch(url, opts);
+  };
+  try {
+    const { status } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'How many?' } });
+    assert.equal(status, 200);
+    assert.match(prompt, /Test Venue at 1 Main St, Springfield, IL/);
+    assert.match(prompt, /\\"Big Room\\", \\"Small Room\\"/);
+    assert.match(prompt, /\\"OrderID\\" \(INTEGER\) -> \\"Order\\".\\"ID\\"/);
+    assert.match(prompt, /ProductSeatCode/);
+    assert.match(prompt, /America\/Chicago/);
+    assert.doesNotMatch(prompt, /lawrence|TicketHolderName|Spacement/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('POST /api/insights/query: a write that slips past the keyword list is still blocked by the read-only transaction', async () => {
   await ctx.pgClient.query(
     `INSERT INTO "QRCodeProduct" ("QRCode", "ExpirationDate", "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductID", "Status")
