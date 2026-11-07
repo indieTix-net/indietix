@@ -63,6 +63,10 @@ Each folder below is one piece of the platform, with its own README and tests. S
 
 See [`infrastructure/README.md`](./infrastructure/README.md) for the full walkthrough — AWS setup, connecting Square, Google Calendar, social media, and ticket printing. [`infrastructure/DEPLOY.md`](./infrastructure/DEPLOY.md) documents the deploy tooling itself.
 
+## Contributing
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Contributors sign a one-time [Contributor License Agreement](./CLA.md).
+
 ## License
 
 AGPL-3.0-or-later — see [`LICENSE`](./LICENSE). Chosen deliberately: IndieTix's model is free self-hosted code plus optional paid hosting/support, and AGPL keeps a hosted competitor honest about sharing improvements back, the way a permissive license wouldn't.
