@@ -8,7 +8,7 @@ Keep it to what a venue or ticket buyer could be told. Never add internal notes,
 |---|---|
 | `about.md` | What IndieTix is, who it's for, open source and hosted |
 | `getting-started.md` | Signing up, the welcome email, logging in, staff accounts |
-| `square.md` | Connect Square, selling tickets, adding movies and events, refunds |
+| `square.md` | Connect Square, selling tickets, adding movies and events, how a ticket item is built in Square (attributes, ticket types, showtimes), refunds |
 | `tickets-and-customers.md` | Ticket emails and texts, resending, transfers, a buyer who didn't get a ticket |
 | `at-the-door.md` | The scanner, manual check-in, skeleton keys, printing stubs |
 | `reports-and-marketing.md` | Event reports, Insights, distributor reports, marketing posts |
