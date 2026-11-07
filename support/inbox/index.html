@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IndieTix Support Inbox</title>
+<style>
+  :root { --bg:#f6f5f2; --panel:#fff; --ink:#1d1b19; --muted:#6b6560; --line:#e2ded8; --accent:#7a1f2b; --accent-ink:#fff; --in:#fff; --out:#f1ece6; --note:#fff6d6; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161413; --panel:#1f1c1a; --ink:#ece7e1; --muted:#a39b93; --line:#36312d; --accent:#c4505f; --accent-ink:#fff; --in:#1f1c1a; --out:#2a2522; --note:#3a3220; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; align-items:center; gap:16px; padding:12px 20px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:16px; margin:0; }
+  .tabs button { border:1px solid var(--line); background:transparent; color:var(--ink); padding:4px 12px; border-radius:14px; cursor:pointer; }
+  .tabs button.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  main { display:grid; grid-template-columns: minmax(260px, 340px) 1fr; height: calc(100vh - 53px); }
+  #list { border-right:1px solid var(--line); overflow:auto; background:var(--panel); }
+  .ticket { padding:10px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .ticket:hover, .ticket.on { background:var(--out); }
+  .ticket .who { font-weight:600; }
+  .ticket .meta, .muted { color:var(--muted); font-size:12px; }
+  #detail { overflow:auto; padding:20px 28px; }
+  .msg { border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin-bottom:12px; background:var(--in); }
+  .msg.out { background:var(--out); }
+  .msg pre { white-space:pre-wrap; word-wrap:break-word; font:inherit; margin:8px 0 0; }
+  .note { background:var(--note); border-radius:6px; padding:8px 12px; margin:8px 0; }
+  textarea { width:100%; min-height:260px; font:inherit; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .row button { padding:7px 14px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
+  .row button.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  .row button:disabled { opacity:.5; cursor:default; }
+  #status { margin-left:8px; }
+  .empty { padding:40px; color:var(--muted); }
+  @media (max-width: 700px) { main { grid-template-columns: 1fr; height:auto; } #list { max-height:40vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>IndieTix Support</h1>
+  <div class="tabs" id="tabs">
+    <button data-s="open" class="on">Open</button><button data-s="waiting">Waiting on them</button><button data-s="closed">Closed</button><button data-s="spam">Spam</button><button data-s="">All</button>
+  </div>
+</header>
+<main>
+  <div id="list"></div>
+  <div id="detail"><div class="empty">Pick a ticket.</div></div>
+</main>
+<script>
+const KEY = new URLSearchParams(location.search).get('key');
+history.replaceState(null, '', '/');
+let filter = 'open', current = null;
+const $ = (tag, props = {}, ...kids) => { const el = document.createElement(tag); Object.assign(el, props); el.append(...kids); return el; };
+const when = (v) => v ? new Date(String(v).replace(' ', 'T') + (/[zZ+]/.test(String(v).slice(-6)) ? '' : 'Z')).toLocaleString() : '';
+async function api(path, body) {
+  const res = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'x-inbox-key': KEY, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+async function loadList() {
+  const { tickets } = await api('/api/tickets' + (filter ? `?status=${filter}` : ''));
+  const list = document.getElementById('list');
+  list.replaceChildren(...(tickets.length ? tickets.map(t => {
+    const el = $('div', { className: 'ticket' + (t.ID === current ? ' on' : '') },
+      $('div', { className: 'who', textContent: t.CustomerName || t.CustomerEmail }),
+      $('div', { textContent: t.Subject }),
+      $('div', { className: 'meta', textContent: `T-${t.ID} · ${t.Status} · ${when(t.LastMessageDate)} · ${t.MessageCount} message${t.MessageCount === 1 ? '' : 's'}` }));
+    el.onclick = () => openTicket(t.ID);
+    return el;
+  }) : [$('div', { className: 'empty', textContent: 'Nothing here.' })]));
+}
+function splitNote(draft) {
+  const m = /^NOTE TO IndieTix:(.*)\n\s*\n([\s\S]*)$/.exec(draft || '');
+  return m ? { note: m[1].trim(), reply: m[2] } : { note: '', reply: draft || '' };
+}
+async function openTicket(id) {
+  current = id;
+  const { ticket, messages } = await api(`/api/tickets/${id}`);
+  const latestIn = [...messages].reverse().find(m => m.Direction === 'in');
+  const { note, reply } = splitNote(latestIn?.Draft);
+  const box = $('textarea', { value: reply, placeholder: latestIn?.Skipped ? `No draft: ${latestIn.Skipped.replace('_', ' ')}.` : 'No draft yet. Click Regenerate, or write a reply.' });
+  const status = $('span', { id: 'status', className: 'muted' });
+  const busy = (on, text = '') => { buttons.forEach(b => b.disabled = on); status.textContent = text; };
+  const act = (label, cls, fn) => { const b = $('button', { textContent: label, className: cls }); b.onclick = fn; return b; };
+  const buttons = [
+    act('Send reply', 'primary', async () => {
+      if (!box.value.trim()) { status.textContent = 'The reply is empty.'; return; }
+      busy(true, 'Sending...');
+      try { await api(`/api/tickets/${id}/send`, { body: box.value }); await openTicket(id); await loadList(); document.getElementById('status').textContent = `Sent to ${ticket.CustomerEmail}.`; }
+      catch (e) { busy(false, `Not sent: ${e.message}`); }
+    }),
+    act('Regenerate draft', '', async () => {
+      busy(true, 'Drafting... (up to a minute)');
+      try { const r = await api(`/api/tickets/${id}/redraft`, {}); if (r.draft) { const s = splitNote(r.draft); box.value = s.reply; noteEl.textContent = s.note ? `Note: ${s.note}` : ''; noteEl.hidden = !s.note; busy(false, 'New draft ready.'); } else busy(false, r.declined ? 'The model declined to draft this one.' : (r.error || 'No draft.')); }
+      catch (e) { busy(false, e.message); }
+    }),
+    ...['open', 'waiting', 'closed', 'spam'].filter(s => s !== ticket.Status).map(s => act(s === 'open' ? 'Reopen' : s === 'waiting' ? 'Mark waiting' : s === 'closed' ? 'Close' : 'Mark spam', '', async () => {
+      busy(true); try { await api(`/api/tickets/${id}/status`, { status: s }); await loadList(); await openTicket(id); } catch (e) { busy(false, e.message); }
+    }))
+  ];
+  const noteEl = $('div', { className: 'note', textContent: note ? `Note: ${note}` : '' }); noteEl.hidden = !note;
+  document.getElementById('detail').replaceChildren(
+    $('h2', { textContent: ticket.Subject }),
+    $('div', { className: 'muted', textContent: `T-${ticket.ID} · ${ticket.CustomerName ? ticket.CustomerName + ' · ' : ''}${ticket.CustomerEmail} · ${ticket.Status}` }),
+    $('br'),
+    ...messages.map(m => $('div', { className: 'msg' + (m.Direction === 'out' ? ' out' : '') },
+      $('div', { className: 'muted', textContent: `${m.Direction === 'out' ? `Our reply${m.SentBy ? ' (' + m.SentBy + ')' : ''}` : (m.FromName ? `${m.FromName} <${m.FromAddress}>` : m.FromAddress)} · ${when(m.CreatedDate)}${m.Skipped ? ' · no draft: ' + m.Skipped.replace('_', ' ') : ''}` }),
+      ...(m.Attachments?.length ? [$('div', { className: 'muted', textContent: 'Attachments: ' + m.Attachments.map(a => a.filename).join(', ') + ' (open the forwarded copy in Gmail to see them)' })] : []),
+      $('pre', { textContent: m.BodyText || '(no text)' }))),
+    $('h3', { textContent: 'Your reply' }),
+    $('div', { className: 'muted', textContent: `Sent from ${'support@indietix.net'} with their last email quoted below it. Nothing is sent until you click Send.` }),
+    noteEl, box, $('div', { className: 'row' }, ...buttons, status));
+  document.querySelectorAll('.ticket').forEach(el => el.classList.toggle('on', el.textContent.includes(`T-${id} `)));
+}
+document.getElementById('tabs').onclick = (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  filter = e.target.dataset.s;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b === e.target));
+  loadList().catch(err => alertBox(err));
+};
+const alertBox = (err) => document.getElementById('list').replaceChildren($('div', { className: 'empty', textContent: err.message }));
+loadList().catch(alertBox);
+</script>
+</body>
+</html>

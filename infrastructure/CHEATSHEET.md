@@ -99,6 +99,14 @@ Runs one SQL statement against a venue's database through the RDS Data API: no s
 
 Typing `'"'"'` for every quote gets old fast. For anything with quoted values, put the statement in a file and use `-f`. Limits: one statement per call, 1 MB of results, 45 seconds per statement.
 
+## Support inbox (`support.sh`)
+
+| Task | Command | Touches |
+|---|---|---|
+| Open the support inbox | `./support.sh` (opens your browser; Ctrl+C to stop) | reads; **Send** emails the customer |
+| Redraft from the command line | `aws lambda invoke --function-name indietix-prod-support-intake --payload '{"action":"draft","ticketId":12}' --cli-binary-format raw-in-base64-out /dev/stdout` | PROD (one draft, a few cents) |
+| List open tickets | `./db-sql.sh --db indietix --login indieTix/support/db 'SELECT "ID", "CustomerEmail", "Subject", "Status" FROM "SupportTicket" ORDER BY "LastMessageDate" DESC LIMIT 20'` | read-only |
+
 ## Tests
 
 | Command | What it does |
