@@ -42,7 +42,7 @@ async function insertPost({ channel = 'facebook', postType = 'campaign', status 
   const id = squareItemId || `item-${postCounter}`;
   const result = await client.query(
     `INSERT INTO "MarketingPost" ("SquareItemID", "Channel", "PostType", "ScheduledFor", "Status", "PostContent")
-     VALUES ($1, $2, $3, NOW(), $4, $5) RETURNING *`,
+     VALUES ($1, $2, $3, (NOW() AT TIME ZONE 'America/Chicago') - interval '1 minute', $4, $5) RETURNING *`,
     [id, channel, postType, status, JSON.stringify({ caption: 'Come see our movie!', imageUrl: null })]
   );
   return result.rows[0];
@@ -155,4 +155,14 @@ test('sendDuePosts: a digest post skips the pre-send Square check entirely (no i
   await sendDuePosts(client, 'send_due_posts_test');
 
   assert.equal(fetchCalled, false, 'a digest post is not a real Square item -- there is nothing to pre-check');
+});
+
+test('sendDuePosts: a post due later today in Chicago is not sent early', async () => {
+  __setCurrentClientConfigForTesting({});
+  await client.query(
+    `INSERT INTO "MarketingPost" ("SquareItemID", "Channel", "PostType", "ScheduledFor", "Status", "PostContent")
+     VALUES ('digest', 'facebook', 'digest', (NOW() AT TIME ZONE 'America/Chicago') + interval '2 hours', 'approved', '{}')`
+  );
+  const result = await sendDuePosts(client, 'send_due_posts_test');
+  assert.equal(result.sent, 0);
 });

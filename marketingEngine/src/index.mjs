@@ -588,6 +588,16 @@ const CAMPAIGN_TEMPLATES = [
   (ctx) => `${ctx.title} -- grab your tickets before it's gone.${ctx.descriptorLine} ${ctx.priceLine}${ctx.linkLine}`
 ];
 
+// A Square item description as caption text: trailing spaces and runs of
+// blank lines tidied, paragraphs kept.
+function cleanDescription(description) {
+  return (description || '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n').map(line => line.trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function buildTemplateCaption({ item, channel, clientConfig, scheduledFor, window, templateIndex, isLastChance }) {
   const title = item.item_data?.name || '(untitled)';
   const venueName = clientConfig.WEB_HEADER_COMPANY || 'us';
@@ -599,19 +609,25 @@ function buildTemplateCaption({ item, channel, clientConfig, scheduledFor, windo
   const nearestShowtime = (window.showtimes || []).find(s => s.descriptors.length > 0);
   const descriptorLine = nearestShowtime?.descriptors.length ? ` (${nearestShowtime.descriptors.join(', ')})` : '';
 
-  let text;
+  // The venue's own Square description, then price and ticket link. The
+  // canned headlines below are only for items with no description
+  // (2026-11-06, the user's call: start with the description).
+  let headline;
   if (isLastChance) {
     const sameDayShowtimes = (window.showtimes || []).filter(s =>
-      s.date.toDateString() === scheduledFor.toDateString() && s.date >= scheduledFor
+      chicagoDay(s.date) === chicagoDay(scheduledFor) && s.date >= scheduledFor
     );
     const timesText = sameDayShowtimes.length > 0
       ? sameDayShowtimes.map(formatShowtime).join(', ')
       : 'today';
-    text = `Last chance to see ${title} at ${venueName}! Only showing at ${timesText}.${linkLine}`;
+    headline = `Last chance to see ${title} at ${venueName}! Only showing at ${timesText}.`;
   } else {
     const templateFn = CAMPAIGN_TEMPLATES[templateIndex % CAMPAIGN_TEMPLATES.length];
-    text = templateFn({ title, venueName, priceLine, linkLine, descriptorLine });
+    headline = templateFn({ title, venueName, priceLine: '', linkLine: '', descriptorLine });
   }
+  const description = cleanDescription(item.item_data?.description);
+  const ticketLine = `${priceLine}${linkLine}`.trim();
+  const text = [description || headline.replace(/\s+/g, ' ').trim(), ticketLine].filter(Boolean).join('\n\n');
 
   const limit = CAPTION_CHAR_LIMITS[channel] || 2200;
   return text.length > limit ? text.slice(0, limit - 1) + '…' : text;
@@ -696,18 +712,22 @@ function CHANNEL_LABEL(channel) {
 //   { "offsets": [ { "daysFromAnchor": -28, "time": "11:30" }, ... ] }
 // =====================================================================
 
+// "N days from the first showtime at HH:MM" is counted on Chicago's
+// calendar and clock (2026-11-06: it used Lambda's UTC, so a 7 PM show
+// counted as the next day and "11:30" meant 5:30 AM Chicago). Returns the
+// real instants; upsertPlannedPosts stores them as Chicago wall-clock.
 function computePlannedPostSlots(phaseConfig, anchorDate, lastShowtimeDate) {
   const offsets = phaseConfig?.offsets;
   if (!Array.isArray(offsets)) return [];
 
+  const anchor = getChicagoDateParts(anchorDate);
   const slots = [];
   for (const offset of offsets) {
     if (typeof offset.daysFromAnchor !== 'number' || !offset.time) continue;
 
     const [hours, minutes] = offset.time.split(':').map(Number);
-    const scheduledFor = new Date(anchorDate);
-    scheduledFor.setDate(scheduledFor.getDate() + offset.daysFromAnchor);
-    scheduledFor.setHours(hours, minutes, 0, 0);
+    const day = addDaysToYMD(Number(anchor.year), Number(anchor.month), Number(anchor.day), offset.daysFromAnchor);
+    const scheduledFor = chicagoWallClockToDate(day.year, day.month, day.day, hours, minutes);
 
     // Bound during-the-run (positive-offset) slots by the item's actual
     // last showtime -- there's nothing left to promote after that.
@@ -730,7 +750,7 @@ async function upsertPlannedPosts(pgClient, squareItemId, channel, plannedPosts)
        VALUES ($1, $2, 'campaign', $3, 'draft', $4)
        ON CONFLICT ("SquareItemID", "Channel", "PostType", "ScheduledFor") DO NOTHING
        RETURNING "ID"`,
-      [squareItemId, channel, scheduledFor, JSON.stringify({ caption, imageUrl })]
+      [squareItemId, channel, formatChicagoWallClock(scheduledFor), JSON.stringify({ caption, imageUrl })]
     );
     inserted += result.rows.length;
   }
@@ -799,6 +819,22 @@ function getChicagoDateParts(date, withWeekday = false) {
   if (map.hour === '24') map.hour = '00'; // Intl quirk: midnight can come back as "24" with hour12:false
   return map;
 }
+
+// The instant at a Chicago wall-clock date and time (DST-aware).
+function chicagoWallClockToDate(year, month, day, hours, minutes) {
+  const guess = Date.UTC(year, month - 1, day, hours, minutes);
+  const p = getChicagoDateParts(new Date(guess));
+  const shownAsUtc = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
+  return new Date(guess + (guess - shownAsUtc));
+}
+
+// MarketingPost.ScheduledFor is Chicago wall-clock (no time zone).
+function formatChicagoWallClock(date) {
+  const p = getChicagoDateParts(date);
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:00`;
+}
+
+const chicagoDay = (date) => { const p = getChicagoDateParts(date); return `${p.year}-${p.month}-${p.day}`; };
 
 function formatChicagoTime12h(date) {
   return date.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' });
@@ -1335,7 +1371,7 @@ async function generatePlannedPosts(pgClient, clientConfig) {
         // remaining showtimes instead of generic copy. No new trigger,
         // just a different content path for whichever post happens to
         // land there (see design doc's "Also In Scope").
-        const isLastChance = scheduledFor.toDateString() === window.lastShowtimeDate.toDateString();
+        const isLastChance = chicagoDay(scheduledFor) === chicagoDay(window.lastShowtimeDate);
 
         const captionArgs = { item, channel: schedule.Channel, clientConfig, scheduledFor, window, isLastChance };
         const caption = schedule.UseAiCaptions
@@ -1722,7 +1758,7 @@ async function sendDuePosts(pgClient, clientId) {
   // per-channel decision about whether this poller is allowed to touch it.
   const dueResult = await pgClient.query(
     `SELECT * FROM "MarketingPost"
-     WHERE "Status" = 'approved' AND "ScheduledFor" <= CURRENT_TIMESTAMP
+     WHERE "Status" = 'approved' AND "ScheduledFor" <= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Chicago')
      ORDER BY "ScheduledFor" ASC`
   );
 
@@ -1818,6 +1854,8 @@ export {
   resolveItemImageUrl,
   getChicagoNow,
   getChicagoDateParts,
+  chicagoWallClockToDate,
+  formatChicagoWallClock,
   formatChicagoTime12h,
   addDaysToYMD,
   escapeSvgText,

@@ -97,3 +97,23 @@ test('buildTemplateCaption: respects each channel\'s character limit, truncating
   assert.equal(igCaption.length, 2200);
   assert.ok(igCaption.endsWith('…'));
 });
+
+test('buildTemplateCaption: starts with the Square description (no canned headline), then the ticket line', () => {
+  const item = {
+    id: 'jazz',
+    item_data: {
+      name: 'Jazz Sunday in the Spacement',
+      description: 'Come down to The Spacement and enjoy some fine local Jazz!   \r\n\r\n\r\n\r\nDoors 6:30, Show from 7-9pm\n\nLimited capacity so come early!  '
+    }
+  };
+  const caption = buildTemplateCaption({ item, channel: 'facebook', clientConfig: { WEB_HEADER_COMPANY: 'Liberty Hall', ECOMMERCE_SITE_URL: 'https://shop.example.com' }, scheduledFor: new Date(), window: { showtimes: [] }, templateIndex: 0, isLastChance: false });
+  const parts = caption.split('\n\n');
+  assert.deepEqual(parts.slice(0, 3), ['Come down to The Spacement and enjoy some fine local Jazz!', 'Doors 6:30, Show from 7-9pm', 'Limited capacity so come early!']);
+  assert.match(parts[3], /^Get tickets: https:\/\/shop\.example\.com/);
+  assert.equal(parts.length, 4);
+});
+
+test('buildTemplateCaption: no description still gives a clean single-paragraph caption', () => {
+  const caption = buildTemplateCaption({ item: { id: 'x', item_data: { name: 'House (1977)' } }, channel: 'instagram', clientConfig: { WEB_HEADER_COMPANY: 'Liberty Hall' }, scheduledFor: new Date(), window: { showtimes: [] }, templateIndex: 2, isLastChance: false });
+  assert.equal(caption, 'Now showing: House (1977).');
+});
