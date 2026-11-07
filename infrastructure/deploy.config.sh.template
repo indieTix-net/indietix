@@ -16,3 +16,9 @@ LEGAL_CLIENT_ID=""                      # Optional: the client ID whose Terms & 
 DB_CLUSTER=""                           # Aurora cluster identifier
 DB_NAME=""                              # default database (a venue's client ID)
 DB_SECRET=""                            # Secrets Manager name of the login, e.g. indieTix/rds/clients/<clientId>/credentials
+
+# Optional, for support.sh (the support inbox; see DEPLOY.md)
+SUPPORT_FUNCTION=""                     # e.g. indietix-prod-support-intake
+SUPPORT_DB_CLUSTER_ARN=""               # Aurora cluster ARN
+SUPPORT_DB_SECRET_ARN=""                # secret for the support_inbox login
+SUPPORT_BCC=""                          # optional: an address that gets a copy of every reply

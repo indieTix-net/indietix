@@ -96,6 +96,16 @@ aws cloudformation deploy --region us-east-1 --stack-name indietix-prod-api-edge
   --parameter-overrides EnvPrefix=indietix-prod ApiOriginDomain=<Function URL host>
 ```
 
+## Support inbox (`support/`, `support/template.yaml`)
+
+Email to support@indietix.net gets filed under a ticket and a drafted reply; a person reviews, edits and sends every reply from the local inbox (`./support.sh`). Nothing is sent automatically, and the existing forwarding of support@ to Gmail is unchanged.
+
+- **Stack** `indietix-prod-support` (us-east-2): Lambda `indietix-prod-support-intake` (code in `support/`), its log group (30 days), and SES receipt rule `indietix-prod-support-inbox` in the active rule set `tickets` (S3 copy to `indietix-net-inbound-mail/support/`, then the Lambda). The forward rule `indietix-net-forward` is not part of the stack.
+- **Data:** tables `SupportTicket` and `SupportMessage` in the `indietix` platform database (`support/schema.sql`, created by the `indietix` login), reached through the RDS Data API with the `support_inbox` login (secret `indieTix/support/db`; created by the `libertyhall` master, which can create roles). Tickets idle for 2 years are deleted by the Lambda.
+- **Drafts:** Claude Opus 5.5 with the public knowledge pack in `support/knowledge/`; the key is `indieTix/support/anthropic` (`{"api_key"}`), separate from any venue's.
+- **Deploy:** `sam build -t infrastructure/support/template.yaml && sam deploy` with the parameters in the template (production: `ReceiptRuleSet=tickets`, `InboundBucket=indietix-net-inbound-mail`, the cluster and the two secret ARNs).
+- **Inbox settings** in `deploy.config.sh`: `SUPPORT_FUNCTION`, `SUPPORT_DB_CLUSTER_ARN`, `SUPPORT_DB_SECRET_ARN`, optional `SUPPORT_BCC`.
+
 ## Venues' own web addresses (`<name>.indietix.net`)
 
 Each venue can pick a web address under one domain (QRScanner's `VENUE WEB ADDRESS`: Client Settings, or the signup form). Every name reaches the environment's one static site; QRScanner reserves a name by writing `venue-sites/<name>/` (`site.json`, `privacy.html`, `terms.html`) in the static site bucket, and sets the venue's `STATIC_WEBSITE_URL`. The login page reads `site.json` to fill in the Client ID. Teardown frees the name.

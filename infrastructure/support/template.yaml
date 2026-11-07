@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  IndieTix support inbox: email to the support address is stored (S3), filed
+  under a ticket in the platform database (the `indietix` database, via the
+  RDS Data API) and given a drafted reply by Claude. A person reviews, edits
+  and sends every reply from the local inbox (infrastructure/support.sh);
+  nothing is sent automatically. Adds one SES receipt rule to an existing
+  rule set; the existing forwarding rule is untouched. Code: support/.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-prod
+  SupportAddress:
+    Type: String
+    Default: support@indietix.net
+  ReceiptRuleSet:
+    Type: String
+    Description: The active SES receipt rule set (production's is "tickets")
+  AfterRule:
+    Type: String
+    Default: ''
+    Description: Put the new rule after this one ('' = first)
+  InboundBucket:
+    Type: String
+    Description: Bucket SES already writes inbound mail to (its policy must allow ses.amazonaws.com PutObject)
+  DbClusterArn:
+    Type: String
+  DbSecretArn:
+    Type: String
+    Description: Secret for the support_inbox database login
+  AnthropicSecretArn:
+    Type: String
+    Description: Secret holding {"api_key"} for drafting
+  NotifyEmail:
+    Type: String
+    Default: ''
+    Description: Optional address told about each new support email ('' = none)
+  NotifyFrom:
+    Type: String
+    Default: indietix@indietix.net
+
+Conditions:
+  HasAfterRule: !Not [!Equals [!Ref AfterRule, '']]
+
+Resources:
+  SupportIntakeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${EnvPrefix}-support-intake'
+      CodeUri: ../../support/
+      Handler: src/intake.handler
+      Runtime: nodejs22.x
+      Architectures: [x86_64]
+      MemorySize: 512
+      Timeout: 120
+      Environment:
+        Variables:
+          DB_CLUSTER_ARN: !Ref DbClusterArn
+          DB_SECRET_ARN: !Ref DbSecretArn
+          DB_NAME: indietix
+          ANTHROPIC_SECRET_ID: !Ref AnthropicSecretArn
+          INBOUND_BUCKET: !Ref InboundBucket
+          INBOUND_PREFIX: support/
+          NOTIFY_EMAIL: !Ref NotifyEmail
+          NOTIFY_FROM: !Ref NotifyFrom
+      LoggingConfig:
+        LogGroup: !Ref SupportIntakeLogs
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: rds-data:ExecuteStatement
+              Resource: !Ref DbClusterArn
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: [!Ref DbSecretArn, !Ref AnthropicSecretArn]
+            - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub 'arn:aws:s3:::${InboundBucket}/support/*'
+            - Effect: Allow
+              Action: ses:SendEmail
+              Resource: '*'
+              Condition:
+                StringEquals: { 'ses:FromAddress': !Ref NotifyFrom }
+
+  SupportIntakeLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${EnvPrefix}-support-intake'
+      RetentionInDays: 30
+
+  SesInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SupportIntakeFunction
+      Action: lambda:InvokeFunction
+      Principal: ses.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  SupportReceiptRule:
+    Type: AWS::SES::ReceiptRule
+    DependsOn: SesInvokePermission
+    Properties:
+      RuleSetName: !Ref ReceiptRuleSet
+      After: !If [HasAfterRule, !Ref AfterRule, !Ref AWS::NoValue]
+      Rule:
+        Name: !Sub '${EnvPrefix}-support-inbox'
+        Enabled: true
+        ScanEnabled: true
+        TlsPolicy: Require
+        Recipients: [!Ref SupportAddress]
+        Actions:
+          - S3Action:
+              BucketName: !Ref InboundBucket
+              ObjectKeyPrefix: support/
+          - LambdaAction:
+              FunctionArn: !GetAtt SupportIntakeFunction.Arn
+              InvocationType: Event
+
+Outputs:
+  FunctionName:
+    Value: !Ref SupportIntakeFunction
