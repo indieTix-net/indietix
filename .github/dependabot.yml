@@ -1,0 +1,13 @@
+# Keeps the GitHub Actions used by CI (pinned to exact commits) up to date.
+# npm packages aren't bumped automatically: several package.json files are
+# production Lambda layers, and a bump here would drift from what's
+# deployed. Dependabot security alerts (a repository setting) still flag
+# vulnerable packages.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14

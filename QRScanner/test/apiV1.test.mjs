@@ -64,7 +64,8 @@ test('API keys: the client login creates a key; the full key is returned once an
   assert.match(key, /^itk_TESTCLIENT123_[A-Za-z0-9_-]{40,}$/);
   const { json } = await ctx.request('GET', '/api/api-keys', { token: ctx.clientToken });
   assert.equal(json.keys.length, 1);
-  assert.ok(!JSON.stringify(json).includes(key.split('_').pop()), 'secret must never be listed');
+  // The secret itself can contain '_', so take everything after the prefix.
+  assert.ok(!JSON.stringify(json).includes(key.slice('itk_TESTCLIENT123_'.length)), 'secret must never be listed');
   const row = await ctx.pgClient.query(`SELECT "KeyHash" FROM "ApiKey"`);
   assert.equal(row.rows[0].KeyHash.length, 64);
 });

@@ -65,7 +65,7 @@ See [`infrastructure/README.md`](./infrastructure/README.md) for the full walkth
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Contributors sign a one-time [Contributor License Agreement](./CLA.md).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Contributors sign a one-time [Contributor License Agreement](./CLA.md). Found a security problem? Please report it privately; see [`SECURITY.md`](./SECURITY.md).
 
 ## License
 

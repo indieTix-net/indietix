@@ -38,7 +38,8 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
       - id: filter
         if: github.event_name != 'workflow_dispatch'
-        uses: dorny/paths-filter@v3
+        # Third-party action: pinned to an exact commit (v3.0.4).
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad
         with:
           filters: |
             QRScanner:
@@ -156,3 +157,18 @@ jobs:
       - name: Run ${{ matrix.suite }} test suite
         working-directory: ${{ matrix.suite }}
         run: npm test
+
+  # The one check branch protection requires: which suites run varies by
+  # change, so the individual test jobs can't be required by name.
+  ci-ok:
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          TEST: ${{ needs.test.result }}
+        run: |
+          echo "changes: $CHANGES, test: $TEST"
+          [ "$CHANGES" = "success" ] && { [ "$TEST" = "success" ] || [ "$TEST" = "skipped" ]; }
