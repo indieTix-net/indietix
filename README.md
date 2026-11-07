@@ -70,3 +70,5 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Contributors sign a one-time [Contri
 ## License
 
 AGPL-3.0-or-later — see [`LICENSE`](./LICENSE). Chosen deliberately: IndieTix's model is free self-hosted code plus optional paid hosting/support, and AGPL keeps a hosted competitor honest about sharing improvements back, the way a permissive license wouldn't.
+
+**Self-hosting comes with no warranty or service commitment.** If you run IndieTix yourself, it's provided as is, as the license says: no guarantee of uptime or availability, that it's error-free, or that it fits your purpose, and no support. Running, securing, backing up and updating your copy is up to you. The hosted service's commitments are in its [Terms of Service](./QRScanner/src/public/indietix-terms.html), which don't apply to self-hosted copies.
