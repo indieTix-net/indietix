@@ -38,8 +38,8 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
       - id: filter
         if: github.event_name != 'workflow_dispatch'
-        # Third-party action: pinned to an exact commit (v3.0.4).
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
+        # Third-party action: pinned to an exact commit; Dependabot keeps it current.
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
             QRScanner:
