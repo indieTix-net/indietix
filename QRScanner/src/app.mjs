@@ -2388,6 +2388,7 @@ const CLIENT_SETTINGS_KEYS = [
   'TICKET_FILENAME', 'SENDER_EMAIL', 'OWNER_BCC_EMAIL', 'ONE_PER_EMAIL_ITEMS',
   'LEGAL_NAME', 'LEGAL_SHORT_NAME', 'LEGAL_ADDRESS', 'LEGAL_PHONE', 'LEGAL_EMAIL',
   'LEGAL_STATE', 'LEGAL_COURT_COUNTY', 'SALES_TAX_RATE', 'SCREEN_NUMBERS',
+  'MOVIE_TICKET_TYPES', 'EVENT_TICKET_TYPES', 'MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR',
   'META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID', 'META_IG_BUSINESS_ID', 'TIKTOK_ACCESS_TOKEN',
   'TIKTOK_REFRESH_TOKEN', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_PRIVACY_LEVEL'
 ];
@@ -2432,6 +2433,19 @@ function validateReportSettings(configuration) {
     for (const [text, screen] of Object.entries(screens)) {
       if (!text.trim() || text.length > 100) return 'Each screen number needs the venue text it matches (up to 100 characters)';
       if (!/^[0-9]{1,3}$/.test(String(screen))) return `Screen number for "${text}" must be a whole number`;
+    }
+  }
+  // Add Movie / Add Event ticket types and distributors (SQUARE TICKET ITEM SETUP)
+  for (const [key, label] of [['MOVIE_TICKET_TYPES', 'Movie'], ['EVENT_TICKET_TYPES', 'Event']]) {
+    const value = configuration[key];
+    const blank = isBlankSetting(value) || (Array.isArray(value) && value.length === 0);
+    if (!blank && !parseTicketTypes(value)) {
+      return `${label} ticket types need a name and a price like 12.50 on each row (up to 20, no repeated names)`;
+    }
+  }
+  for (const key of ['MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR']) {
+    if (configuration[key] !== undefined && configuration[key] !== null && String(configuration[key]).length > 255) {
+      return 'A distributor name can be up to 255 characters';
     }
   }
   return null;
@@ -5094,6 +5108,170 @@ async function findOrCreateSquareCategory(accessToken, name) {
 }
 // ---- END SQUARE CATEGORY FIND-OR-CREATE ----
 
+// ---- SQUARE TICKET ITEM SETUP ----
+// What Add Movie / Add Event put on a Square item, per venue:
+// - The four catalog custom attributes getSquareOrders and the reports read
+//   (UseQRCode is the switch: an item without it never makes tickets). A new
+//   venue's Square account has none of them, so missing ones are created the
+//   first time they're needed, with Movie/Live and this venue's distributors
+//   as the choices. An existing definition is never changed; a missing choice
+//   on one comes back as a warning so staff can set it by hand. Names follow
+//   the venue's USE_QR_CODE / EVENT_TYPE / DISTRIBUTOR_NAME, like
+//   getSquareOrders.
+// - The ticket types (variations) and prices: MOVIE_TICKET_TYPES /
+//   EVENT_TICKET_TYPES (Client Settings, JSON [{"name","price"}]), else the
+//   defaults below.
+// - The Distributor choice: MOVIE_DISTRIBUTOR / EVENT_DISTRIBUTOR, else the
+//   venue's name.
+// Items no longer send `channels`: Square documents it as read-only, and the
+// IDs that were here belonged to one venue's account.
+const DEFAULT_TICKET_TYPES = {
+  movie: [{ name: 'Child', price: '10.00' }, { name: 'Adult', price: '12.50' }, { name: 'Senior', price: '11.00' }],
+  event: [{ name: 'Regular', price: '0.00' }]
+};
+const TICKET_EVENT_TYPE_CHOICES = { movie: 'Movie', event: 'Live' };
+const TICKET_PRICE_PATTERN = /^\d{1,5}(\.\d{1,2})?$/;
+
+// A list of {name, price} (price in dollars, as text), or null if the value
+// isn't a usable list.
+function parseTicketTypes(value) {
+  let list = value;
+  if (typeof list === 'string') {
+    if (!list.trim()) return null;
+    try { list = JSON.parse(list); } catch { return null; }
+  }
+  if (!Array.isArray(list) || list.length === 0 || list.length > 20) return null;
+  const seen = new Set();
+  const types = [];
+  for (const entry of list) {
+    const name = String(entry?.name ?? '').trim();
+    const price = String(entry?.price ?? '').trim();
+    if (!name || name.length > 255 || seen.has(name.toLowerCase()) || !TICKET_PRICE_PATTERN.test(price)) return null;
+    seen.add(name.toLowerCase());
+    types.push({ name, price });
+  }
+  return types;
+}
+
+function ticketItemSettings(config, kind) {
+  const venueName = String(config.WEB_HEADER_COMPANY || '').trim() || 'IndieTix';
+  const movieDistributor = String(config.MOVIE_DISTRIBUTOR || '').trim() || venueName;
+  const eventDistributor = String(config.EVENT_DISTRIBUTOR || '').trim() || venueName;
+  return {
+    names: {
+      useQRCode: config.USE_QR_CODE || 'UseQRCode',
+      onlineDisplayName: 'Online Display Name',
+      eventType: config.EVENT_TYPE || 'EventType',
+      distributor: config.DISTRIBUTOR_NAME || 'Distributor'
+    },
+    eventTypeChoice: TICKET_EVENT_TYPE_CHOICES[kind],
+    distributorChoice: kind === 'movie' ? movieDistributor : eventDistributor,
+    distributorChoices: [...new Set([movieDistributor, eventDistributor])],
+    ticketTypes: parseTicketTypes(config[kind === 'movie' ? 'MOVIE_TICKET_TYPES' : 'EVENT_TICKET_TYPES']) || DEFAULT_TICKET_TYPES[kind]
+  };
+}
+
+function ticketVariations(itemId, ticketTypes, locationId) {
+  return ticketTypes.map((ticketType, index) => ({
+    type: 'ITEM_VARIATION',
+    id: `#ticket_variation_${index}`,
+    item_variation_data: {
+      item_id: itemId,
+      name: ticketType.name,
+      pricing_type: 'FIXED_PRICING',
+      price_money: { amount: Math.round(Number(ticketType.price) * 100), currency: 'USD' },
+      track_inventory: true,
+      inventory_alert_type: 'LOW_QUANTITY',
+      location_overrides: [{ location_id: locationId, track_inventory: true, inventory_alert_type: 'LOW_QUANTITY' }]
+    }
+  }));
+}
+
+// Returns { useQRCodeKey, onlineDisplayNameKey, eventTypeKey,
+// eventTypeSelectionUid, distributorKey, distributorSelectionUid, warnings },
+// or { error } when UseQRCode itself can't be found or created (an item
+// without it would sell but never make tickets, so don't create one).
+async function ensureTicketAttributes(accessToken, settings) {
+  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+  const definitions = [];
+  let cursor;
+  do {
+    const url = SQUARE_CATALOG_LIST_API_URL + '?types=CUSTOM_ATTRIBUTE_DEFINITION' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+    const response = await fetch(url, { method: 'GET', headers });
+    if (!response.ok) {
+      console.error(`Failed to list Square custom attributes: ${response.status}`);
+      return { error: 'Could not read the custom attributes from Square' };
+    }
+    const data = await response.json();
+    definitions.push(...(data.objects || []));
+    cursor = data.cursor;
+  } while (cursor);
+
+  const specs = [
+    { role: 'useQRCode', type: 'BOOLEAN', key: 'indietix_use_qr_code' },
+    { role: 'onlineDisplayName', type: 'STRING', key: 'indietix_online_display_name' },
+    { role: 'eventType', type: 'SELECTION', key: 'indietix_event_type', choices: Object.values(TICKET_EVENT_TYPE_CHOICES), wanted: settings.eventTypeChoice },
+    { role: 'distributor', type: 'SELECTION', key: 'indietix_distributor', choices: settings.distributorChoices, wanted: settings.distributorChoice }
+  ];
+  const result = { warnings: [] };
+  for (const spec of specs) {
+    const name = settings.names[spec.role];
+    let definition = definitions.find(d => d.custom_attribute_definition_data?.name === name);
+    if (!definition) {
+      definition = await createTicketAttribute(headers, name, spec);
+      if (!definition) {
+        if (spec.role === 'useQRCode') return { error: `Could not create the ${name} custom attribute in Square` };
+        result.warnings.push(`The ${name} custom attribute couldn't be created in Square, so it isn't set on this item.`);
+        continue;
+      }
+    }
+    const data = definition.custom_attribute_definition_data;
+    result[`${spec.role}Key`] = data.key;
+    if (spec.choices) {
+      const selection = (data.selection_config?.allowed_selections || []).find(s => s.name === spec.wanted);
+      if (selection) {
+        result[`${spec.role}SelectionUid`] = selection.uid;
+      } else {
+        result.warnings.push(`"${spec.wanted}" isn't a choice on the ${name} attribute in Square, so it isn't set on this item. Add the choice in Square and set it on the item.`);
+      }
+    }
+  }
+  return result;
+}
+
+async function createTicketAttribute(headers, name, spec) {
+  const definitionData = {
+    name,
+    type: spec.type,
+    key: spec.key,
+    allowed_object_types: ['ITEM', 'ITEM_VARIATION'],
+    seller_visibility: 'SELLER_VISIBILITY_READ_WRITE_VALUES',
+    app_visibility: 'APP_VISIBILITY_READ_WRITE_VALUES'
+  };
+  if (spec.type === 'SELECTION') {
+    definitionData.selection_config = {
+      max_allowed_selections: 1,
+      allowed_selections: spec.choices.map((choice, index) => ({ uid: `#choice_${index}`, name: choice }))
+    };
+  }
+  const response = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      idempotency_key: crypto.randomUUID(),
+      object: { type: 'CUSTOM_ATTRIBUTE_DEFINITION', id: `#${spec.key}`, custom_attribute_definition_data: definitionData }
+    })
+  });
+  if (!response.ok) {
+    console.error(`Failed to create the ${name} custom attribute: ${await response.text()}`);
+    return null;
+  }
+  const created = await response.json();
+  console.log(`Created the ${name} custom attribute: ${created.catalog_object?.id}`);
+  return created.catalog_object?.custom_attribute_definition_data ? created.catalog_object : null;
+}
+// ---- END SQUARE TICKET ITEM SETUP ----
+
 // UPDATED ENDPOINT for app.mjs
 // This replaces the existing app.post('/api/square/create-movie-item', ...) endpoint
 
@@ -5180,65 +5358,15 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       return res.status(500).json({ error: 'Could not find or create the Cinema category in Square' });
     }
    
-    // 3. Get custom attribute definitions
-    const customAttrResponse = await fetch(SQUARE_CATALOG_LIST_API_URL+'?types=CUSTOM_ATTRIBUTE_DEFINITION', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const customAttrData = await customAttrResponse.json();
-    console.log('Custom attributes response:', JSON.stringify(customAttrData, null, 2));
-
-    let useQRCodeDefId = null;
-let useQRCodeKey = null;  // ADD
-let onlineDisplayNameDefId = null;
-let onlineDisplayNameKey = null;  // ADD
-let eventTypeDefId = null;
-let eventTypeKey = null;  // ADD
-let eventTypeMovieSelectionUid = null;
-let distributorDefId = null;
-let distributorKey = null;  // ADD
-let distributorLibertyHallSelectionUid = null;
-
-if (customAttrData.objects) {
-  for (const def of customAttrData.objects) {
-    if (def.custom_attribute_definition_data) {
-      const attrName = def.custom_attribute_definition_data.name;
-      const attrData = def.custom_attribute_definition_data;
-      
-      if (attrName === 'UseQRCode') {
-        useQRCodeDefId = def.id;
-        useQRCodeKey = attrData.key;  // ADD
-      } else if (attrName === 'Online Display Name') {
-        onlineDisplayNameDefId = def.id;
-        onlineDisplayNameKey = attrData.key;  // ADD
-      } else if (attrName === 'EventType') {
-        eventTypeDefId = def.id;
-        eventTypeKey = attrData.key;  // ADD
-        const selections = attrData.selection_config?.allowed_selections || [];
-        for (const sel of selections) {
-          if (sel.name === 'Movie') {
-            eventTypeMovieSelectionUid = sel.uid;
-            break;
-          }
-        }
-      } else if (attrName === 'Distributor') {
-        distributorDefId = def.id;
-        distributorKey = attrData.key;  // ADD
-        const selections = attrData.selection_config?.allowed_selections || [];
-        for (const sel of selections) {
-          if (sel.name === 'Liberty Hall Cinema') {
-            distributorLibertyHallSelectionUid = sel.uid;
-            break;
-          }
-        }
-      } 
+    // 3. Find (or create) the ticket custom attributes -- see SQUARE TICKET ITEM SETUP
+    const ticketSettings = ticketItemSettings(globalConfig, 'movie');
+    const ticketAttributes = await ensureTicketAttributes(accessToken, ticketSettings);
+    if (ticketAttributes.error) {
+      return res.status(500).json({ error: ticketAttributes.error });
     }
-  }
-}
+    const { useQRCodeKey, onlineDisplayNameKey, eventTypeKey, distributorKey, distributorSelectionUid } = ticketAttributes;
+    const eventTypeMovieSelectionUid = ticketAttributes.eventTypeSelectionUid;
+    const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
     
     // 4. Create modifier list with all showtimes
     // Each showtime becomes a modifier option in the list
@@ -5399,63 +5527,7 @@ if (customAttrData.objects) {
           max_selected_modifiers: 1,
           enabled: true
         }],
-        variations: [
-          {
-            type: 'ITEM_VARIATION',
-            id: '#child_variation',
-            item_variation_data: {
-              item_id: '#movie_item',
-              name: 'Child',
-              pricing_type: 'FIXED_PRICING',
-              price_money: { amount: 1000, currency: 'USD' },
-              track_inventory: true,
-              inventory_alert_type: 'LOW_QUANTITY',
-              location_overrides: [{
-                location_id: locationId,
-                track_inventory: true,
-                inventory_alert_type: 'LOW_QUANTITY'
-              }]
-            }
-          },
-          {
-            type: 'ITEM_VARIATION',
-            id: '#adult_variation',
-            item_variation_data: {
-              item_id: '#movie_item',
-              name: 'Adult',
-              pricing_type: 'FIXED_PRICING',
-              price_money: { amount: 1250, currency: 'USD' },
-              track_inventory: true,
-              inventory_alert_type: 'LOW_QUANTITY',
-              location_overrides: [{
-                location_id: locationId,
-                track_inventory: true,
-                inventory_alert_type: 'LOW_QUANTITY'
-              }]
-            }
-          },
-          {
-            type: 'ITEM_VARIATION',
-            id: '#senior_variation',
-            item_variation_data: {
-              item_id: '#movie_item',
-              name: 'Senior',
-              pricing_type: 'FIXED_PRICING',
-              price_money: { amount: 1100, currency: 'USD' },
-              track_inventory: true,
-              inventory_alert_type: 'LOW_QUANTITY',
-              location_overrides: [{
-                location_id: locationId,
-                track_inventory: true,
-                inventory_alert_type: 'LOW_QUANTITY'
-              }]
-            }
-          }
-        ],
-        channels: [
-          "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
-          "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
-        ]
+        variations: ticketVariations('#movie_item', ticketSettings.ticketTypes, locationId)
       },
       present_at_location_ids: [locationId]
     };
@@ -5486,9 +5558,9 @@ if (eventTypeKey && eventTypeMovieSelectionUid) {
   };
 }
 
-if (distributorKey && distributorLibertyHallSelectionUid) {
+if (distributorKey && distributorSelectionUid) {
   itemObject.custom_attribute_values[distributorKey] = {
-    selection_uid_values: [distributorLibertyHallSelectionUid]
+    selection_uid_values: [distributorSelectionUid]
   };
 }
 
@@ -5688,7 +5760,7 @@ if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALE
 res.json({
   success: true,
   itemId: createItemData.catalog_object.id,
-  message: `Successfully created "${movieData.title}" in Square with ${movieData.showtimes.length} showtimes.${calendarNote}`,
+  message: `Successfully created "${movieData.title}" in Square with ${movieData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}`,
   squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
 });
     
@@ -5765,65 +5837,15 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       return res.status(500).json({ error: 'Could not find or create the Events category in Square' });
     }
    
-    // 3. Get custom attribute definitions
-    const customAttrResponse = await fetch(SQUARE_CATALOG_LIST_API_URL+'?types=CUSTOM_ATTRIBUTE_DEFINITION', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const customAttrData = await customAttrResponse.json();
-    console.log('Custom attributes response:', JSON.stringify(customAttrData, null, 2));
-
-    let useQRCodeDefId = null;
-    let useQRCodeKey = null;
-    let onlineDisplayNameDefId = null;
-    let onlineDisplayNameKey = null;
-    let eventTypeDefId = null;
-    let eventTypeKey = null;
-    let eventTypeEventSelectionUid = null;
-    let distributorDefId = null;
-    let distributorKey = null;
-    let distributorLibertyHallSelectionUid = null;
-
-    if (customAttrData.objects) {
-      for (const def of customAttrData.objects) {
-        if (def.custom_attribute_definition_data) {
-          const attrName = def.custom_attribute_definition_data.name;
-          const attrData = def.custom_attribute_definition_data;
-          
-          if (attrName === 'UseQRCode') {
-            useQRCodeDefId = def.id;
-            useQRCodeKey = attrData.key;
-          } else if (attrName === 'Online Display Name') {
-            onlineDisplayNameDefId = def.id;
-            onlineDisplayNameKey = attrData.key;
-          } else if (attrName === 'EventType') {
-            eventTypeDefId = def.id;
-            eventTypeKey = attrData.key;
-            const selections = attrData.selection_config?.allowed_selections || [];
-            for (const sel of selections) {
-              if (sel.name === 'Live') {
-                eventTypeEventSelectionUid = sel.uid;
-                break;
-              }
-            }
-          } else if (attrName === 'Distributor') {
-            distributorDefId = def.id;
-            distributorKey = attrData.key;
-            const selections = attrData.selection_config?.allowed_selections || [];
-            for (const sel of selections) {
-              if (sel.name === 'Liberty Hall Events') {
-                distributorLibertyHallSelectionUid = sel.uid;
-                break;
-              }
-            }
-          } 
-        }
-      }
+    // 3. Find (or create) the ticket custom attributes -- see SQUARE TICKET ITEM SETUP
+    const ticketSettings = ticketItemSettings(globalConfig, 'event');
+    const ticketAttributes = await ensureTicketAttributes(accessToken, ticketSettings);
+    if (ticketAttributes.error) {
+      return res.status(500).json({ error: ticketAttributes.error });
     }
+    const { useQRCodeKey, onlineDisplayNameKey, eventTypeKey, distributorKey, distributorSelectionUid } = ticketAttributes;
+    const eventTypeEventSelectionUid = ticketAttributes.eventTypeSelectionUid;
+    const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
     
     // 4. Create modifier list with all showtimes (SAME AS MOVIE)
     const modifiers = eventData.showtimes.map((showtime, index) => {
@@ -5981,29 +6003,7 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
           max_selected_modifiers: 1,
           enabled: true
         }],
-        variations: [
-          {
-            type: 'ITEM_VARIATION',
-            id: '#event_variation',
-            item_variation_data: {
-              item_id: '#event_item',
-              name: 'Regular',
-              pricing_type: 'FIXED_PRICING',
-              price_money: { amount: 0, currency: 'USD' },
-              track_inventory: true,
-              inventory_alert_type: 'LOW_QUANTITY',
-              location_overrides: [{
-                location_id: locationId,
-                track_inventory: true,
-                inventory_alert_type: 'LOW_QUANTITY'
-              }]
-            }
-          }
-        ],
-        channels: [
-          "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
-          "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
-        ]
+        variations: ticketVariations('#event_item', ticketSettings.ticketTypes, locationId)
       },
       present_at_location_ids: [locationId]
     };
@@ -6035,9 +6035,9 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       };
     }
 
-    if (distributorKey && distributorLibertyHallSelectionUid) {
+    if (distributorKey && distributorSelectionUid) {
       itemObject.custom_attribute_values[distributorKey] = {
-        selection_uid_values: [distributorLibertyHallSelectionUid]
+        selection_uid_values: [distributorSelectionUid]
       };
     }
 
@@ -6047,7 +6047,7 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     console.log(`   - UseQRCode key: ${useQRCodeKey || 'NOT SET'}`);
     console.log(`   - OnlineDisplayName key: ${onlineDisplayNameKey || 'NOT SET'}`);
     console.log(`   - EventType key: ${eventTypeKey || 'NOT SET'} (UID: ${eventTypeEventSelectionUid || 'NOT SET'})`);
-    console.log(`   - Distributor key: ${distributorKey || 'NOT SET'} (UID: ${distributorLibertyHallSelectionUid || 'NOT SET'})`);
+    console.log(`   - Distributor key: ${distributorKey || 'NOT SET'} (UID: ${distributorSelectionUid || 'NOT SET'})`);
     console.log('=== END CUSTOM ATTRIBUTES ===');
 
     const createItemResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
@@ -6258,7 +6258,7 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     res.json({
       success: true,
       itemId: createItemData.catalog_object.id,
-      message: `Successfully created "${eventData.title}" in Square with ${eventData.showtimes.length} showtimes.${calendarNote}`,
+      message: `Successfully created "${eventData.title}" in Square with ${eventData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}`,
       squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
     });
     

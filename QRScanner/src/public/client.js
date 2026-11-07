@@ -242,6 +242,48 @@ document.addEventListener('DOMContentLoaded', function() {
         return screens;
     }
 
+    // MOVIE_TICKET_TYPES / EVENT_TICKET_TYPES management: rows of [name, price]
+    const ticketTypeLists = {
+        movie: document.getElementById('movie-ticket-types-list'),
+        event: document.getElementById('event-ticket-types-list')
+    };
+    document.getElementById('add-movie-ticket-type-btn').addEventListener('click', () => addTicketTypeRow('movie', '', ''));
+    document.getElementById('add-event-ticket-type-btn').addEventListener('click', () => addTicketTypeRow('event', '', ''));
+
+    function addTicketTypeRow(kind, name, price) {
+        const row = document.createElement('div');
+        row.className = 'ticket-type-row';
+        row.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 8px;';
+        row.innerHTML = `
+            <input type="text" class="form-control ticket-type-name" placeholder="Ticket type, e.g. Adult" maxlength="255" style="flex: 3;">
+            <input type="number" class="form-control ticket-type-price" placeholder="Price" min="0" step="0.01" style="flex: 1;">
+            <button type="button" class="btn btn-sm btn-danger">Remove</button>`;
+        row.querySelector('.ticket-type-name').value = name;
+        row.querySelector('.ticket-type-price').value = price;
+        row.querySelector('button').addEventListener('click', () => row.remove());
+        ticketTypeLists[kind].appendChild(row);
+    }
+
+    function setTicketTypes(kind, value) {
+        ticketTypeLists[kind].innerHTML = '';
+        let list = value;
+        if (typeof list === 'string') {
+            try { list = list.trim() ? JSON.parse(list) : []; } catch { list = []; }
+        }
+        (Array.isArray(list) ? list : []).forEach(t => addTicketTypeRow(kind, t?.name || '', t?.price || ''));
+    }
+
+    // Blank rows are skipped; none at all saves blank (the defaults).
+    function getTicketTypes(kind) {
+        const types = [];
+        ticketTypeLists[kind].querySelectorAll('.ticket-type-row').forEach(row => {
+            const name = row.querySelector('.ticket-type-name').value.trim();
+            const price = row.querySelector('.ticket-type-price').value.trim();
+            if (name || price) types.push({ name, price: price === '' ? '' : Number(price).toFixed(2) });
+        });
+        return types.length ? JSON.stringify(types) : '';
+    }
+
     // EVENT_DESCRIPTORS management
     let eventDescriptors = [];
     const newDescriptorInput = document.getElementById('new-descriptor');
@@ -780,6 +822,10 @@ document.addEventListener('DOMContentLoaded', function() {
         eborTheatreNoInput.value = config.EBOR_THEATRE_NO || '';
         document.getElementById('sales-tax-rate').value = config.SALES_TAX_RATE || '';
         setScreenNumbers(config.SCREEN_NUMBERS);
+        setTicketTypes('movie', config.MOVIE_TICKET_TYPES);
+        setTicketTypes('event', config.EVENT_TICKET_TYPES);
+        document.getElementById('movie-distributor').value = config.MOVIE_DISTRIBUTOR || '';
+        document.getElementById('event-distributor').value = config.EVENT_DISTRIBUTOR || '';
         ticketOrientationInput.value = config.TICKET_ORIENTATION || '';
         ticketFilenameInput.value = config.TICKET_FILENAME || '';
         modifierNameFilterInput.value = config.MODIFIER_NAME_FILTER || '';
@@ -872,6 +918,10 @@ document.addEventListener('DOMContentLoaded', function() {
         config.EBOR_THEATRE_NO = eborTheatreNoInput.value.trim();
         config.SALES_TAX_RATE = document.getElementById('sales-tax-rate').value.trim();
         config.SCREEN_NUMBERS = getScreenNumbers();
+        config.MOVIE_TICKET_TYPES = getTicketTypes('movie');
+        config.EVENT_TICKET_TYPES = getTicketTypes('event');
+        config.MOVIE_DISTRIBUTOR = document.getElementById('movie-distributor').value.trim();
+        config.EVENT_DISTRIBUTOR = document.getElementById('event-distributor').value.trim();
         config.TICKET_ORIENTATION = ticketOrientationInput.value.trim();
         config.TICKET_FILENAME = ticketFilenameInput.value.trim();
         config.MODIFIER_NAME_FILTER = modifierNameFilterInput.value.trim();

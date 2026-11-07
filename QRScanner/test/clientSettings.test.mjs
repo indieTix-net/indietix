@@ -225,7 +225,8 @@ test('PUT /api/client: every USER_DEFINABLE key from clientSetup-Teardown is acc
   const keys = [...list.matchAll(/"([A-Z0-9_]+)"/g)].map((m) => m[1]);
   assert.ok(keys.length > 50, 'should have found the onboarding list');
   // Keys the save route validates get a well-formed value; the rest just 'x'.
-  const wellFormed = { SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2' } };
+  const ticketTypes = JSON.stringify([{ name: 'Adult', price: '12.50' }]);
+  const wellFormed = { SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2' }, MOVIE_TICKET_TYPES: ticketTypes, EVENT_TICKET_TYPES: ticketTypes };
   const configuration = Object.fromEntries(keys.map((key) => [key, wellFormed[key] ?? 'x']));
   const { status, json } = await ctx.request('PUT', '/api/client', {
     token: ctx.clientToken,
@@ -267,4 +268,26 @@ test('PUT /api/client: a malformed SALES_TAX_RATE or SCREEN_NUMBERS is rejected 
     const { status } = await saveReportSettings(configuration);
     assert.equal(status, 400, JSON.stringify(configuration));
   }
+});
+
+// ---- Square ticket item settings: ticket types and distributors ----
+
+test('PUT /api/client: ticket types must each have a name and a price', async () => {
+  const save = (configuration) => ctx.request('PUT', '/api/client', {
+    token: ctx.clientToken,
+    body: { contactName: 'New Contact', clientEmail: 'new-contact@example.com', configuration }
+  });
+  for (const bad of [
+    JSON.stringify([{ name: 'Adult', price: '' }]),
+    JSON.stringify([{ name: '', price: '12.50' }]),
+    JSON.stringify([{ name: 'Adult', price: '12.505' }]),
+    JSON.stringify([{ name: 'Adult', price: '10' }, { name: 'adult', price: '11' }]),
+    'not json'
+  ]) {
+    const { status, json } = await save({ MOVIE_TICKET_TYPES: bad });
+    assert.equal(status, 400, bad);
+    assert.match(json.message, /Movie ticket types/);
+  }
+  assert.equal((await save({ EVENT_TICKET_TYPES: '[{"name":"VIP","price":"40"}]', MOVIE_TICKET_TYPES: '', MOVIE_DISTRIBUTOR: 'Janus Films' })).status, 200);
+  assert.equal((await save({ EVENT_DISTRIBUTOR: 'x'.repeat(256) })).status, 400);
 });

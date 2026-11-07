@@ -1090,6 +1090,10 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       "EVENT_LOCATIONS": ["Main Auditorium"],
       "SALES_TAX_RATE": "",                                   // optional: percent included in ticket prices, split out of Gross in box-office reports (blank = no tax)
       "SCREEN_NUMBERS": {},                                   // optional: {"text in a ticket's venue": "screen number"} for box-office reports; no match = screen 1
+      "MOVIE_TICKET_TYPES": "",                               // optional: JSON [{"name":"Adult","price":"12.50"}] for Add Movie's ticket types (blank = Child 10.00, Adult 12.50, Senior 11.00)
+      "EVENT_TICKET_TYPES": "",                               // optional: same for Add Event (blank = Regular 0.00)
+      "MOVIE_DISTRIBUTOR": "",                                // optional: the Distributor choice Add Movie sets (blank = the venue name)
+      "EVENT_DISTRIBUTOR": "",                                // optional: the Distributor choice Add Event sets (blank = the venue name)
       "EVENT_DESCRIPTORS": ["Closed Caption", "75mm", "All Ages", "21+", "18 and over"],
       "USERS_NAMES": [],
       "GOOGLE_SERVICE_ACCOUNT_KEY": "updateWithRealServiceAccountKey", 
@@ -1235,6 +1239,10 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
         "EVENT_LOCATIONS",
         "SALES_TAX_RATE",
         "SCREEN_NUMBERS",
+        "MOVIE_TICKET_TYPES",
+        "EVENT_TICKET_TYPES",
+        "MOVIE_DISTRIBUTOR",
+        "EVENT_DISTRIBUTOR",
         "EVENT_DESCRIPTORS",
         "USERS_NAMES",
         "GOOGLE_SERVICE_ACCOUNT_KEY",

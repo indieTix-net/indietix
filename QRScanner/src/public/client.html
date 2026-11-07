@@ -275,6 +275,45 @@
                     </div>
                 </div>
 
+                <!-- Square ticket items (Add Movie / Add Event) -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h4>Square Ticket Items</h4>
+                        <p class="text-muted">What Add Movie and Add Event put on each new Square item. Changing these doesn't change items that already exist; edit those in Square.</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Movie Ticket Types</label>
+                        <div class="form-text mb-2">Each one becomes a variation (ticket type) with its price, and its name is printed on the ticket. None listed: Child 10.00, Adult 12.50, Senior 11.00.</div>
+                        <div id="movie-ticket-types-list"></div>
+                        <button type="button" id="add-movie-ticket-type-btn" class="btn btn-success btn-sm">+ Add Ticket Type</button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Event Ticket Types</label>
+                        <div class="form-text mb-2">The same for Add Event. None listed: Regular 0.00.</div>
+                        <div id="event-ticket-types-list"></div>
+                        <button type="button" id="add-event-ticket-type-btn" class="btn btn-success btn-sm">+ Add Ticket Type</button>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="movie-distributor" class="form-label">Movie Distributor</label>
+                                <input type="text" class="form-control" id="movie-distributor" name="movie_distributor" maxlength="255" autocomplete="off">
+                                <div class="form-text">The Distributor choice set on new movies, used on distributor reports. Blank: your venue name.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="event-distributor" class="form-label">Event Distributor</label>
+                                <input type="text" class="form-control" id="event-distributor" name="event_distributor" maxlength="255" autocomplete="off">
+                                <div class="form-text">The same for new events. Blank: your venue name.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Marquee Engine: Social Media Integration -->
                 <div class="form-section">
                     <div class="section-header">
