@@ -4,7 +4,7 @@ import fs from 'fs';
 import pg from 'pg';
 import { setupTestDatabase, teardownTestDatabase } from 'test-db-harness';
 import { createPgQuery } from '../src/db.mjs';
-import { receiveEmail, handler } from '../src/intake.mjs';
+import { receiveEmail, handleEvent } from '../src/intake.mjs';
 import { getMessages, getTicket, listTickets, deleteExpired } from '../src/store.mjs';
 import { rawEmail, fakeAnthropic } from './helpers.mjs';
 
@@ -81,16 +81,16 @@ test('if drafting fails the email is still stored, for Regenerate to retry', asy
   assert.equal(m.Draft, null);
 });
 
-test('handler: an SES event reads the raw email from the support/ prefix; {action:"draft"} redrafts', async () => {
+test('handleEvent: an SES event reads the raw email from the support/ prefix; {action:"draft"} redrafts', async () => {
   const keys = [];
   const anthropic = fakeAnthropic({ text: 'Second draft' });
   const d = deps(anthropic, { getRaw: async (key) => { keys.push(key); return rawEmail(); } });
   const event = { Records: [{ eventSource: 'aws:ses', ses: { mail: { messageId: 'sesid1', source: 'sam@venue.example' }, receipt: { spamVerdict: { status: 'PASS' } } } }] };
-  const result = await handler(event, {}, d);
+  const result = await handleEvent(event, d);
   assert.deepEqual(keys, ['support/sesid1']);
-  const redraft = await handler({ action: 'draft', ticketId: result.ticketId }, {}, d);
+  const redraft = await handleEvent({ action: 'draft', ticketId: result.ticketId }, d);
   assert.equal(redraft.draft, 'Second draft');
-  assert.equal((await handler({ action: 'draft', ticketId: 999 }, {}, d)).error, 'ticket not found');
+  assert.equal((await handleEvent({ action: 'draft', ticketId: 999 }, d)).error, 'ticket not found');
 });
 
 test('list shows tickets with messages; tickets idle for 2+ years are deleted', async () => {

@@ -111,7 +111,11 @@ function defaultDeps() {
   return cached;
 }
 
-export async function handler(event, context, deps = defaultDeps()) {
+// Lambda passes (event, context, callback), so the entry point takes no deps of its own;
+// tests call handleEvent with fakes.
+export const handler = (event) => handleEvent(event, defaultDeps());
+
+export async function handleEvent(event, deps) {
   if (event?.action === 'draft') {
     return draftTicket(deps, Number(event.ticketId));
   }
