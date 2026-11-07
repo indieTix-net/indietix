@@ -1374,11 +1374,34 @@ async function generatePlannedPosts(pgClient, clientConfig) {
 
 const META_GRAPH_API_VERSION = 'v26.0';
 
+// ---- META PAGE TOKEN ----
+// Page posts need the Page's own token. META_PAGE_ACCESS_TOKEN may be that,
+// or a user / Business system-user token with access to the Page (what
+// Meta's Business Settings hands out, and it never expires); either way
+// GET /{page}?fields=access_token returns the Page token. Falls back to
+// the stored token if the lookup fails, so a plain Page token still works.
+async function resolveMetaPageToken() {
+  const pageId = currentClientConfig.META_PAGE_ID;
+  const token = currentClientConfig.META_PAGE_ACCESS_TOKEN;
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/${META_GRAPH_API_VERSION}/${pageId}?fields=access_token&access_token=${encodeURIComponent(token)}`
+    );
+    const data = await response.json();
+    if (response.ok && data.access_token) return data.access_token;
+    console.warn('Page token lookup returned none; posting with the stored token:', JSON.stringify(data.error?.message || data));
+  } catch (error) {
+    console.warn('Page token lookup failed; posting with the stored token:', error.message);
+  }
+  return token;
+}
+// ---- END META PAGE TOKEN ----
+
 async function sendFacebookPost(post) {
   const caption = post.PostContent?.caption || '';
   const imageUrl = post.PostContent?.imageUrl;
   const pageId = currentClientConfig.META_PAGE_ID;
-  const token = currentClientConfig.META_PAGE_ACCESS_TOKEN;
+  const token = await resolveMetaPageToken();
 
   // With an image, /photos (caption goes on the photo); without one,
   // /feed (plain text post) -- a digest with no background configured
@@ -1397,15 +1420,62 @@ async function sendFacebookPost(post) {
   return { platformPostId: data.post_id || data.id, facebookResponse: data };
 }
 
-async function sendInstagramPost(post) {
+// ---- INSTAGRAM IMAGE FIT ----
+// Instagram only takes JPEGs from 4:5 (tall) to 1.91:1 (wide); a 2:3 movie
+// poster is taller and gets refused. Anything outside that range, or not a
+// JPEG, is placed whole (never cropped) on a 1080-wide canvas at the
+// nearest allowed shape, over a blurred, darkened copy of itself, and
+// uploaded to the venue bucket's public digest-generated/ prefix (already
+// readable by Meta, no policy change). An image already in range and JPEG
+// is used as-is.
+const INSTAGRAM_MIN_RATIO = 4 / 5;
+const INSTAGRAM_MAX_RATIO = 1.91;
+const INSTAGRAM_WIDTH = 1080;
+
+async function fitImageForInstagram(buffer) {
+  const { width, height, format } = await sharp(buffer).metadata();
+  const ratio = width / height;
+  if (format === 'jpeg' && ratio >= INSTAGRAM_MIN_RATIO && ratio <= INSTAGRAM_MAX_RATIO) return null;
+  const targetRatio = Math.min(INSTAGRAM_MAX_RATIO, Math.max(INSTAGRAM_MIN_RATIO, ratio));
+  const canvasWidth = INSTAGRAM_WIDTH;
+  const canvasHeight = Math.round(INSTAGRAM_WIDTH / targetRatio);
+  const backdrop = await sharp(buffer)
+    .resize(canvasWidth, canvasHeight, { fit: 'cover' })
+    .blur(40)
+    .modulate({ brightness: 0.45 })
+    .toBuffer();
+  const foreground = await sharp(buffer)
+    .resize(canvasWidth, canvasHeight, { fit: 'inside' })
+    .toBuffer();
+  return sharp(backdrop)
+    .composite([{ input: foreground, gravity: 'center' }])
+    .flatten({ background: '#000000' })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
+async function instagramImageUrl(imageUrl, clientId, postId) {
+  const response = await fetch(imageUrl);
+  if (!response.ok) throw new Error(`Could not download the post image for Instagram (${response.status})`);
+  const fitted = await fitImageForInstagram(Buffer.from(await response.arrayBuffer()));
+  if (!fitted) return imageUrl;
+  const region = process.env.AWS_REGION || 'us-east-2';
+  const bucketName = `${currentClientConfig.S3_BUCKET_PREFIX}${clientId.toLowerCase()}`;
+  const key = `digest-generated/instagram_${postId}_${Date.now()}.jpg`;
+  await s3Client.send(new PutObjectCommand({ Bucket: bucketName, Key: key, Body: fitted, ContentType: 'image/jpeg' }));
+  return `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+}
+// ---- END INSTAGRAM IMAGE FIT ----
+
+async function sendInstagramPost(post, clientId) {
   const caption = post.PostContent?.caption || '';
-  const imageUrl = post.PostContent?.imageUrl;
   const igUserId = currentClientConfig.META_IG_BUSINESS_ID;
   const token = currentClientConfig.META_PAGE_ACCESS_TOKEN;
 
-  if (!imageUrl) {
+  if (!post.PostContent?.imageUrl) {
     throw new Error('Instagram requires an image and this post has none (no digest background configured, or the source item has no Square image)');
   }
+  const imageUrl = await instagramImageUrl(post.PostContent.imageUrl, clientId, post.ID);
 
   const containerResponse = await fetch(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${igUserId}/media`, {
     method: 'POST',
@@ -1435,7 +1505,7 @@ async function sendInstagramPost(post) {
   const publishData = await publishResponse.json();
   if (!publishResponse.ok) throw new Error(`Instagram publish failed: ${JSON.stringify(publishData.error || publishData)}`);
 
-  return { platformPostId: publishData.id, instagramResponse: publishData };
+  return { platformPostId: publishData.id, instagramResponse: publishData, instagramImageUrl: imageUrl };
 }
 
 // TikTok access tokens expire in ~24h; the refresh token lasts ~365 days
@@ -1620,7 +1690,7 @@ async function sendDuePost(pgClient, post, item, clientId) {
     } else if (post.Channel === 'facebook' && currentClientConfig.META_PAGE_ACCESS_TOKEN && currentClientConfig.META_PAGE_ID) {
       result = await sendFacebookPost(post);
     } else if (post.Channel === 'instagram' && currentClientConfig.META_PAGE_ACCESS_TOKEN && currentClientConfig.META_IG_BUSINESS_ID) {
-      result = await sendInstagramPost(post);
+      result = await sendInstagramPost(post, clientId);
     } else if (post.Channel === 'tiktok' && currentClientConfig.TIKTOK_ACCESS_TOKEN) {
       result = await sendTikTokPost(pgClient, post, clientId);
     } else {
@@ -1754,7 +1824,9 @@ export {
   buildDigestSvg,
   generateDigestPost,
   generatePlannedPosts,
+  resolveMetaPageToken,
   sendFacebookPost,
+  fitImageForInstagram,
   sendInstagramPost,
   refreshTikTokToken,
   sendTikTokPost,

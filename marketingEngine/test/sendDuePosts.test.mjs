@@ -62,6 +62,7 @@ test('sendDuePost: a channel with no credentials configured falls back to the dr
 test('sendDuePost: facebook WITH credentials configured calls the real sender and records the platform post ID', async () => {
   __setCurrentClientConfigForTesting({ META_PAGE_ACCESS_TOKEN: 'fb-token', META_PAGE_ID: 'page-123' });
   globalThis.fetch = async (url) => {
+    if (/fields=access_token/.test(url)) return { ok: true, json: async () => ({ access_token: 'page-token', id: 'page-123' }) };
     assert.match(url, /\/page-123\/feed/); // no imageUrl on this post -> /feed, not /photos
     return { ok: true, json: async () => ({ id: 'fb-post-999' }) };
   };

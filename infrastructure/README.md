@@ -303,9 +303,9 @@ Optional — pushes a calendar event for every showtime when you add a movie or 
 
 ### Connecting Social Media (Facebook, Instagram, TikTok)
 
-Optional, part of the Marquee Engine. No admin UI for these yet — they're set directly on your venue's config in the database for now.
+Optional, part of the Marquee Engine. Enter the credentials in Client Settings.
 
-**Facebook & Instagram:** create a Meta app, generate a Page Access Token, connect your Instagram Business account to the Page. Set `META_PAGE_ACCESS_TOKEN` + `META_PAGE_ID` for Facebook; additionally set `META_IG_BUSINESS_ID` for Instagram.
+**Facebook & Instagram:** link your Instagram Business (or Creator) account to the Facebook Page, create a Meta app (type Business), and in Business Settings → System Users give a system user the Page and generate a token with `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic` and `instagram_content_publish`. That token never expires. A Page Access Token works too. Set `META_PAGE_ACCESS_TOKEN` and `META_PAGE_ID` for Facebook, plus `META_IG_BUSINESS_ID` (the number from `<page id>?fields=instagram_business_account` in Meta's Graph API Explorer) for Instagram. Facebook posts use the Page's own token, looked up from whichever you saved. Instagram only takes pictures from 4:5 to 1.91:1, so a poster outside that is placed whole on a blurred backdrop of itself at the nearest allowed shape.
 
 **TikTok:** create an app in the TikTok for Developers portal, apply for Content Posting API access (requires an app audit), then go through TikTok's OAuth flow as the venue's account to get an access token + refresh token. Set `TIKTOK_ACCESS_TOKEN` and `TIKTOK_REFRESH_TOKEN` from that exchange, plus `TIKTOK_CLIENT_KEY` + `TIKTOK_CLIENT_SECRET` (your app's own credentials, not per-token). TikTok's access tokens only last ~24h — with all four of those set, the Marquee Engine poller automatically refreshes (and re-persists) the token pair before every send, so you only have to do this OAuth exchange once rather than re-pasting a token daily. Optionally set `TIKTOK_PRIVACY_LEVEL` to match an approved privacy option — otherwise it auto-falls-back to whatever your account is actually approved for.
 
