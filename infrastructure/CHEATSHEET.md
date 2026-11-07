@@ -79,6 +79,26 @@ Usually run together: `./deploy.sh deploy-layer QRScanner && ./deploy.sh attach-
 | One-off SQL | `aws lambda invoke --function-name <env-prefix>-sql-runner --payload '{"database": "<clientId>", "sql": "...", "params": [...]}' ...` | ENV |
 | Change a venue's settings | Log in to the site → Client Settings (client login). | that venue |
 
+## Database: SQL from your own machine (`db-sql.sh`)
+
+Runs one SQL statement against a venue's database through the RDS Data API: no server, no `psql`, no SSH tunnel. Set `DB_CLUSTER`, `DB_NAME` and `DB_SECRET` once in `deploy.config.sh`. The cluster needs the Data API on (`aws rds enable-http-endpoint --resource-arn <cluster ARN>`; bootstrap environments use their `sql-runner` instead). **Read-only by default:** the statement runs in a read-only transaction that's always rolled back, so a slip can't change anything. Names are PascalCase, so double-quote them, and wrap the whole statement in single quotes for the shell.
+
+| Task | Command | Touches |
+|---|---|---|
+| Count orders | `./db-sql.sh 'SELECT count(*) FROM "Order"'` | read-only |
+| Tickets sold per showing, last 7 days | `./db-sql.sh 'SELECT "ProductName", "ProductDate", count(*) FROM "QRCodeProduct" WHERE "Status" = '"'"'valid'"'"' AND "ProductDate" >= now() - interval '"'"'7 days'"'"' GROUP BY 1, 2 ORDER BY 2'` | read-only |
+| Look up a buyer's orders | `./db-sql.sh 'SELECT "ID", "OrderID", "CreatedDate", "FirstName", "LastName", "Status" FROM "Order" WHERE lower("EmailAddress") = '"'"'someone@example.com'"'"''` | read-only |
+| One ticket by QR code | `./db-sql.sh 'SELECT "ProductName", "ProductDate", "Status", "CheckedIn" FROM "QRCodeProduct" WHERE "QRCode" = '"'"'<code>'"'"''` | read-only |
+| Who's subscribed to texts | `./db-sql.sh 'SELECT count(*) FROM "SmsConsent" WHERE "Status" = '"'"'active'"'"''` | read-only |
+| Read one setting | `./db-sql.sh 'SELECT configuration->>'"'"'SEND_SMS'"'"' AS send_sms FROM "Client"'` | read-only |
+| List tables | `./db-sql.sh 'SELECT table_name FROM information_schema.tables WHERE table_schema = '"'"'public'"'"' ORDER BY 1'` | read-only |
+| Run a longer query from a file | `./db-sql.sh -f query.sql` (one statement per file) | read-only |
+| Raw JSON rows | `./db-sql.sh --json '...'` | read-only |
+| Another database or login | `./db-sql.sh --db <database> --login <secret name> '...'` (report functions belong to the cluster's master login) | read-only |
+| **Change data** | `./db-sql.sh --write 'UPDATE ...'` — commits. Take a revert copy first (`SELECT` the rows you're about to change). | **PROD** |
+
+Typing `'"'"'` for every quote gets old fast. For anything with quoted values, put the statement in a file and use `-f`. Limits: one statement per call, 1 MB of results, 45 seconds per statement.
+
 ## Tests
 
 | Command | What it does |
