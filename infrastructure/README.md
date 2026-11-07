@@ -1,4 +1,4 @@
-**Last Edited:** 2026-10-28
+**Last Edited:** 2026-11-06
 
 
 take the ticket
@@ -52,6 +52,7 @@ IndieTix is free, open source, and yours to self-host and modify with no strings
 - **As many venues as you need, on one deployment.** Each Square account is one IndieTix "client." Own two locations with two Square accounts? Two clients on the same infrastructure, fully isolated from each other. Want completely separate environments (production + a sandbox, or one per business)? Give each its own `ENV_PREFIX` and they can live side by side in the same AWS account without colliding.
 - **Self-discovering.** New clients are found automatically: incoming Square webhooks are routed by merchant ID, and the inbound-SMS handler discovers clients from Secrets Manager. Onboarding a venue never needs a redeploy.
 - **A public API, included.** A small, documented REST API lets the tools around your venue use your data: a promoter's dashboard, your website, a third-party door scanner. Keys are scoped (buyer contact info is its own scope), can be limited to one promoter's events, are rate-limited, and are stored only as hashes. There's no paid tier; it ships with the self-hosted app. See [FUNCTIONALITY.md](./FUNCTIONALITY.md#public-api).
+- **Security and privacy built in.** A firewall in front of the API, GuardDuty threat detection, a year-long CloudTrail audit trail, error alarms with a public status page, and a Privacy Requests page that finds, exports or erases one customer's details. See [Security and privacy](#security-and-privacy).
 - **Everything else in the box.** Email + opt-in SMS ticket delivery, a phone-friendly door scanner, staff accounts with server-enforced permissions and per-promoter data filters, refunds/transfers/resends, nightly box-office reporting (BDOR/EBOR) over SFTP/FTP, plain-English analytics, and a marketing scheduler for email/Facebook/Instagram/TikTok. See [FUNCTIONALITY.md](./FUNCTIONALITY.md) for the full tour.
 
 ## Architecture: why it's cheap, small, and boring (on purpose)
@@ -67,11 +68,13 @@ IndieTix is built from managed AWS services and nothing else. That means no serv
 | Two-way SMS | **AWS End User Messaging + SNS** | 10DLC-compliant, with a separate campaign, number, and opt-out list for each venue. |
 | Credentials | **Secrets Manager** | Nothing secret lives in code or in the repo. |
 | Cost controls (optional) | **AWS Budgets → SNS → Lambda** | Daily and monthly budgets email you when spend runs high. Over the daily limit, an optional breaker sets every Lambda in the environment to zero concurrency, so nothing can run up a bill until you reset it. |
-| Logs + monitoring | **CloudWatch** | Every Lambda logs the raw incoming event first, so debugging starts from the actual input, not a guess. Alarms, metrics, and Lambda Insights come built in. |
+| API firewall (optional) | **CloudFront + AWS WAF** | Rate limits on logins and public routes, plus AWS's managed rules for known attacks, in front of the operator app and public API. |
+| Threat detection + audit trail | **GuardDuty + CloudTrail** | GuardDuty emails when something in the account looks wrong (stolen keys, known-malicious traffic). CloudTrail records every account action for a year. |
+| Logs + monitoring | **CloudWatch** | Every Lambda logs the raw incoming event first, so debugging starts from the actual input, not a guess. Logs are kept 30 days. Error alarms email you and drive a public status page. |
 
 **What it costs to run.** At rough AWS list prices, the always-on floor for one environment is about **$80–100/month**. Most of that is the Aurora minimum capacity (~$45) and the NAT gateway that lets the private Lambdas reach AWS APIs (~$35). Lambda, SQS, SNS, S3, and CloudFront for a single venue's traffic usually come to a few dollars. Add about $0.40/month per Secrets Manager secret. That floor is shared by every venue on the deployment, so a second or third venue costs almost nothing extra. Compare that to 20–30% of every ticket. (Prices depend on region and change over time; check AWS's pricing pages for your own numbers.)
 
-**A small attack surface.** The only things reachable from the internet are the Square webhook endpoint (every request is signature-verified), the web app's Lambda Function URL (which also serves the public API), and the static site on CloudFront. There are no SSH boxes and no always-on servers. The database can't be reached from outside its VPC. Each venue gets its own database user, so one venue's credentials can't open another venue's data. Inside a venue, every route checks the caller's permissions on the server, and API keys only reach the scopes they were given.
+**A small attack surface.** The only things reachable from the internet are the Square webhook endpoint (signature-verified once the venue's `ENV_TYPE` is `"prod"`, see [Square webhook signatures](#square-webhook-signatures)), the web app's API (which also serves the public `/v1` API; with `API_EDGE="true"` it's only reachable through the firewall), and the static site on CloudFront. There are no SSH boxes and no always-on servers. The database can't be reached from outside its VPC. Each venue gets its own database user, so one venue's credentials can't open another venue's data. Inside a venue, every route checks the caller's permissions on the server, and API keys only reach the scopes they were given.
 
 **Isolation, honestly stated.** Each venue's *data* is never shared: separate database, separate S3 buckets, separate Secrets Manager entry, separate Square credentials, separate SMS campaign and opt-out list. A few things that can be shared by the venues on one deployment, and they're all plumbing rather than storage:
 - the Square webhook queue (messages are routed to the right venue by merchant ID)
@@ -256,6 +259,38 @@ It costs about $10 a month, and always deploys in us-east-1 (stack `<ENV_PREFIX>
 
 With an alert email set (`ALARM_EMAIL`, else `OPERATOR_ALERT_EMAIL` or `BUDGET_ALERT_EMAIL`), `up` deploys `<ENV_PREFIX>-alarms`: CloudWatch alarms that email you when ticket orders fail or back up in the queue, the Square webhook or QRScanner returns errors, or a background job crashes, and again when each recovers. Click the confirmation link AWS emails first. The same alarms drive the public **status page**, `status.html` on the static site, which shows each part of IndieTix as working or having a problem (never alarm names or details). Alarms cost about $0.10 each a month.
 
+### Security and privacy
+
+What a venue or its security reviewer usually asks about, and where each piece is set up:
+
+| Control | How | Where |
+|---|---|---|
+| Venue isolation | A database, database login, buckets, secrets and SMS campaign per venue | Automatic |
+| Payment data | Never stored; Square handles it | Automatic |
+| Encryption | Aurora and S3 encrypted at rest; HTTPS everywhere | Automatic |
+| API firewall | CloudFront + AWS WAF | [`API_EDGE="true"`](#api-firewall-optional) |
+| Webhook authenticity | Square's HMAC signature on every webhook | [`ENV_TYPE` = `"prod"`](#square-webhook-signatures) |
+| Threat detection and audit trail | GuardDuty + CloudTrail | [Account security](#account-security-guardduty-and-cloudtrail) |
+| Error alarms and status page | CloudWatch alarms | [Error alarms](#error-alarms-and-status-page) |
+| Access control | Server-enforced permission flags, data filters, hashed scoped API keys | [FUNCTIONALITY.md](./FUNCTIONALITY.md#accounts-and-access) |
+| Privacy requests (GDPR/CCPA) | Find, export or erase one customer's details | [FUNCTIONALITY.md](./FUNCTIONALITY.md#privacy-requests) |
+| SMS consent | 10DLC per venue, verbatim consent log, per-venue STOP | [Setting up SMS](#setting-up-sms-10dlc) |
+| Backups | Aurora automated backups with point-in-time restore | Automatic; test a restore now and then |
+| Log retention | 30 days (`LOG_RETENTION_DAYS`) | Automatic |
+| Spending limits | AWS Budgets, optional breaker, SMS caps | [Infrastructure](#infrastructure) |
+
+#### Account security (GuardDuty and CloudTrail)
+
+With an alert email set, `up` also deploys `<ENV_PREFIX>-security`:
+- **GuardDuty** threat detection, which emails each medium or high finding (stolen-key use, known-malicious traffic and similar)
+- a **CloudTrail** trail of every AWS account action in every region, kept `TRAIL_RETENTION_DAYS` (default 365) with log file validation
+
+GuardDuty and a multi-region trail are one per account, so `up` uses existing ones when the account already has them. Click AWS's confirmation email for the security topic first. Test it with `aws guardduty create-sample-findings --detector-id <id> --finding-types 'Backdoor:EC2/C&CActivity.B!DNS'`. Cost: the trail's first copy of account events is free and its storage pennies; GuardDuty is free for 30 days, then a few dollars a month for a small deployment.
+
+#### Square webhook signatures
+
+Every Square webhook carries an HMAC signature. getSquareOrders checks it when the venue's `ENV_TYPE` is `"prod"`, using `SQUARE_SIGNATURE_KEY` and `SQUARE_WEBHOOK_URL` from Client Settings. New venues start at `"dev"` (no check) so a first test purchase can't fail on a mistyped key. Once a test order works, confirm the key and URL match the webhook subscription in Square's Developer Console exactly, then set `ENV_TYPE` to `"prod"` and make one more test purchase. A rejected webhook isn't retried by Square, so watch getSquareOrders' log for `Unauthorized` after the switch.
+
 ### Connecting Google Calendar
 
 Optional — pushes a calendar event for every showtime when you add a movie or event.
@@ -348,6 +383,7 @@ Branch protection (required CI checks, no direct pushes to `main`) gets turned o
 
 - **Other POS systems.** Square was a deliberate choice, not a hard requirement. The original goal was to avoid running an item catalog at all and to never end up with two catalogs that disagree, so IndieTix uses whatever catalog the venue's POS already has. That same pattern carries over to other systems: a **Stripe** or **Lightspeed** plugin would handle the catalog/webhook/order layer for that POS, while tickets, the door scanner, reporting, SMS, and marketing stay exactly as they are. An **IndieTix-native** checkout is also on the table for venues that have no POS at all.
 - **Query performance at higher volume.** Nothing has been tuned for scale yet. At one venue's volume it hasn't needed to be, and Aurora Serverless has plenty of headroom to scale up if it ever does. Scaling hardware isn't the first fix, though. The data model is deliberately simple (orders, tickets, and a join table), so the real work is in the queries themselves: checking that they use indexes (`EXPLAIN ANALYZE` on the busy ones, especially anything that filters by showtime date, event name, or QR code) and adding indexes where they don't. A few pages also pull a lot of data at once; the ticket and order lists in particular load far more rows than a person can look at. Those need server-side paging and narrower queries before a venue selling thousands of tickets a week would feel them. This is next on the list.
-- **Smaller items already on the list:** a rate-limiting WAF in front of the public endpoints, an SMS spend circuit breaker, and a direct number-to-venue routing table for inbound SMS once there are more than a handful of venues.
+- **A SOC 2 audit** when a customer needs one. The controls are in place (see [Security and privacy](#security-and-privacy)); what's left is written policies and an auditor.
+- **Smaller items already on the list:** a direct number-to-venue routing table for inbound SMS once there are more than a handful of venues.
 
 Ideas, plugins, and pull requests are welcome.

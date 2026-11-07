@@ -1,6 +1,6 @@
 # What IndieTix Does
 
-**Last Edited:** 2026-10-29
+**Last Edited:** 2026-11-06
 
 A high-level tour of what the platform actually lets a venue do, grouped the way the app itself groups it (by who's allowed to do what). For setup and integration details, see [README.md](./README.md). For the full step-by-step on bringing up a brand-new venue, see [CLIENT_SETUP.md](./CLIENT_SETUP.md).
 
@@ -25,6 +25,8 @@ Tickets are sold through Square — IndieTix doesn't run its own checkout. When 
 - **Editing an order** is limited to the buyer's contact info (name, phone, email) — there's no price/showtime/seat editing through IndieTix; once a Square item is live, those changes happen in the Square dashboard directly. Editing an order's contact info also propagates to the tickets linked to that order (capped at the first 10 tickets on a single order — a rare edge case, but worth knowing if a venue ever sells a block that large to one buyer).
 - **Transfer Tickets** — move a valid, not-yet-checked-in ticket to a new person by name, email, and optional phone. The original ticket is permanently voided (can never be checked in again, and box-office reports don't double-count it) and a brand-new ticket — new QR code, same event/price/seat details, same underlying order for revenue reporting — is generated and emailed to the new recipient. Deliberately email-only, no SMS: the new recipient hasn't gone through SMS consent, and transfer isn't meant to be a backdoor around that. If the email fails to send, the transfer still completes (the ticket is real either way) and staff get the new QR code to resend by hand.
 - **Print Ticket** (optional, see the README's printing section) — from the Products page's action menu, send a ticket straight to a physical label printer at the venue, for a venue that wants to hand customers a real paper stub instead of (or alongside) the emailed/texted PDF.
+- **Print Tickets** (whole order) — from the Orders page's action menu, print every valid ticket on an order in one click, in order, with no popup. Refunded, cancelled and transferred tickets are skipped. The print agent prepares the next ticket while the current one prints.
+- **Confirm Check-in & Print** — in the check-in confirm box, check the person in and print their stub in one tap. It only prints after a successful check-in, and a print failure leaves them checked in and says so.
 
 ## Adding movies and events
 
@@ -66,6 +68,13 @@ Tickets are sold through Square — IndieTix doesn't run its own checkout. When 
 - **Data filtering for a 3rd party** — each sub-user can have one or more filters (configured on the User Management page: an "Add Filter" row with a date, an event dropdown, an "event name contains" box, and an event type of Cinema or Live) that get written into a `DataFilter` field on their account. Multiple filters are OR'd together; the fields within one filter are AND'd. The event dropdown lists every ticketed item in the venue's Square catalog plus every event that has already sold tickets, so a promoter's account can be set up before their show's first sale. Picking an event from the dropdown matches that exact name; "event name contains" matches any part of it ("Rocky" covers both "Rocky Horror" and "The Rocky Horror Picture Show"). Capitals never matter. The server folds the filter into every relevant query (ticket lists, orders, the dashboard, and single-ticket and single-order lookups and edits), so a filtered sub-user genuinely only ever sees the tickets and events matching their filter. Anything outside it answers exactly like "not found". It's a real way to give a promoter, distributor, or co-presenter visibility into just their own numbers without seeing the rest of the venue's business. One honest tradeoff: a showtime with zero sales so far won't show up for a filtered user on the dashboard, since filtering happens against the ticket table, not the full Square catalog.
 - **Client Settings** (client login only) — the control panel for a venue's entire configuration: Square credentials, branding, Google Calendar and social media integrations, SMS settings, FTP reporting destinations, Skeleton Keys, API Keys, and more.
 
+## Privacy requests
+
+- **Privacy Requests** (client login only, linked from Client Settings) — for when a customer asks what the venue holds about them, or asks to be erased (GDPR, CCPA and similar laws). Search by email or phone to see their orders, tickets, customer record, text-message consent and email-list entries.
+- **Download Their Data** exports everything about them as a JSON file to send back.
+- **Erase Their Details** replaces their name, email and phone on every order, ticket, customer record, text log and email-list entry, and scrubs personal fields from Square's stored order details. The records themselves stay, so sales, refunds and box-office reports remain correct, and their tickets keep working. Text-message consent records are kept as legal proof of consent, and any active consent is revoked so no more texts go out.
+- **Request log** — every download and erasure is recorded with when it came in, how the venue confirmed it was really the person, what was found and who did it. The log never stores the person's email or phone, only a one-way fingerprint.
+
 ## Public API
 
 A small, documented REST API (`/v1`) lets the tools around a venue work with its IndieTix data: a third-party door scanner, a promoter's dashboard, the venue's website, a spreadsheet. It's free and part of the self-hosted app, with no paid tier. It's read-mostly. Checking a ticket in (and undoing that) is the only write; selling, pricing and refunds stay in Square.
@@ -81,6 +90,8 @@ A small, documented REST API (`/v1`) lets the tools around a venue work with its
 
 - **SMS opt-in** — the page a customer lands on after choosing to get their ticket by text instead of email.
 - **Unsubscribe / email list signup** — standard list-management pages for marketing email, separate from the transactional ticket emails every buyer gets regardless.
+- **Status page** (`status.html`) — shows customers and staff whether each part of IndieTix (ticket sales, the box office pages and door scanning, text messages, nightly reports and so on) is working, driven by the same alarms that email the operator. It never shows alarm names or details.
+- **The venue's own web address** — each venue can pick `<name>.<domain>` (for example `yourvenue.indietix.net`) in Client Settings or at signup. Its login page fills in the venue's Client ID, and its privacy and terms pages show that venue's own details.
 
 ## Works on mobile
 
