@@ -4,7 +4,7 @@ A Square-integrated ticketing platform for independent venues... built to run yo
 
 ## Why IndieTix Exists
 
-I think some most ticketing platforms take too much of a cut.  Lately, I've seen fees from the ticket giants hang in the range of 20% - 30% or more of what the actual base ticket price is. That most of those fees don't go to the people who made the night happen. The artists, musicians, promoters, or venue: very little of the cut goes to them. It goes to a ticketing company that didn't write a note, book a stage, or sweep a floor, but still gets paid like it did.
+Most ticketing platforms take too much of a cut.  Lately, fees from the ticket giants hang in the range of 20% - 30% or more of what the actual base ticket price is. That most of those fees don't go to the people who made the night happen. The artists, musicians, promoters, or venue: very little of the cut goes to them. It goes to a ticketing company that didn't write a note, book a stage, or sweep a floor, but still gets paid like it did.
 
 IndieTix exists to cut that middleman out.
 
