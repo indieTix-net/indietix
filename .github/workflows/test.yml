@@ -34,7 +34,7 @@ jobs:
     steps:
       - id: all
         run: echo 'suites=["QRScanner","getSquareOrders","smsOptInOptOut","marketingEngine","DailyPgQueryAndSftp","expireQRCodeSquareModifiers","clientReporting","clientSetup-Teardown","test-db-harness","square-queue-forwarder","sms-utils","ticket-pdf-lib","squareTokenRefresher"]' >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name != 'workflow_dispatch'
       - id: filter
         if: github.event_name != 'workflow_dispatch'
@@ -116,7 +116,7 @@ jobs:
         suite: ${{ fromJSON(needs.changes.outputs.suites) }}
     name: test (${{ matrix.suite }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Matches the production Lambda runtime.
       - uses: actions/setup-node@v7
