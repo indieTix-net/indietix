@@ -23,12 +23,12 @@ IndieTix's Add Movie and Add Event pages build all of this for you. It's here fo
 **1. The item's custom attributes.** These are set on the item, in the custom attributes section of Square's item editor.
 - **UseQRCode** (yes/no): this is the switch. IndieTix only makes tickets for items where UseQRCode is turned on. If an item sells but no tickets go out, check this first.
 - **EventType** (a choice, for example Movie or Live): what kind of event it is, used on reports.
-- **Distributor** (a choice): who the film or show comes from, used on box office and distributor reports.
+- **Distributor** (a choice): who the film or show comes from, used on box office and distributor reports. Add Movie and Add Event set the choice named in **Client Settings → Square Ticket Items** (Movie Distributor / Event Distributor; blank means the venue's name). If that name isn't one of the attribute's choices in Square, the item is created without it and IndieTix says so: add the choice in Square and set it on the item.
 - **Online Display Name** (text): the name shown online, usually the same as the item name.
-- The four attributes must exist in the venue's Square account with exactly these names. Setting one on a single variation instead of the item overrides the item's value for that ticket type only.
+- If any of the four is missing from the venue's Square account, Add Movie or Add Event creates it the first time. If UseQRCode can't be created, IndieTix stops and doesn't create the item, so an item never sells without making tickets. When making them by hand, use exactly these names. Setting one on a single variation instead of the item overrides the item's value for that ticket type only.
 
-**2. Variations are the ticket types.** Each variation is one kind of ticket with its own price: movies start with Adult, Child and Senior, and events with Regular. The variation's name is printed on the ticket as its type and used on reports, so name them the way you want them to read (for example "Student" or "VIP").
-- To change a price, edit that variation's price in Square.
+**2. Variations are the ticket types.** Each variation is one kind of ticket with its own price. New items get the ticket types and prices listed in **Client Settings → Square Ticket Items** (if none are listed: Child, Adult and Senior for movies, and Regular for events). The variation's name is printed on the ticket as its type and used on reports, so name them the way you want them to read (for example "Student" or "VIP").
+- To change a price on an existing item, edit that variation's price in Square. Changing Client Settings only affects items created afterwards.
 - To add a ticket type, add a variation to the item. It's ticketed automatically, because UseQRCode is set on the item.
 - Square counts stock per variation, not per showtime. If stock tracking is on, the count covers every showtime of that ticket type.
 
