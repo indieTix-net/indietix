@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 
@@ -25,20 +24,16 @@ function run(cmd, args) {
   });
 }
 
-// Binds to port 0 to ask the OS for a free ephemeral port, then releases it
-// immediately. There's a small window where another process could grab the
-// same port before `docker run` binds it (TOCTOU) -- acceptable for test
-// tooling; a real production bind-address allocator this is not.
-function pickFreePort() {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
+// Docker picks the host port itself when it binds (`-p 127.0.0.1::5432`), then
+// reports it. Picking a free port ourselves and passing it in left a gap
+// where a parallel test file could be handed the same one ("address already
+// in use" when QRScanner's test files start their containers at once).
+async function publishedPort(containerName) {
+  const { stdout } = await run('docker', ['port', containerName, '5432/tcp']);
+  const line = stdout.split('\n').find((l) => l.startsWith('127.0.0.1:')) || stdout.split('\n')[0];
+  const port = Number(line.slice(line.lastIndexOf(':') + 1));
+  if (!Number.isInteger(port) || port <= 0) throw new Error(`Could not read the published port of ${containerName}: "${stdout}"`);
+  return port;
 }
 
 async function waitUntilReady(dbConfig, deadline) {
@@ -71,16 +66,23 @@ async function waitUntilReady(dbConfig, deadline) {
  *   else.
  */
 export async function startPostgresContainer({ image = DEFAULT_IMAGE } = {}) {
-  const port = await pickFreePort();
   const containerName = `test-db-harness-${randomUUID().slice(0, 8)}`;
 
   await run('docker', [
     'run', '-d', '--rm',
     '--name', containerName,
     '-e', `POSTGRES_PASSWORD=${DEFAULT_PASSWORD}`,
-    '-p', `127.0.0.1:${port}:5432`,
+    '-p', '127.0.0.1::5432',
     image
   ]);
+
+  let port;
+  try {
+    port = await publishedPort(containerName);
+  } catch (err) {
+    await stopPostgresContainer(containerName).catch(() => {});
+    throw err;
+  }
 
   const dbConfig = {
     host: '127.0.0.1',

@@ -35,6 +35,20 @@ test('startPostgresContainer: two containers in the same run get different ports
   }
 });
 
+// Several test files start containers at the same moment (node --test runs
+// files in parallel); none may fail on a port another one took.
+test('startPostgresContainer: many containers started at once all come up on their own ports', async () => {
+  const started = await Promise.allSettled(Array.from({ length: 6 }, () => startPostgresContainer()));
+  try {
+    const failures = started.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
+    assert.deepEqual(failures, []);
+    const ports = started.map((r) => r.value.dbConfig.port);
+    assert.equal(new Set(ports).size, ports.length);
+  } finally {
+    await Promise.all(started.filter((r) => r.status === 'fulfilled').map((r) => stopPostgresContainer(r.value.containerName)));
+  }
+});
+
 test('stopPostgresContainer: actually removes the container (started with --rm)', async () => {
   const { dbConfig, containerName } = await startPostgresContainer();
   await stopPostgresContainer(containerName);
