@@ -99,7 +99,7 @@ export async function setStatus(query, ticketId, status) {
 // Deletes tickets (and their messages) with no activity for RETENTION_YEARS.
 export async function deleteExpired(query) {
   const expired = await query(
-    `DELETE FROM "SupportTicket" WHERE "LastMessageDate" < now() - make_interval(years => :years) RETURNING "ID"`,
+    `DELETE FROM "SupportTicket" WHERE "LastMessageDate" < now() - make_interval(years => CAST(:years AS integer)) RETURNING "ID"`,
     { years: RETENTION_YEARS });
   if (expired.length) {
     await query(
