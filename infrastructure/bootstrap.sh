@@ -273,6 +273,42 @@ else:
   echo "$result"
 }
 
+# ---- ACCOUNT SECURITY ----
+# deploy_security -- security/template.yaml: GuardDuty, a CloudTrail trail
+# (kept TRAIL_RETENTION_DAYS, default 365) and an email for medium/high
+# findings to ALARM_EMAIL. GuardDuty and a multi-region trail are one per
+# account, so either is skipped when the account already has one (another
+# environment in the same account, or production's own).
+deploy_security() {
+  if [ -z "$ALARM_EMAIL" ]; then
+    echo "(ALARM_EMAIL is blank -- skipping GuardDuty and CloudTrail)"
+    echo
+    return 0
+  fi
+  local stack="${ENV_PREFIX}-security" guardduty="true" trail="true" mine
+  mine=$(aws cloudformation describe-stack-resources --stack-name "$stack" \
+    --query "StackResources[?ResourceType=='AWS::GuardDuty::Detector' || ResourceType=='AWS::CloudTrail::Trail'].ResourceType" \
+    --output text "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null || true)
+  if [[ "$mine" != *GuardDuty* ]] && [ -n "$(aws guardduty list-detectors --query 'DetectorIds[0]' --output text \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null | grep -v None)" ]; then
+    guardduty="false"
+    echo "(This account already has GuardDuty in ${AWS_REGION} -- using it.)"
+  fi
+  if [[ "$mine" != *CloudTrail* ]] && [ -n "$(aws cloudtrail describe-trails --query 'trailList[?IsMultiRegionTrail].Name' --output text \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null)" ]; then
+    trail="false"
+    echo "(This account already has a multi-region CloudTrail trail -- using it.)"
+  fi
+  deploy_stack "security" "security" \
+    "AlertEmail=${ALARM_EMAIL}" \
+    "EnableGuardDuty=${guardduty}" \
+    "EnableTrail=${trail}" \
+    "TrailRetentionDays=${TRAIL_RETENTION_DAYS:-365}"
+  echo "GuardDuty findings email ${ALARM_EMAIL} (confirm AWS's subscription email first)."
+  echo
+}
+# ---- END ACCOUNT SECURITY ----
+
 # ---- ERROR ALARMS ----
 # deploy_alarms -- the same alarms/template.yaml production uses, with this
 # environment's function names, emailed to ALARM_EMAIL. Then points
@@ -836,6 +872,9 @@ cmd_up() {
   # reads them.
   deploy_alarms
 
+  # 5d. GuardDuty, CloudTrail and their alert email.
+  deploy_security
+
   # 6. Onboard the first client. Payload shape is client-setup-teardown's
   # real handler input (clientSetup-Teardown/src/index.js's exports.handler
   # -- username/clientSecret/contactName/clientEmail/square_access_token/
@@ -1210,6 +1249,13 @@ cmd_down() {
   # fire mid-teardown.
   delete_stack "cost-guard"
   delete_stack "alarms"
+  # The trail keeps writing to its bucket until it stops.
+  aws cloudtrail stop-logging --name "${ENV_PREFIX}-trail" \
+    "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1 || true
+  for b in $(stack_buckets security); do
+    empty_bucket "$b"
+  done
+  delete_stack "security"
   # The API edge lives in us-east-1 whatever the environment's region.
   if AWS_REGION=us-east-1 stack_output api-edge ApiUrl | grep -q .; then
     ( AWS_REGION=us-east-1; SAM_ARGS=("${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region us-east-1); delete_stack "api-edge" )

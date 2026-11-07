@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  IndieTix account security: GuardDuty threat detection, a CloudTrail
+  record of every AWS account action (kept a year), and an email for
+  each medium-or-worse GuardDuty finding. Watches the account, never
+  blocks or changes anything else. GuardDuty and the trail are one per
+  account per region, so bootstrap.sh turns either off when the account
+  already has one. GuardDuty also reads IAM and other global events from
+  this region. Cost at IndieTix's size: the trail's management events are
+  free (first copy), its S3 storage pennies; GuardDuty a few dollars a
+  month after its 30-day free trial.
+
+Parameters:
+  EnvPrefix:
+    Type: String
+    Default: indietix-prod
+    Description: Prefix for the topic, rule, trail and bucket names
+  AlertEmail:
+    Type: String
+    Description: Where GuardDuty findings go (confirm AWS's subscription email first)
+  EnableGuardDuty:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: '"false" when this account and region already has a GuardDuty detector'
+  EnableTrail:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: '"false" when this account already has a multi-region trail (a second copy is billed)'
+  TrailRetentionDays:
+    Type: Number
+    Default: 365
+
+Conditions:
+  GuardDutyOn: !Equals [!Ref EnableGuardDuty, 'true']
+  TrailOn: !Equals [!Ref EnableTrail, 'true']
+
+Resources:
+  # ---- GuardDuty ----
+  Detector:
+    Type: AWS::GuardDuty::Detector
+    Condition: GuardDutyOn
+    Properties:
+      Enable: true
+      FindingPublishingFrequency: FIFTEEN_MINUTES
+
+  SecurityTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${EnvPrefix}-security'
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  SecurityTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref SecurityTopic]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EventBridgePublish
+            Effect: Allow
+            Principal: { Service: events.amazonaws.com }
+            Action: sns:Publish
+            Resource: !Ref SecurityTopic
+            Condition:
+              ArnEquals: { 'aws:SourceArn': !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${EnvPrefix}-guardduty-findings' }
+
+  # Severity 4+ is GuardDuty's medium and high; low findings are mostly noise.
+  FindingRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${EnvPrefix}-guardduty-findings'
+      Description: Emails medium and high GuardDuty findings
+      EventPattern:
+        source: [aws.guardduty]
+        detail-type: [GuardDuty Finding]
+        detail:
+          severity: [{ numeric: ['>=', 4] }]
+      Targets:
+        - Id: email
+          Arn: !Ref SecurityTopic
+          InputTransformer:
+            InputPathsMap:
+              title: $.detail.title
+              severity: $.detail.severity
+              type: $.detail.type
+              region: $.region
+              id: $.detail.id
+              description: $.detail.description
+            InputTemplate: |
+              "GuardDuty finding (severity <severity>, <region>): <title>"
+              "Type: <type>"
+              "<description>"
+              "Details: https://console.aws.amazon.com/guardduty/home?region=<region>#/findings?search=id%3D<id>"
+
+  # ---- CloudTrail ----
+  TrailBucket:
+    Type: AWS::S3::Bucket
+    Condition: TrailOn
+    Properties:
+      BucketName: !Sub '${EnvPrefix}-cloudtrail-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire
+            Status: Enabled
+            ExpirationInDays: !Ref TrailRetentionDays
+
+  TrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: TrailOn
+    Properties:
+      Bucket: !Ref TrailBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudTrailAclCheck
+            Effect: Allow
+            Principal: { Service: cloudtrail.amazonaws.com }
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt TrailBucket.Arn
+            Condition:
+              StringEquals: { 'aws:SourceArn': !Sub 'arn:aws:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${EnvPrefix}-trail' }
+          - Sid: CloudTrailWrite
+            Effect: Allow
+            Principal: { Service: cloudtrail.amazonaws.com }
+            Action: s3:PutObject
+            Resource: !Sub '${TrailBucket.Arn}/AWSLogs/${AWS::AccountId}/*'
+            Condition:
+              StringEquals:
+                's3:x-amz-acl': bucket-owner-full-control
+                'aws:SourceArn': !Sub 'arn:aws:cloudtrail:${AWS::Region}:${AWS::AccountId}:trail/${EnvPrefix}-trail'
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt TrailBucket.Arn, !Sub '${TrailBucket.Arn}/*']
+            Condition:
+              Bool: { 'aws:SecureTransport': 'false' }
+
+  # Management events only (who changed what), every region; no data
+  # events, which are billed per request.
+  Trail:
+    Type: AWS::CloudTrail::Trail
+    Condition: TrailOn
+    DependsOn: TrailBucketPolicy
+    Properties:
+      TrailName: !Sub '${EnvPrefix}-trail'
+      S3BucketName: !Ref TrailBucket
+      IsLogging: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      EnableLogFileValidation: true
+
+Outputs:
+  SecurityTopicArn:
+    Value: !Ref SecurityTopic
+  TrailBucketName:
+    Condition: TrailOn
+    Value: !Ref TrailBucket

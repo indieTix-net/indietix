@@ -147,7 +147,8 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
               OriginSSLProtocols: [TLSv1.2]
-              OriginReadTimeout: 30
+              # Above QRScanner's own 40 s limit (60 is CloudFront's default maximum).
+              OriginReadTimeout: 60
             OriginCustomHeaders:
               # bootstrap.sh keeps the value in Secrets Manager (us-east-1),
               # indieTix/edge/<EnvPrefix> = {"secret": ...}, so it never

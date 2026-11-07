@@ -75,6 +75,27 @@ aws cloudformation deploy --region us-east-2 --stack-name indietix-prod-alarms \
 
 A new `AlertEmail` must click the AWS confirmation email before anything arrives. Test delivery with `aws cloudwatch set-alarm-state --region us-east-2 --alarm-name indietix-prod-qrscanner-crashed --state-value ALARM --state-reason test` (it flips back to OK by itself at the next evaluation). Function names are template parameters, since production's functions were made by hand; `bootstrap.sh` deploys the same template for its environments (`deploy_alarms`). QRScanner's public status page (`status.html`, `GET /api/public/status`) reads these alarms when QRScanner has `STATUS_ALARM_PREFIX=indietix-prod` and its role allows `cloudwatch:DescribeAlarms`.
 
+## Account security (`security/template.yaml`)
+
+Stack `indietix-prod-security` (us-east-2, live 2026-11-06): GuardDuty threat detection, a multi-region CloudTrail trail of every AWS account action (management events only, kept 365 days in `indietix-prod-cloudtrail-<account>`, log file validation on), and SNS topic `indietix-prod-security`, which emails each GuardDuty finding of severity 4 or higher (medium and high). It watches the account and blocks nothing. GuardDuty reads IAM and other global events from this region; other regions aren't watched.
+
+```
+aws cloudformation deploy --region us-east-2 --stack-name indietix-prod-security \
+  --template-file security/template.yaml --parameter-overrides AlertEmail=<address>
+```
+
+Test the email with `aws guardduty create-sample-findings --region us-east-2 --detector-id <id> --finding-types 'Backdoor:EC2/C&CActivity.B!DNS'`. `bootstrap.sh` deploys the same template (`deploy_security`), skipping GuardDuty or the trail when the account already has one, and `down` stops the trail and empties its bucket first.
+
+## API firewall (`api-edge/template.yaml`)
+
+Stack `indietix-prod-api-edge` (us-east-1, live 2026-11-06): CloudFront `https://d2dp74tg29n4ng.cloudfront.net` plus WAF web ACL `indietix-prod-api` in front of QRScanner's Function URL, and the header secret `indieTix/edge/indietix-prod` (us-east-1). Production's `config.js` points `INDIETIX_API_URL` at it. QRScanner refuses direct calls to its Function URL only once its env has `EDGE_ORIGIN_SECRET` (the secret's `secret` value, merged into the existing env, keeping `TICKET_SIGNER_*`). Set that on a quiet weekday, after staff devices have reloaded the new `config.js`; until then the firewall can be bypassed by calling the old address. Remove `EDGE_ORIGIN_SECRET` to switch the check back off, and restore `config.js` from `.prod-backups/2026-11-06-api-edge/` to stop using the edge.
+
+```
+aws cloudformation deploy --region us-east-1 --stack-name indietix-prod-api-edge \
+  --template-file api-edge/template.yaml \
+  --parameter-overrides EnvPrefix=indietix-prod ApiOriginDomain=<Function URL host>
+```
+
 ## Venues' own web addresses (`<name>.indietix.net`)
 
 Each venue can pick a web address under one domain (QRScanner's `VENUE WEB ADDRESS`: Client Settings, or the signup form). Every name reaches the environment's one static site; QRScanner reserves a name by writing `venue-sites/<name>/` (`site.json`, `privacy.html`, `terms.html`) in the static site bucket, and sets the venue's `STATIC_WEBSITE_URL`. The login page reads `site.json` to fill in the Client ID. Teardown frees the name.
