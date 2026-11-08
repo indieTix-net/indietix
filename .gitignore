@@ -12,4 +12,6 @@ oldConfigs.josh
 # Never commit keys or installed packages.
 *.pem
 node_modules/
+# QRScanner's dev install; its deployed packages are locked in nodePackages/.
+/QRScanner/package-lock.json
 .DS_Store

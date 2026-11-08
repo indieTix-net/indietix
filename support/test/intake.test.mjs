@@ -81,6 +81,28 @@ test('if drafting fails the email is still stored, for Regenerate to retry', asy
   assert.equal(m.Draft, null);
 });
 
+test('past the daily draft limit, emails are filed without a draft and only the first sends a notice', async () => {
+  const anthropic = fakeAnthropic();
+  const notices = [];
+  const d = deps(anthropic, { dailyDraftLimit: 2, notify: async (n) => notices.push(n) });
+  const results = [];
+  for (let i = 1; i <= 4; i++) {
+    results.push(await receiveEmail(d, { raw: rawEmail({ messageId: `<flood${i}@x>`, from: `p${i}@else.example` }), s3Key: `k${i}` }));
+  }
+  assert.deepEqual(results.map(r => r.drafted), [true, true, false, false]);
+  assert.equal(results[2].overLimit, true);
+  assert.equal(anthropic.calls.length, 2);
+  assert.deepEqual(notices.map(n => n.limitReached), [null, null, 2]);
+  // Regenerate from the inbox isn't limited.
+  const redraft = await handleEvent({ action: 'draft', ticketId: results[3].ticketId }, d);
+  assert.ok(redraft.draft);
+  // Spam doesn't use up the limit, and the limit is per 24 hours.
+  await client.query(`UPDATE "SupportMessage" SET "CreatedDate" = now() - interval '25 hours'`);
+  await receiveEmail(d, { raw: rawEmail({ messageId: '<s@x>' }), s3Key: 'ks', receipt: { spamVerdict: { status: 'FAIL' } } });
+  const next = await receiveEmail(d, { raw: rawEmail({ messageId: '<next@x>', from: 'n@else.example' }), s3Key: 'kn' });
+  assert.equal(next.drafted, true);
+});
+
 test('handleEvent: an SES event reads the raw email from the support/ prefix; {action:"draft"} redrafts', async () => {
   const keys = [];
   const anthropic = fakeAnthropic({ text: 'Second draft' });
