@@ -12,8 +12,13 @@ import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import Anthropic from '@anthropic-ai/sdk';
 import { createDataApiQuery } from './db.mjs';
 import { parseEmail, skipReason, ticketNumberFromSubject } from './mail.mjs';
-import { findTicketForEmail, createTicket, addMessage, saveDraft, getTicket, getMessages, setStatus, deleteExpired } from './store.mjs';
+import { findTicketForEmail, createTicket, addMessage, saveDraft, getTicket, getMessages, setStatus, deleteExpired, countDraftableEmailsToday } from './store.mjs';
 import { generateDraft } from './draft.mjs';
+
+// Most automatic drafts in any 24 hours, so a flood of email can't run up the
+// Anthropic bill (about 5 cents a draft). Past it, emails are still filed and
+// Regenerate in the inbox still drafts.
+export const DEFAULT_DAILY_DRAFT_LIMIT = 50;
 
 const NEW_TICKET_STATUS = { spam: 'spam', virus: 'spam', auto_reply: 'closed', bulk: 'closed', automated_sender: 'closed', own_address: 'closed', no_sender: 'closed' };
 
@@ -54,21 +59,29 @@ export async function receiveEmail(deps, { raw, s3Key, receipt }) {
     console.log(`T-${ticket.ID}: stored ${email.messageId}, no draft (${skipped})`);
     return { ticketId: ticket.ID, skipped };
   }
+  const limit = deps.dailyDraftLimit ?? DEFAULT_DAILY_DRAFT_LIMIT;
+  const today = await countDraftableEmailsToday(deps.query);
+  const overLimit = today > limit;
   let drafted = false;
-  try {
-    drafted = Boolean((await draftTicket(deps, ticket.ID)).draft);
-  } catch (error) {
-    // The email is stored; the inbox's Regenerate button retries the draft.
-    console.error(`ERROR drafting T-${ticket.ID}:`, error?.status || '', error?.message);
-  }
-  if (deps.notify) {
+  if (overLimit) {
+    console.warn(`T-${ticket.ID}: no draft, ${today} emails in 24 hours is past the daily draft limit of ${limit}`);
+  } else {
     try {
-      await deps.notify({ ticket, email, drafted });
+      drafted = Boolean((await draftTicket(deps, ticket.ID)).draft);
+    } catch (error) {
+      // The email is stored; the inbox's Regenerate button retries the draft.
+      console.error(`ERROR drafting T-${ticket.ID}:`, error?.status || '', error?.message);
+    }
+  }
+  // Past the limit, only the first email sends a notice, so a flood doesn't fill the mailbox.
+  if (deps.notify && today <= limit + 1) {
+    try {
+      await deps.notify({ ticket, email, drafted, limitReached: overLimit ? limit : null });
     } catch (error) {
       console.error(`ERROR sending the new-ticket notice for T-${ticket.ID}:`, error.message);
     }
   }
-  return { ticketId: ticket.ID, isNew, drafted };
+  return { ticketId: ticket.ID, isNew, drafted, ...(overLimit && { overLimit: true }) };
 }
 
 // ---- AWS wiring ----
@@ -97,13 +110,14 @@ function defaultDeps() {
       const object = await s3.send(new GetObjectCommand({ Bucket: process.env.INBOUND_BUCKET, Key: key }));
       return Buffer.from(await object.Body.transformToByteArray());
     },
-    notify: process.env.NOTIFY_EMAIL ? async ({ ticket, email, drafted }) => {
+    dailyDraftLimit: process.env.DAILY_DRAFT_LIMIT ? Number(process.env.DAILY_DRAFT_LIMIT) : DEFAULT_DAILY_DRAFT_LIMIT,
+    notify: process.env.NOTIFY_EMAIL ? async ({ ticket, email, drafted, limitReached }) => {
       await ses.send(new SendEmailCommand({
         Source: process.env.NOTIFY_FROM || 'indietix@indietix.net',
         Destination: { ToAddresses: [process.env.NOTIFY_EMAIL] },
         Message: {
           Subject: { Data: `[support T-${ticket.ID}] ${email.subject || '(no subject)'}`.slice(0, 200) },
-          Body: { Text: { Data: `New support email from ${email.fromName ? `${email.fromName} <${email.fromAddress}>` : email.fromAddress}.\n${drafted ? 'A draft reply is ready.' : 'No draft yet; use Regenerate in the inbox.'}\n\nOpen the inbox: ./support.sh (in infrastructure/).` } }
+          Body: { Text: { Data: `New support email from ${email.fromName ? `${email.fromName} <${email.fromAddress}>` : email.fromAddress}.\n${drafted ? 'A draft reply is ready.' : 'No draft yet; use Regenerate in the inbox.'}${limitReached ? `\nThe daily limit of ${limitReached} automatic drafts was reached, so emails for the rest of the 24 hours are filed without drafts or notices.` : ''}\n\nOpen the inbox: ./support.sh (in infrastructure/).` } }
         }
       }));
     } : null

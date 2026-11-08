@@ -73,6 +73,15 @@ export async function saveDraft(query, messageId, { draft, model }) {
     { messageId, draft, model: model || null });
 }
 
+// Emails from the last 24 hours that weren't skipped, i.e. ones that asked
+// for an automatic draft (the daily draft limit counts these).
+export async function countDraftableEmailsToday(query) {
+  const rows = await query(
+    `SELECT count(*)::int AS n FROM "SupportMessage"
+     WHERE "Direction" = 'in' AND "Skipped" IS NULL AND "CreatedDate" > now() - interval '24 hours'`, {});
+  return rows[0].n;
+}
+
 export async function listTickets(query, { status } = {}) {
   return query(
     `SELECT t.*,
