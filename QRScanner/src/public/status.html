@@ -25,7 +25,8 @@
         <!-- Standalone header, same convention as support.html -- public
              page, not auth-gated, so header-loader.js isn't used here. -->
         <div class="text-center py-4 mb-4 border-bottom border-dark border-3">
-            <img src="indieTixLogo.png" alt="IndieTix" style="max-width: 160px;" onerror="this.style.display='none';">
+            <!-- The venue's own logo on its address (<name>.indietix.net), else IndieTix's; set by status.js. -->
+            <img id="status-logo" alt="" style="max-width: 160px;" hidden onerror="this.hidden = true;">
             <h4 class="mt-3 mb-0">System status</h4>
         </div>
 

@@ -7,6 +7,31 @@
     const API_URL = window.INDIETIX_API_URL;
     const REFRESH_MS = 60 * 1000;
 
+    // ---- VENUE LOGO ----
+    // On a venue's own address (<name>.<INDIETIX_VENUE_SITE_DOMAIN>) the page
+    // wears that venue's logo and name, read from its public site.json like
+    // the login page does; anywhere else, or if the venue has none, IndieTix's.
+    (function showLogo() {
+        const logo = document.getElementById('status-logo');
+        if (!logo) return;
+        const useLogo = (src, alt) => { logo.src = src; logo.alt = alt; logo.hidden = false; };
+        const useDefault = () => useLogo('indieTixLogo.png', 'IndieTix');
+        const domain = String(window.INDIETIX_VENUE_SITE_DOMAIN || '').toLowerCase();
+        const host = window.location.hostname.toLowerCase();
+        if (!domain || !host.endsWith(`.${domain}`)) return useDefault();
+        const name = host.slice(0, -(domain.length + 1));
+        if (!/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(name)) return useDefault();
+        fetch(`venue-sites/${name}/site.json`, { cache: 'no-cache' })
+            .then(response => (response.ok ? response.json() : null))
+            .then(site => {
+                const file = site && site.logoFile;
+                if (!file || !/^[A-Za-z0-9._\/-]+$/.test(file) || file.includes('..')) return useDefault();
+                useLogo(file, site.venueName ? `${site.venueName} logo` : 'Venue logo');
+                if (site.venueName) document.title = `${site.venueName} - System status`;
+            })
+            .catch(useDefault);
+    })();
+
     const overallEl = document.getElementById('overall');
     const componentsEl = document.getElementById('components');
     const checkedAtEl = document.getElementById('checked-at');
