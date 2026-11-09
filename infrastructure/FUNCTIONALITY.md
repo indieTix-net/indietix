@@ -4,6 +4,8 @@
 
 A high-level tour of what the platform actually lets a venue do, grouped the way the app itself groups it (by who's allowed to do what). For setup and integration details, see [README.md](./README.md). For the full step-by-step on bringing up a brand-new venue, see [CLIENT_SETUP.md](./CLIENT_SETUP.md).
 
+Built for independent venues, and works the same for independent promoters running their own Square account: the cinema-only pieces (distributor box-office reports) are optional.
+
 **Running a venue day to day?** The step-by-step guide for venue staff (with screenshots) is in [`support/knowledge/`](../support/knowledge/), published as the Help pages at `/help/` on every venue's site.
 
 ## Selling tickets

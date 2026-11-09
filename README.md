@@ -1,6 +1,6 @@
 # IndieTix
 
-A Square-integrated ticketing platform for independent venues... built to run your own box office without handing a cut of every ticket to a company that had nothing to do with the show.
+A Square-integrated ticketing platform for independent venues and promoters... built to run your own box office without handing a cut of every ticket to a company that had nothing to do with the show.
 
 ## Why IndieTix Exists
 
@@ -9,6 +9,8 @@ Most ticketing platforms take too much of a cut.  Fees from the ticket giants ha
 IndieTix exists to cut that middleman out.
 
 IndieTix was built as tool for one independent event space and cinema trying to run its own box office without handing a slice of every ticket to a company that had nothing to do with the film, the venue, or the night itself. It's grown into a full ticketing platform, but the principle hasn't changed: The people putting on the show, the venues, the promoters, the artists, should be the ones deciding what a ticket costs, not a platform with no stake in whether the show is any good. Fees should fund the event, not a stranger's margin.
+
+**Not just for venues.** Independent promoters who put on shows in rented or borrowed spaces have the same problem: ticketing platforms like Eventbrite add service fees to every ticket. With a free Square account and IndieTix, a promoter sells tickets on their own Square Online page and at a Square reader at the door, scans tickets on a phone, and keeps every sale in their own Square account. Buyers pay the ticket price, not a fee on top.
 
 IndieTix is free, open source, and yours to self-host and modify with no strings attached... no tier that unlocks "real" control, no cut of your ticket sales baked into the code. If you'd rather not run the infrastructure yourself or need help, hosted and supported plans are available too. 
 
