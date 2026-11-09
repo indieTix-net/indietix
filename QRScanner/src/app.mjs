@@ -6431,11 +6431,26 @@ AND ("CreatedDate" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Chicago') < date_tru
 // ---- END INSIGHTS DATABASE CONTEXT ----
 
 // Insights endpoint - Text-to-SQL with Claude API
+// The SQL-writing reply: either just the query, or a "NOTE:" (or a few plain
+// sentences) about what the data can't answer, followed by the closest query.
+// Returns { note, sql }; sql is null when there's no query in the reply.
+function splitInsightsReply(text) {
+  const lines = String(text || '').split('\n');
+  const start = lines.findIndex(line => /^\s*(SELECT|WITH)\b/i.test(line));
+  const before = (start === -1 ? lines : lines.slice(0, start)).join('\n').trim();
+  const sql = start === -1 ? null : lines.slice(start).join('\n').trim();
+  const isNote = /^NOTE:/i.test(before);
+  // Plain text before a query is a note too; text with no query is only a
+  // note when it says so (anything else, e.g. a DELETE, is refused below).
+  const note = isNote ? before.replace(/^NOTE:\s*/i, '').trim() : (sql && before ? before : null);
+  return { note: note || null, sql };
+}
+
 app.post('/api/insights/query', requireAuth, requirePermission('admin'), async (req, res) => {
   const clientId = req.user.clientId;
   const { question } = req.body;
   
-  console.log(`[Insights] Client ${clientId} asking: ${question}`);
+  console.log(`[Insights] Client ${clientId || req.user.dbName} asking: ${question}`);
   
   if (!question || typeof question !== 'string') {
       return res.status(400).json({ error: 'Question is required' });
@@ -6450,7 +6465,10 @@ app.post('/api/insights/query', requireAuth, requirePermission('admin'), async (
       // Database context for the SQL-writing step, with this venue's own
       // name, address, rooms and ticket types from its settings.
       const venueConfigResult = await clientPool.query(`SELECT "configuration" FROM "Client" LIMIT 1`);
-      const schemaContext = buildInsightsContext(venueConfigResult.rows[0]?.configuration || {});
+      const venueConfig = venueConfigResult.rows[0]?.configuration || {};
+      const schemaContext = buildInsightsContext(venueConfig);
+      // Where the venue is, for the answer step's web searches (weather, local events).
+      const venueLocation = [venueConfig.WEB_HEADER_COMPANY || venueConfig.THEATER_NAME, venueConfig.LEGAL_ADDRESS].filter(Boolean).join(', ');
 
       // Step 1: Call Claude API to generate SQL
       console.log('[Insights] Calling Claude API to generate SQL...');
@@ -6471,7 +6489,11 @@ app.post('/api/insights/query', requireAuth, requirePermission('admin'), async (
 
 User question: "${question}"
 
-Generate a PostgreSQL SELECT query to answer this question. Return ONLY the SQL query, no explanation or markdown formatting. The query must be read-only (SELECT only).`
+Generate a PostgreSQL query to answer this question: a single read-only SELECT (it may start with WITH). Reply with ONLY the SQL, no explanation or markdown formatting.
+
+The answer step after you can search the web. So when the question mixes sales with facts from outside this database (moon phases, weather, holidays, sports schedules, school calendars, film release dates, local events), don't explain that they're missing: write the query that returns the sales those facts will be matched against, usually tickets and revenue per show date (include the date), and the outside facts are looked up and joined in the next step.
+
+Only if the question needs something neither this data nor a web search can give (for example a movie's genre, which isn't stored), reply instead with one line starting "NOTE:" that says plainly what's missing and what you'll show instead, then the SQL for the closest question the data can answer. If nothing related can be answered, reply with only the NOTE: line.`
               }]
           })
       });
@@ -6487,10 +6509,19 @@ Generate a PostgreSQL SELECT query to answer this question. Return ONLY the SQL 
       generatedSQL = generatedSQL.replace(/```sql\n?/g, '').replace(/```\n?/g, '').trim();
       
       console.log('[Insights] Generated SQL:', generatedSQL);
+
+      // A question the data can't answer exactly comes back as a "NOTE:" line
+      // (or, sometimes, plain sentences) before the closest query: keep that
+      // text to pass on, and take the query from where it starts.
+      const { note, sql: extractedSQL } = splitInsightsReply(generatedSQL);
+      if (!extractedSQL && note) {
+          return res.json({ answer: note, sql: null, rowCount: 0 });
+      }
+      if (extractedSQL) generatedSQL = extractedSQL;
       
-      // Security check: Ensure it's a SELECT query only
+      // Security check: Ensure it's a read-only query (SELECT, or WITH ... SELECT)
       const sqlUpper = generatedSQL.toUpperCase().trim();
-      if (!sqlUpper.startsWith('SELECT')) {
+      if (!sqlUpper.startsWith('SELECT') && !sqlUpper.startsWith('WITH')) {
           return res.status(400).json({ 
               error: 'Only SELECT queries are allowed for safety',
               sql: generatedSQL 
@@ -6566,7 +6597,7 @@ const formattingResponse = await fetch('https://api.anthropic.com/v1/messages', 
         messages: [{
             role: 'user',
             content: `Original question: "${question}"
-
+${venueLocation ? `\nThe venue is ${venueLocation}; use that location when searching the web for weather, local events and the like.\n` : ''}${note ? `\nNote from the query writer: ${note}\nIf that note says the data can't answer the question exactly, start the answer by saying so plainly and what's shown instead.\n` : ''}
 SQL query executed: ${generatedSQL}
 
 Query results (${result.rows.length} rows):
