@@ -16,13 +16,15 @@ beforeEach(async () => {
 });
 
 let formattingPrompts = [];
+let sqlPrompts = [];
 function installAnthropicMock({ sqlText, formattingOk = true, answerText = 'Here is your answer.', sqlOk = true, sqlStatus = 200, formattingStatus = 200 }) {
   formattingPrompts = [];
+  sqlPrompts = [];
   globalThis.fetch = async (url, opts) => {
     if (url === 'https://api.anthropic.com/v1/messages') {
       const body = JSON.parse(opts.body);
       const isFormatting = Array.isArray(body.tools);
-      if (isFormatting) formattingPrompts.push(body.messages[0].content);
+      if (isFormatting) formattingPrompts.push(body.messages[0].content); else sqlPrompts.push(body.messages[0].content);
       if (!isFormatting) {
         if (!sqlOk) return { ok: false, status: sqlStatus, json: async () => ({}) };
         return { ok: true, status: 200, json: async () => ({ content: [{ text: sqlText }] }) };
@@ -267,5 +269,25 @@ test('POST /api/insights/query: a WITH query is accepted (still read-only)', asy
     assert.equal(json.rowCount, 1);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('POST /api/insights/query: sales mixed with outside facts (moon phases) get the sales by date, and the web-search step gets the venue location', async () => {
+  await insertMovieTicket('QR-MOON-1', 'Northlight Pictures');
+  await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = ("configuration"::jsonb || '{"LEGAL_ADDRESS": "100 Example Street, Riverton, KS"}'::jsonb)::json`);
+  installAnthropicMock({
+    sqlText: `SELECT "ProductDate"::date AS show_date, COUNT(*) AS tickets FROM "QRCodeProduct" WHERE "Status" = 'valid' GROUP BY 1 ORDER BY 1`,
+    answerText: 'Full moons sold the most tickets.'
+  });
+  try {
+    const { status, json } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'What phase of the moon is best for selling movie tickets?' } });
+    assert.equal(status, 200);
+    assert.equal(json.answer, 'Full moons sold the most tickets.');
+    assert.match(sqlPrompts[0], /can search the web.*moon phases.*tickets and revenue per show date/s);
+    assert.match(formattingPrompts[0], /The venue is .*100 Example Street, Riverton, KS; use that location when searching the web/);
+    assert.doesNotMatch(formattingPrompts[0], /Note from the query writer/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = ("configuration"::jsonb - 'LEGAL_ADDRESS')::json`);
   }
 });

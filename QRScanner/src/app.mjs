@@ -6465,7 +6465,10 @@ app.post('/api/insights/query', requireAuth, requirePermission('admin'), async (
       // Database context for the SQL-writing step, with this venue's own
       // name, address, rooms and ticket types from its settings.
       const venueConfigResult = await clientPool.query(`SELECT "configuration" FROM "Client" LIMIT 1`);
-      const schemaContext = buildInsightsContext(venueConfigResult.rows[0]?.configuration || {});
+      const venueConfig = venueConfigResult.rows[0]?.configuration || {};
+      const schemaContext = buildInsightsContext(venueConfig);
+      // Where the venue is, for the answer step's web searches (weather, local events).
+      const venueLocation = [venueConfig.WEB_HEADER_COMPANY || venueConfig.THEATER_NAME, venueConfig.LEGAL_ADDRESS].filter(Boolean).join(', ');
 
       // Step 1: Call Claude API to generate SQL
       console.log('[Insights] Calling Claude API to generate SQL...');
@@ -6488,7 +6491,9 @@ User question: "${question}"
 
 Generate a PostgreSQL query to answer this question: a single read-only SELECT (it may start with WITH). Reply with ONLY the SQL, no explanation or markdown formatting.
 
-If the data above can't answer the question exactly (for example it asks about something these tables don't record), reply instead with one line starting "NOTE:" that says plainly what's missing and what you'll show instead, then the SQL for the closest question the data can answer. If nothing related can be answered, reply with only the NOTE: line.`
+The answer step after you can search the web. So when the question mixes sales with facts from outside this database (moon phases, weather, holidays, sports schedules, school calendars, film release dates, local events), don't explain that they're missing: write the query that returns the sales those facts will be matched against, usually tickets and revenue per show date (include the date), and the outside facts are looked up and joined in the next step.
+
+Only if the question needs something neither this data nor a web search can give (for example a movie's genre, which isn't stored), reply instead with one line starting "NOTE:" that says plainly what's missing and what you'll show instead, then the SQL for the closest question the data can answer. If nothing related can be answered, reply with only the NOTE: line.`
               }]
           })
       });
@@ -6592,7 +6597,7 @@ const formattingResponse = await fetch('https://api.anthropic.com/v1/messages', 
         messages: [{
             role: 'user',
             content: `Original question: "${question}"
-${note ? `\nNote from the query writer: ${note}\nIf that note says the data can't answer the question exactly, start the answer by saying so plainly and what's shown instead.\n` : ''}
+${venueLocation ? `\nThe venue is ${venueLocation}; use that location when searching the web for weather, local events and the like.\n` : ''}${note ? `\nNote from the query writer: ${note}\nIf that note says the data can't answer the question exactly, start the answer by saying so plainly and what's shown instead.\n` : ''}
 SQL query executed: ${generatedSQL}
 
 Query results (${result.rows.length} rows):
