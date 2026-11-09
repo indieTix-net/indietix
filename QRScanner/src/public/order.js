@@ -1004,18 +1004,17 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
                 
                card.innerHTML = `
     <div class="card-header collapsed" onclick="toggleCardDetails('card-${index}')">
-        <h5 data-column="order-id">${orderID}</h5>
-        <div class="customer-name" data-column="customer-name">${customerName}</div>
         <div class="card-header-row">
-            <div></div>
+            <h5 class="card-title-name">${customerName}</h5>
             <span class="card-collapse-icon">›</span>
         </div>
+        <div class="card-date">${formatDate(createdDate)}</div>
     </div>
     
     <div class="card-details">
         <dl>
-            <dt data-column="created-date">Created Date</dt>
-            <dd data-column="created-date">${formatDate(createdDate)}</dd>
+            <dt data-column="order-id">Order ID</dt>
+            <dd data-column="order-id">${orderID}</dd>
             
             <dt data-column="email">Email Address</dt>
             <dd data-column="email">${emailAddress}</dd>
@@ -1039,7 +1038,7 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
     
     <div class="card-action">
         <div class="card-action-left">
-            <button class="btn btn-sm btn-outline-secondary" 
+            <button class="btn btn-sm btn-outline-secondary card-btn-details" 
                 onclick="event.stopPropagation(); toggleCardDetails('card-${index}')">
                 Details
             </button>
@@ -1048,7 +1047,7 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
         <div class="card-action-right">
             ${status === 'Valid' ? `
             <div class="dropdown dropup">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle action-dropdown-btn"
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle action-dropdown-btn card-btn-actions"
                         type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     Actions
                 </button>

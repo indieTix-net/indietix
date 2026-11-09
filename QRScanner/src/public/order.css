@@ -374,6 +374,28 @@
     margin-top: 2px;
 }
 
+/* A closed card shows only who and when; the order ID is in the details. */
+.order-card .card-title-name {
+    margin: 0;
+}
+
+.card-date {
+    color: var(--lh-muted, #6c757d);
+    font-size: 0.9rem;
+    margin-top: 2px;
+}
+
+/* Different outline colors so the two card buttons are easy to tell apart */
+.order-card .card-btn-details {
+    border-color: var(--lh-info, #0dcaf0);
+    color: var(--lh-info-text, #0aa2c0);
+}
+
+.order-card .card-btn-actions.dropdown-toggle { /* beats the theme's grey dropdown-toggle outline */
+    border-color: var(--lh-colvis, #d63384);
+    color: var(--lh-colvis-text, #d63384);
+}
+
 .card-collapse-icon {
     font-size: 1.25rem;
     transition: transform 0.2s;
@@ -582,16 +604,18 @@
    ======================= */
 @media (max-width: 767px) {
     /* Mobile card action layout */
+    /* Details and Actions side by side, so a closed card stays short */
     .mobile-cards .card-action {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 15px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        margin-top: 10px;
     }
-    
+
     .mobile-cards .card-action-left,
     .mobile-cards .card-action-right {
-        width: 100%;
-        justify-content: center;
+        width: auto;
     }
 }
 
