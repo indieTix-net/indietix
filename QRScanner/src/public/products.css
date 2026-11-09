@@ -218,6 +218,17 @@ tr.row-status-valid.row-checked-in > td {
 }
 
 /* Mobile cards */
+/* Different outline colors so the two card buttons are easy to tell apart (as on Orders) */
+.event-card .card-btn-details {
+    border-color: var(--lh-info, #0dcaf0);
+    color: var(--lh-info-text, #0aa2c0);
+}
+
+.event-card .card-btn-actions.dropdown-toggle { /* beats the theme's grey dropdown-toggle outline */
+    border-color: var(--lh-colvis, #d63384);
+    color: var(--lh-colvis-text, #d63384);
+}
+
 .event-card.row-status-valid {
     background-color: rgba(255, 255, 255, 0.04);
     color: var(--lh-row-text, #E2E0E4);
@@ -524,16 +535,18 @@ tr.row-status-valid.row-checked-in > td {
    MOBILE SPECIFIC STYLES (up to 991px)
    ======================= */
 @media (max-width: 991px) {
+    /* Details and Actions side by side, so a closed card stays short (as on Orders) */
     .mobile-cards .card-action {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 15px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        margin-top: 10px;
     }
-    
+
     .mobile-cards .card-action-left,
     .mobile-cards .card-action-right {
-        width: 100%;
-        justify-content: center;
+        width: auto;
     }
 
     .date-input-group {
