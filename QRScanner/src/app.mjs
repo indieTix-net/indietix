@@ -6482,7 +6482,7 @@ app.post('/api/insights/query', requireAuth, requirePermission('admin'), async (
           },
           body: JSON.stringify({
               model: 'claude-sonnet-5',
-              max_tokens: 2000,
+              max_tokens: 8000, // room for the model's own thinking (on by default) plus the reply
               messages: [{
                   role: 'user',
                   content: `${schemaContext}
@@ -6503,7 +6503,13 @@ Only if the question needs something neither this data nor a web search can give
       }
       
       const sqlData = await sqlGenerationResponse.json();
-      let generatedSQL = sqlData.content[0].text.trim();
+      // The model thinks first by default, so the reply can open with a
+      // thinking block: read the text from every text block, not content[0].
+      let generatedSQL = (sqlData.content || []).filter(block => typeof block.text === 'string').map(block => block.text).join('').trim();
+      if (!generatedSQL) {
+          console.error('[Insights] No text in the SQL reply:', JSON.stringify({ stop_reason: sqlData.stop_reason, blocks: (sqlData.content || []).map(block => block.type) }));
+          return res.status(502).json({ error: 'Insights couldn\'t work out a query for that question. Try rephrasing it.' });
+      }
       
       // Clean up SQL (remove markdown code blocks if present)
       generatedSQL = generatedSQL.replace(/```sql\n?/g, '').replace(/```\n?/g, '').trim();
@@ -6593,7 +6599,7 @@ const formattingResponse = await fetch('https://api.anthropic.com/v1/messages', 
     },
     body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 2000,
+        max_tokens: 8000, // room for the model's own thinking (on by default) plus the reply
         messages: [{
             role: 'user',
             content: `Original question: "${question}"

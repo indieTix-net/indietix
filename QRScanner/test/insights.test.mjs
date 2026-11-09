@@ -17,7 +17,7 @@ beforeEach(async () => {
 
 let formattingPrompts = [];
 let sqlPrompts = [];
-function installAnthropicMock({ sqlText, formattingOk = true, answerText = 'Here is your answer.', sqlOk = true, sqlStatus = 200, formattingStatus = 200 }) {
+function installAnthropicMock({ sqlText, sqlContent, formattingOk = true, answerText = 'Here is your answer.', sqlOk = true, sqlStatus = 200, formattingStatus = 200 }) {
   formattingPrompts = [];
   sqlPrompts = [];
   globalThis.fetch = async (url, opts) => {
@@ -27,7 +27,7 @@ function installAnthropicMock({ sqlText, formattingOk = true, answerText = 'Here
       if (isFormatting) formattingPrompts.push(body.messages[0].content); else sqlPrompts.push(body.messages[0].content);
       if (!isFormatting) {
         if (!sqlOk) return { ok: false, status: sqlStatus, json: async () => ({}) };
-        return { ok: true, status: 200, json: async () => ({ content: [{ text: sqlText }] }) };
+        return { ok: true, status: 200, json: async () => ({ content: sqlContent || [{ text: sqlText }] }) };
       }
       if (!formattingOk) return { ok: false, status: formattingStatus, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: answerText }] }) };
@@ -289,5 +289,35 @@ test('POST /api/insights/query: sales mixed with outside facts (moon phases) get
   } finally {
     globalThis.fetch = originalFetch;
     await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = ("configuration"::jsonb - 'LEGAL_ADDRESS')::json`);
+  }
+});
+
+test('POST /api/insights/query: a reply that starts with a thinking block (the real moon-phase failure) still works', async () => {
+  await insertMovieTicket('QR-THINK-1', 'Northlight Pictures');
+  installAnthropicMock({
+    sqlContent: [
+      { type: 'thinking', thinking: 'Moon phases come from the web; return tickets per show date.', signature: 'sig' },
+      { type: 'text', text: `SELECT "ProductDate"::date AS show_date, COUNT(*) AS tickets FROM "QRCodeProduct" GROUP BY 1` }
+    ],
+    answerText: 'Full moons sold best.'
+  });
+  try {
+    const { status, json } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'what phases of the moon sell the best movie tickets ?' } });
+    assert.equal(status, 200);
+    assert.equal(json.answer, 'Full moons sold best.');
+    assert.match(json.sql, /^SELECT "ProductDate"::date/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('POST /api/insights/query: a reply with no text at all is a clear message, not a crash', async () => {
+  installAnthropicMock({ sqlContent: [{ type: 'thinking', thinking: 'hmm', signature: 'sig' }] });
+  try {
+    const { status, json } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'anything' } });
+    assert.equal(status, 502);
+    assert.match(json.error, /Try rephrasing/);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
