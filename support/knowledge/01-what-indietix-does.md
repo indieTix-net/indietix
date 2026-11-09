@@ -1,6 +1,6 @@
 # What IndieTix does
 
-IndieTix is ticketing for independent cinemas and venues, built on Square. It started as the box office for Liberty Hall in Lawrence, Kansas, and grew into a full platform.
+IndieTix is ticketing for independent cinemas, venues and promoters, built on Square. It started as the box office for Liberty Hall in Lawrence, Kansas, and grew into a full platform.
 
 - **Square handles the sale.** Tickets are Square items, sold at the venue's register and on its Square Online store. IndieTix never handles card details.
 - **IndieTix handles everything around the sale:** QR-code tickets by email (and by text, if the venue has texting set up), a door scanner that runs on any phone, tablet or laptop, order management (refunds, resends, transfers), box-office reports, and a marketing scheduler.
@@ -8,6 +8,12 @@ IndieTix is ticketing for independent cinemas and venues, built on Square. It st
 - **Each venue is fully separate:** its own database, storage and settings. One venue can never see another's data.
 - **Free and open source.** The code is public at https://github.com/indieTix-net/indietix under the AGPL license; anyone can run it on their own AWS account. Hosted IndieTix is the same software, run for the venue, on a monthly plan (see https://indietix.net for pricing).
 - **Who's behind it:** Wolffebrothers LLC.
+
+## Who it's for
+
+- **Independent cinemas and venues** that already run their bar or shop on Square and want ticketing in the same system.
+- **Independent promoters** who book shows in rented or borrowed spaces. Instead of a ticketing site that charges buyers fees, a promoter can open a free Square account and use IndieTix: tickets sell on their own Square Online page or at the door, buyers get QR-code tickets by email, and staff or volunteers scan them on any phone.
+- **Promoters working with a venue on IndieTix:** the venue can give them their own login, limited to their own shows' sales (see [Staff and permissions](09-staff-and-permissions.md)).
 
 ## A night at the box office, start to finish
 

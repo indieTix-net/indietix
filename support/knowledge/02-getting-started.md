@@ -10,6 +10,8 @@ How a venue signs up, how staff log in, and the first settings to fill in.
 
 The Client ID and the main login's username are the same.
 
+**Promoters without a venue** sign up the same way, with their own Square account (a free Square account works). Skip the theater and box-office report settings; set your **Event Locations** to the rooms you book, and your promoter name as the **Event Distributor** under Square Ticket Items.
+
 ## Logging in
 
 ![The login page](images/login.webp)
