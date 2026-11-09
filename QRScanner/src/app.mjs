@@ -9310,6 +9310,84 @@ app.post('/api/public/opt-in', async (req, res) => {
 
   /* end of texting endpoints */
 
+  /** A staff login's data filter as an AND( OR(...) ) SQL block over QRCodeProduct; adds its values to replacements. */
+  function dataFilterSql(req, replacements) {
+    const filters = req.dataFilter?.datafilters || [];
+    const ors = [];
+    filters.forEach((filter, i) => {
+      const parts = [];
+      if (filter.date) {
+        parts.push(`DATE("ProductDate") = :f_date_${i}`);
+        replacements[`f_date_${i}`] = filter.date;
+      }
+      if (filter.event) {
+        parts.push(`"ProductName" ILIKE :f_event_${i}`);
+        replacements[`f_event_${i}`] = eventExactPattern(filter.event);
+      }
+      if (filter.eventContains) {
+        parts.push(`"ProductName" ILIKE :f_econtains_${i}`);
+        replacements[`f_econtains_${i}`] = eventContainsPattern(filter.eventContains);
+      }
+      if (filter.eventType) {
+        parts.push(`"ProductType" ILIKE :f_etype_${i}`);
+        replacements[`f_etype_${i}`] = normalizeEventType(filter.eventType);
+      }
+      if (parts.length) ors.push('(' + parts.join(' AND ') + ')');
+    });
+    return ors.length ? { filterSql: ' AND (' + ors.join(' OR ') + ')', filterApplied: true } : { filterSql: '', filterApplied: false };
+  }
+
+  // ---- DASHBOARD WITHOUT SQUARE ----
+  // A venue with no Square token (the demo venue, or a self-hoster who hasn't
+  // connected Square yet) can't list the day's showtimes from the catalog,
+  // so the day's shows are the ones it has sold tickets for. A showing with
+  // no tickets yet doesn't appear.
+  async function dashboardFromTickets(req, todayStr, tz) {
+    const dbCredentials = await getDatabaseCredentials(req.user.dbName);
+    const { QRCodeProduct } = await initializeModelForClient(req.user.dbName, dbCredentials);
+    const sequelize = QRCodeProduct.sequelize;
+    const replacements = { today: todayStr };
+    const statusPlaceholders = EXCLUDED_TICKET_STATUSES.map((status, i) => {
+      replacements[`exc${i}`] = status;
+      return `:exc${i}`;
+    });
+    const { filterSql, filterApplied } = dataFilterSql(req, replacements);
+    const rows = await sequelize.query(`
+      SELECT "ProductName", "ProductDetails", "ProductVenue", "ProductID",
+             to_char("ProductDate", 'FMHH12:MI AM') AS "displayTime",
+             count(*)::int AS "ticketsSold",
+             (count(*) FILTER (WHERE "CheckedIn"))::int AS "checkedIn"
+      FROM "QRCodeProduct"
+      WHERE "ProductDate" >= CAST(:today AS date)
+        AND "ProductDate" <  (CAST(:today AS date) + INTERVAL '1 day')
+        AND LOWER(COALESCE("Status", '')) NOT IN (${statusPlaceholders.join(', ')})
+        ${filterSql}
+      GROUP BY "ProductName", "ProductDetails", "ProductVenue", "ProductID", "ProductDate"
+      ORDER BY "ProductDate", "ProductName"
+      LIMIT 12
+    `, { replacements, type: sequelize.QueryTypes.SELECT });
+    const events = rows.map(row => {
+      const parsed = parseShowtimeString(row.ProductDetails || '');
+      return {
+        title:       row.ProductName,
+        location:    parsed?.location || row.ProductVenue || '',
+        displayTime: row.displayTime,
+        runtime:     null,
+        descriptors: parsed?.descriptors || [],
+        itemId:      row.ProductID,
+        modifierId:  null,
+        ticketsSold: row.ticketsSold,
+        checkedIn:   row.checkedIn,
+        matchedBy:   'tickets'
+      };
+    });
+    return {
+      date: todayStr, timezone: tz, generatedAt: new Date().toISOString(),
+      filtered: filterApplied, eventCount: events.length, events, source: 'tickets'
+    };
+  }
+  // ---- END DASHBOARD WITHOUT SQUARE ----
+
   app.get('/api/dashboard/today', requireAuth, requirePermission(...PERMS_DOOR), async (req, res) => {
     const debug = req.query.debug === '1' || req.query.debug === 'true';
     const dbg = {};
@@ -9321,10 +9399,6 @@ app.post('/api/public/opt-in', async (req, res) => {
       clientPool = null;
 
       const accessToken = globalConfig.SQUARE_ACCESS_TOKEN;
-      if (!accessToken) {
-        return res.status(500).json({ error: 'Square API not configured' });
-      }
-
       const tz = globalConfig.VENUE_TIMEZONE || VENUE_TZ_FALLBACK;
 
       // Optional ?date=YYYY-MM-DD to view a day other than today (dashboard's
@@ -9349,6 +9423,12 @@ app.post('/api/public/opt-in', async (req, res) => {
           }).format(new Date());
 
       console.log(`[dashboard] Building ${isValidDateStr ? 'requested' : 'today'} view for ${todayStr} (${tz})`);
+
+      // No Square connection (a demo or self-hosted venue without a token):
+      // the day's shows come from the venue's own tickets instead.
+      if (!accessToken) {
+        return res.json(await dashboardFromTickets(req, todayStr, tz));
+      }
 
       const showtimes = await getShowtimesForDate(accessToken, todayStr);
       console.log(`[dashboard] ${showtimes.length} showtime(s) found.`);
@@ -9381,35 +9461,7 @@ app.post('/api/public/opt-in', async (req, res) => {
       });
 
       // Sub-user data filter -> optional AND( OR(...) ) block.
-      let filterApplied = false;
-      let filterSql = '';
-      if (req.dataFilter && req.dataFilter.datafilters && req.dataFilter.datafilters.length > 0) {
-        const ors = [];
-        req.dataFilter.datafilters.forEach((filter, i) => {
-          const parts = [];
-          if (filter.date) {
-            parts.push(`DATE("ProductDate") = :f_date_${i}`);
-            replacements[`f_date_${i}`] = filter.date;
-          }
-          if (filter.event) {
-            parts.push(`"ProductName" ILIKE :f_event_${i}`);
-            replacements[`f_event_${i}`] = eventExactPattern(filter.event);
-          }
-          if (filter.eventContains) {
-            parts.push(`"ProductName" ILIKE :f_econtains_${i}`);
-            replacements[`f_econtains_${i}`] = eventContainsPattern(filter.eventContains);
-          }
-          if (filter.eventType) {
-            parts.push(`"ProductType" ILIKE :f_etype_${i}`);
-            replacements[`f_etype_${i}`] = normalizeEventType(filter.eventType);
-          }
-          if (parts.length) ors.push('(' + parts.join(' AND ') + ')');
-        });
-        if (ors.length) {
-          filterSql = ' AND (' + ors.join(' OR ') + ')';
-          filterApplied = true;
-        }
-      }
+      const { filterSql, filterApplied } = dataFilterSql(req, replacements);
 
       // ProductDate is `timestamp without time zone`. Bracket today +/- 1 day
       // by casting the bound date string; this is timezone-safe regardless of
