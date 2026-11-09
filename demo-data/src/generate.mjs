@@ -15,6 +15,10 @@ import {
   REPERTORY_DISTRIBUTOR, EVENT_DISTRIBUTOR, REFUND_REASONS, USER_AGENTS
 } from './names.mjs';
 
+// Where load-sandbox.sh puts the demo's own logo in the static site (the
+// same folder Client Settings' logo upload uses).
+export const demoLogoPath = (clientId) => `venue-logos/${clientId}/demo-logo.png`;
+
 export const DEMO_VENUE = {
   name: 'The Marquee',
   legalName: 'The Marquee Theater (demo venue)',
@@ -444,7 +448,7 @@ export function generateDemo({ seed = 20260401, now = new Date(), clientId, site
           line_items: lineItems, total_money: money(totalCents), total_tax_money: money(0), total_tip_money: money(0),
           total_discount_money: money(0), total_service_charge_money: money(0),
           tenders: [{
-            id: orderId, type: atDoor && rand.chance(0.4) ? 'CASH' : 'CARD', amount_money: money(totalCents),
+            id: orderId, type: atDoor && rand.chance(0.4) ? 'CASH' : 'CARD', payment_id: orderId, transaction_id: orderId, amount_money: money(totalCents),
             location_id: DEMO_VENUE.locationId, created_at: createdUtc.toISOString(),
             card_details: { card: { card_brand: rand.pick(['VISA', 'MASTERCARD', 'AMERICAN_EXPRESS', 'DISCOVER']), last_4: String(rand.int(1000, 9999)) }, status: 'CAPTURED', entry_method: atDoor ? 'CONTACTLESS' : 'KEYED' }
           }]
@@ -567,9 +571,14 @@ export function generateDemo({ seed = 20260401, now = new Date(), clientId, site
   const settings = {
     SQUARE_ACCESS_TOKEN: '', SQUARE_SIGNATURE_KEY: '',
     WEB_HEADER_COMPANY: DEMO_VENUE.name, THEATER_NAME: DEMO_VENUE.name, SEND_SMS: 'false', USE_FTP: 'false',
+    LOGO_FILE: demoLogoPath(clientId), // assets/marquee-logo.png, uploaded by load-sandbox.sh
     SALES_TAX_RATE: '8.5', SCREEN_NUMBERS: { studio: '2' },
     EVENT_LOCATIONS: Object.values(DEMO_VENUE.rooms), SQUARE_LOCATION_ID: DEMO_VENUE.locationId,
     MOVIE_DISTRIBUTOR: MOVIE_DISTRIBUTORS[0], EVENT_DISTRIBUTOR, MARKETING_ENGINE_ENABLED: 'false',
+    MOVIE_TICKET_TYPES: JSON.stringify([{ name: 'Adult', price: '12.50' }, { name: 'Senior', price: '11.00' }, { name: 'Child', price: '10.00' }]),
+    EVENT_TICKET_TYPES: JSON.stringify([{ name: 'General Admission', price: '15.00' }, { name: 'VIP', price: '35.00' }]),
+    USERS_NAMES: STAFF.filter(u => u.permissions.view).map(u => `${u.first} ${u.last}`),
+    EVENT_DESCRIPTORS: ['Closed Caption', '21+', 'All Ages', 'Q&A After'],
     LEGAL_NAME: DEMO_VENUE.legalName, LEGAL_SHORT_NAME: DEMO_VENUE.name, LEGAL_ADDRESS: `100 Example Street, ${DEMO_VENUE.city} 00000`,
     LEGAL_PHONE: '(785) 555-0100', LEGAL_EMAIL: 'hello@example.com', LEGAL_STATE: 'Kansas', LEGAL_COURT_COUNTY: 'Example County'
   };

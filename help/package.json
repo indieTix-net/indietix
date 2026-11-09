@@ -1,0 +1,23 @@
+{
+  "name": "indietix-help",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Builds the public help pages from the guide in support/knowledge, and takes its screenshots from the demo venue.",
+  "type": "module",
+  "main": "build.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node build.mjs",
+    "screenshots": "node screenshots.mjs"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "marked": "18.1.1"
+  },
+  "devDependencies": {
+    "puppeteer-core": "25.16.0"
+  }
+}

@@ -56,7 +56,8 @@
         { href: '/marketing.html',        label: 'Marketing Schedule',            perms: ['marketing'] },
         { href: '/email-list.html',       label: 'Email List',                    perms: ['marketing'] },
         { href: '/user-management.html',  label: 'User Management',               clientOnly: true },
-        { href: '/client.html',           label: 'Client Settings',               clientOnly: true }
+        { href: '/client.html',           label: 'Client Settings',               clientOnly: true },
+        { href: '/help/index.html',       label: 'Help' }                         // public guide, for everyone
     ];
     
     /**
@@ -402,7 +403,8 @@
 	    '/getEventInfo.html': 'Event Info Creation',
             '/insights.html': 'Reporting Insights',
             '/marketing.html': 'Marketing Schedule',
-            '/email-list.html': 'Email List'
+            '/email-list.html': 'Email List',
+            '/privacy-requests.html': 'Privacy Requests'
         };
         
         return pageTitle[path] || 'Event Scanner';

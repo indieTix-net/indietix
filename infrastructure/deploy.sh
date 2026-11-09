@@ -94,6 +94,11 @@ read-only.
                                 diff vs. live and asks. 'static-push' refuses
                                 those two files: the repo's copies are
                                 placeholders.
+  static-push-help             Build the help pages from the guide
+                                (support/knowledge, via help/build.mjs) and
+                                publish them to /help/ on the static site,
+                                replacing what's there. Shows the files and
+                                asks first.
   invalidate [path...] [--wait] Clear CloudFront's cache for one or more
                                 paths (e.g. /client.html), or everything if
                                 no path is given. Doesn't touch S3 -- just
@@ -561,6 +566,22 @@ cmd_static_push() {
 }
 
 # ---- LEGAL PAGES ----
+# static-push-help -- builds the public help pages from the guide in
+# support/knowledge (one source with the support inbox's knowledge) and
+# syncs them to /help/ in the static bucket, removing pages that no longer
+# exist. WebP screenshots get their content type set explicitly.
+cmd_static_push_help() {
+  local out="$ROOT/QRScanner/src/public/help" reply
+  (cd "$ROOT/help" && npm install --silent --omit=dev && node build.mjs) || { echo "Help build failed." >&2; return 1; }
+  echo "Will publish $(find "$out" -type f | wc -l | tr -d ' ') files to s3://$STATIC_BUCKET/help/ (replacing what's there)."
+  read -r -p "Continue? [y/N] " reply
+  [ "$reply" = "y" ] || [ "$reply" = "Y" ] || { echo "Cancelled."; return 1; }
+  aws s3 sync "$out/" "s3://$STATIC_BUCKET/help/" --delete --exclude "*.webp"
+  aws s3 sync "$out/" "s3://$STATIC_BUCKET/help/" --delete --exclude "*" --include "*.webp" --content-type image/webp
+  aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/help/*" \
+    --query '{Id:Invalidation.Id,Status:Invalidation.Status}' --output table
+}
+
 # static-push-legal [--yes] -- publishes privacy.html and terms.html for
 # LEGAL_CLIENT_ID (deploy.config.sh): fetches each page from the live
 # QRScanner API (GET /legal/<page>?client=<id>&links=static, rendered from
@@ -670,5 +691,6 @@ case "${1:-}" in
   static-push) [ -n "${2:-}" ] || { usage; exit 1; }; cmd_static_push "$2" ;;
   invalidate) cmd_invalidate "${@:2}" ;;
   static-push-legal) cmd_static_push_legal "${2:-}" ;;
+  static-push-help) cmd_static_push_help ;;
   *) usage; exit 1 ;;
 esac
