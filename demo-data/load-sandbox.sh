@@ -55,6 +55,10 @@ grep -q "\"$client\"" "$work/out.json" || { echo "No venue $client in '$ENV_PREF
 site="https://${STATIC_SITE_DOMAIN:-$(aws cloudformation describe-stacks --stack-name "${ENV_PREFIX}-static-site" "${aws_args[@]}" \
   --query "Stacks[0].Outputs[?OutputKey=='DistributionDomainName'].OutputValue" --output text)}"
 (cd "$here" && node bin/build-sql.mjs --client "$client" --site "$site" --out "$work/sql" "$@") | tee "$work/summary.txt"
+bucket="$(aws cloudformation describe-stacks --stack-name "${ENV_PREFIX}-static-site" "${aws_args[@]}" \
+  --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)"
+aws s3 cp "$here/assets/marquee-logo.png" "s3://$bucket/venue-logos/$client/demo-logo.png" --content-type image/png "${aws_args[@]}" >/dev/null
+echo "  logo uploaded"
 for file in "$work"/sql/*.sql; do
   printf '  loading %s\n' "$(basename "$file")"
   run_sql "$file"

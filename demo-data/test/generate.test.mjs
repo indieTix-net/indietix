@@ -78,6 +78,7 @@ test('the settings are merged in, and the box-office report has rows for a past 
   const config = (await client.query(`SELECT "configuration"::jsonb AS c FROM "Client"`)).rows[0].c;
   assert.equal(config.WEB_HEADER_COMPANY, 'The Marquee');
   assert.equal(config.SEND_SMS, 'false');
+  assert.equal(config.LOGO_FILE, `venue-logos/${CLIENT}/demo-logo.png`); // its own logo, never a real venue's
   assert.equal(config.SQUARE_ACCESS_TOKEN, ''); // not connected to Square
   assert.equal(config.FILM_CODE_PREFIX, 'MQ'); // onboarding's other values are kept
   const saturday = demo.tables.QRCodeProduct.find(t => t.ProductType === 'Movie' && new Date(t.ProductDate.replace(' ', 'T') + 'Z').getUTCDay() === 6 && t.ProductDate < '2026-10-01').ProductDate.slice(0, 10);

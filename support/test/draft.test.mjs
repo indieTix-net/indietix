@@ -11,7 +11,7 @@ const messages = [
 
 test('loadKnowledge: every topic file, not the README', () => {
   const knowledge = loadKnowledge();
-  for (const name of ['about.md', 'at-the-door.md', 'square.md', 'texting.md']) assert.ok(knowledge.includes(`<doc name="${name}">`), name);
+  for (const name of ['01-what-indietix-does.md', '05-at-the-door.md', '04-adding-movies-and-events.md', '08-marketing-and-texting.md']) assert.ok(knowledge.includes(`<doc name="${name}">`), name);
   assert.ok(!knowledge.includes('<doc name="README.md">'));
 });
 

@@ -983,8 +983,14 @@ with open(os.environ["PAYLOAD_FILE"], "w") as f:
   bucket="$(stack_output static-site BucketName)"
   if [ -n "$bucket" ]; then
     echo "=== Pushing static assets to s3://$bucket ==="
+    # The help pages are built from the guide (support/knowledge) into public/help/.
+    (cd "$SCRIPT_DIR/../help" && npm install --silent --omit=dev && node build.mjs) \
+      || { echo "Help pages didn't build; pushing the rest without them." >&2; rm -rf "$SCRIPT_DIR/../QRScanner/src/public/help"; }
     aws s3 sync "$SCRIPT_DIR/../QRScanner/src/public/" "s3://$bucket/" \
-      --exclude "config.js" --exclude "*.template" \
+      --exclude "config.js" --exclude "*.template" --exclude "*.webp" \
+      "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
+    aws s3 sync "$SCRIPT_DIR/../QRScanner/src/public/" "s3://$bucket/" \
+      --exclude "*" --include "*.webp" --content-type image/webp \
       "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
     # A re-run's new files sit behind CloudFront's cached copies until
     # invalidated (found when a redeploy kept serving yesterday's pages).

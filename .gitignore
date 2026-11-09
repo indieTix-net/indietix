@@ -14,4 +14,6 @@ oldConfigs.josh
 node_modules/
 # QRScanner's dev install; its deployed packages are locked in nodePackages/.
 /QRScanner/package-lock.json
+# Built from support/knowledge by help/build.mjs at deploy time.
+/QRScanner/src/public/help/
 .DS_Store
