@@ -16,15 +16,17 @@ beforeEach(async () => {
 });
 
 let formattingPrompts = [];
+let formattingBodies = [];
 let sqlPrompts = [];
 function installAnthropicMock({ sqlText, sqlContent, formattingOk = true, answerText = 'Here is your answer.', sqlOk = true, sqlStatus = 200, formattingStatus = 200 }) {
   formattingPrompts = [];
+  formattingBodies = [];
   sqlPrompts = [];
   globalThis.fetch = async (url, opts) => {
     if (url === 'https://api.anthropic.com/v1/messages') {
       const body = JSON.parse(opts.body);
       const isFormatting = Array.isArray(body.tools);
-      if (isFormatting) formattingPrompts.push(body.messages[0].content); else sqlPrompts.push(body.messages[0].content);
+      if (isFormatting) { formattingPrompts.push(body.messages[0].content); formattingBodies.push(body); } else sqlPrompts.push(body.messages[0].content);
       if (!isFormatting) {
         if (!sqlOk) return { ok: false, status: sqlStatus, json: async () => ({}) };
         return { ok: true, status: 200, json: async () => ({ content: sqlContent || [{ text: sqlText }] }) };
@@ -319,5 +321,40 @@ test('POST /api/insights/query: a reply with no text at all is a clear message, 
     assert.match(json.error, /Try rephrasing/);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('POST /api/insights/query: the answer step is kept quick (low effort, at most 3 searches, moon phases worked out not searched)', async () => {
+  await insertMovieTicket('QR-QUICK-1', 'Northlight Pictures');
+  installAnthropicMock({ sqlText: `SELECT "ProductDate"::date AS d, COUNT(*) FROM "QRCodeProduct" GROUP BY 1` });
+  try {
+    const { status } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'moon phases and sales' } });
+    assert.equal(status, 200);
+    const body = formattingBodies[0];
+    assert.deepEqual(body.output_config, { effort: 'low' });
+    assert.equal(body.tools[0].max_uses, 3);
+    assert.equal(body.tools[0].user_location.timezone, 'America/Chicago');
+    assert.match(formattingPrompts[0], /moon phases.*repeat every 29\.53 days/s);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('POST /api/insights/query: an answer step that runs too long is stopped with a clear message, not a timeout', async () => {
+  await insertMovieTicket('QR-SLOW-1', 'Northlight Pictures');
+  process.env.INSIGHTS_ANSWER_TIMEOUT_MS = '200';
+  globalThis.fetch = async (url, opts) => {
+    if (url !== 'https://api.anthropic.com/v1/messages') return originalFetch(url, opts);
+    const body = JSON.parse(opts.body);
+    if (!Array.isArray(body.tools)) return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'SELECT 1 AS one' }] }) };
+    return new Promise((resolve, reject) => opts.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
+  };
+  try {
+    const { status, json } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'slow one' } });
+    assert.equal(status, 504);
+    assert.match(json.error, /took too long.*shorter date range/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.INSIGHTS_ANSWER_TIMEOUT_MS;
   }
 });

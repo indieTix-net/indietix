@@ -6590,8 +6590,15 @@ Only if the question needs something neither this data nor a web search can give
       // Step 3: Call Claude API to format the results into a natural language answer
 console.log('[Insights] Calling Claude API to format results...');
 
-const formattingResponse = await fetch('https://api.anthropic.com/v1/messages', {
+// The answer step must finish inside QRScanner's 40 s limit (a Lambda that
+// runs out of time is a 502): stop it at 35 s and say so instead.
+const answerAbort = new AbortController();
+const answerTimer = setTimeout(() => answerAbort.abort(), Number(process.env.INSIGHTS_ANSWER_TIMEOUT_MS) || 35000);
+let formattingResponse;
+try {
+formattingResponse = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: answerAbort.signal,
     headers: {
         'Content-Type': 'application/json',
         'x-api-key': globalConfig.ANTHROPIC_API_KEY,
@@ -6609,16 +6616,28 @@ SQL query executed: ${generatedSQL}
 Query results (${result.rows.length} rows):
 ${JSON.stringify(result.rows, null, 2)}
 
-Please provide a clear, concise answer to the user's question based on these database results AND any additional information from the web if needed. You have web search available - use it for things like NFL schedules, moon phases, movie releases, local events, etc.
+Please provide a clear, concise answer to the user's question based on these database results AND any additional information from the web if needed. You have web search available (a few searches at most) for things like sports schedules, weather history, movie releases and local events. Work out anything predictable yourself instead of searching for each date: moon phases, for example, repeat every 29.53 days (a full moon fell on January 13, 2025 at 22:27 UTC), and weekdays and holidays follow the calendar.
 
 Format the answer in a friendly, conversational way. If showing numbers, format them nicely (add $ for prices, commas for large numbers, etc.). If there are multiple results, present them in an organized way.`
         }],
+        output_config: { effort: 'low' }, // a quick answer: the heavy lifting is the query above
         tools: [{
             type: 'web_search_20260209',
-            name: 'web_search'
+            name: 'web_search',
+            max_uses: 3,
+            user_location: { type: 'approximate', country: 'US', timezone: globalConfig.VENUE_TIMEZONE || 'America/Chicago' }
         }]
     })
 });
+} catch (fetchError) {
+    if (fetchError.name === 'AbortError') {
+        console.warn('[Insights] Answer step took more than 35 s; stopped it');
+        return res.status(504).json({ error: 'That question took too long to answer. Try a shorter date range or a simpler question.', sql: generatedSQL });
+    }
+    throw fetchError;
+} finally {
+    clearTimeout(answerTimer);
+}
 
 if (!formattingResponse.ok) {
     console.error('[Insights] Formatting API error:', formattingResponse.status);
