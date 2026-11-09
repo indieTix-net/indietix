@@ -15,11 +15,14 @@ beforeEach(async () => {
   originalFetch = globalThis.fetch;
 });
 
+let formattingPrompts = [];
 function installAnthropicMock({ sqlText, formattingOk = true, answerText = 'Here is your answer.', sqlOk = true, sqlStatus = 200, formattingStatus = 200 }) {
+  formattingPrompts = [];
   globalThis.fetch = async (url, opts) => {
     if (url === 'https://api.anthropic.com/v1/messages') {
       const body = JSON.parse(opts.body);
       const isFormatting = Array.isArray(body.tools);
+      if (isFormatting) formattingPrompts.push(body.messages[0].content);
       if (!isFormatting) {
         if (!sqlOk) return { ok: false, status: sqlStatus, json: async () => ({}) };
         return { ok: true, status: 200, json: async () => ({ content: [{ text: sqlText }] }) };
@@ -207,3 +210,62 @@ test('POST /api/insights/query: a write that slips past the keyword list is stil
   assert.equal(rows.rows[0].n, 1);
 });
 
+
+// ---- questions the data can't answer exactly (no genre column, say) ----
+
+async function insertMovieTicket(qr, distributor) {
+  await ctx.pgClient.query(
+    `INSERT INTO "QRCodeProduct" ("QRCode", "ExpirationDate", "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductID", "Status", "Distributor")
+     VALUES ($1, '2099-01-01', '2026-01-01 19:00:00', 'Test Movie', 'Main', 'Movie', 'details', 'ITEM', 'valid', $2)`, [qr, distributor]);
+}
+
+test('POST /api/insights/query: an explanation before the query (the real "best selling genres" reply) runs the closest query and passes the note on', async () => {
+  await insertMovieTicket('QR-GENRE-1', 'Big Sky Studios');
+  installAnthropicMock({
+    sqlText: `I don't have enough information to answer this: there is no genre column in the schema, so movie genre cannot be determined. Here's the closest available substitute, ranking by distributor instead:\n\nSELECT "Distributor", COUNT(*) AS tickets_sold\nFROM "QRCodeProduct"\nWHERE "ProductType" = 'Movie' AND "Status" = 'valid'\nGROUP BY "Distributor"\nORDER BY tickets_sold DESC\nLIMIT 10;`,
+    answerText: 'Your data has no genres; by distributor, Big Sky Studios sold the most.'
+  });
+  try {
+    const { status, json } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'What are the best selling movie genres?' } });
+    assert.equal(status, 200);
+    assert.equal(json.rowCount, 1);
+    assert.match(json.sql, /^SELECT "Distributor"/);
+    assert.match(formattingPrompts[0], /Note from the query writer: I don't have enough information.*no genre column/s);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('POST /api/insights/query: a NOTE line then a query; and a NOTE with no query answers in plain words', async () => {
+  await insertMovieTicket('QR-NOTE-1', 'Paper Moon Films');
+  installAnthropicMock({ sqlText: `NOTE: Genres aren't recorded; showing ticket sales by film instead.\nSELECT "ProductName", COUNT(*) FROM "QRCodeProduct" GROUP BY "ProductName"` });
+  try {
+    const withQuery = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'genres?' } });
+    assert.equal(withQuery.status, 200);
+    assert.match(withQuery.json.sql, /^SELECT "ProductName"/);
+    assert.match(formattingPrompts[0], /Genres aren't recorded/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  installAnthropicMock({ sqlText: `NOTE: The data has no weather information, so this can't be answered from your sales.` });
+  try {
+    const noQuery = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'Do rainy days sell more?' } });
+    assert.equal(noQuery.status, 200);
+    assert.equal(noQuery.json.sql, null);
+    assert.equal(noQuery.json.answer, "The data has no weather information, so this can't be answered from your sales.");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('POST /api/insights/query: a WITH query is accepted (still read-only)', async () => {
+  await insertMovieTicket('QR-WITH-1', 'Juniper Films');
+  installAnthropicMock({ sqlText: `WITH t AS (SELECT "Distributor" FROM "QRCodeProduct") SELECT "Distributor", COUNT(*) FROM t GROUP BY 1` });
+  try {
+    const { status, json } = await ctx.request('POST', '/api/insights/query', { token: ctx.clientToken, body: { question: 'by distributor' } });
+    assert.equal(status, 200);
+    assert.equal(json.rowCount, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
