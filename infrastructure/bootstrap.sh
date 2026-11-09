@@ -984,7 +984,7 @@ with open(os.environ["PAYLOAD_FILE"], "w") as f:
   if [ -n "$bucket" ]; then
     echo "=== Pushing static assets to s3://$bucket ==="
     # The help pages are built from the guide (support/knowledge) into public/help/.
-    (cd "$SCRIPT_DIR/../help" && npm install --silent --omit=dev && node build.mjs) \
+    (cd "$SCRIPT_DIR/../help" && npm install --silent && node build.mjs) \
       || { echo "Help pages didn't build; pushing the rest without them." >&2; rm -rf "$SCRIPT_DIR/../QRScanner/src/public/help"; }
     aws s3 sync "$SCRIPT_DIR/../QRScanner/src/public/" "s3://$bucket/" \
       --exclude "config.js" --exclude "*.template" --exclude "*.webp" \
