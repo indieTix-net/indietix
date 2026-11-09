@@ -11,7 +11,7 @@ Tickets sell through Square; IndieTix turns each sale into tickets and delivers 
 
 - Tickets are Square items, so they sell at the register (Square POS), on the venue's Square Online store, or anywhere else Square sells.
 - When a Square order includes a ticketed item, IndieTix makes the QR-code tickets and emails them to the buyer within a minute or so. Each unit sold is one ticket: a quantity of 4 makes 4 tickets.
-- At the register, ask for the buyer's email so the ticket can be sent. For a walk-up with no email, the ticket can go to the venue's Owner BCC Email (Client Settings) instead, or you can let them in on the spot.
+- At the register, ask for the buyer's email so the ticket can be sent. For a walk-up with no email, the ticket can go to the venue's Owner BCC Email (Client Settings) instead, or you can let them in on the spot. Register sales with no buyer details are saved as "WALK-UP CASH-MASTER", with the Walk-up Phone from Client Settings if you set one.
 
 ## Square Online: pickup only
 

@@ -1480,7 +1480,9 @@ async function processWebhook(event) {
     let recipientEmail = clientConfig.OWNER_BCC_EMAIL || null; // Default recipient for a walk-up sale with no captured email; null skips the send below rather than guessing
     let customerFirstName = 'WALK-UP';
     let customerLastName = 'CASH-MASTER';
-    let customerPhoneNumber = '7857491972';
+    // Walk-up phone: this venue's WALKUP_PHONE setting (blank = none). Used to
+    // be Liberty Hall's own number, hardcoded for every venue.
+    let customerPhoneNumber = (typeof clientConfig.WALKUP_PHONE === 'string' && clientConfig.WALKUP_PHONE.trim()) || null;
     console.log('BigTimeQ2:', JSON.stringify(webhookData));
 
     const paymentId = webhookData.data.object.payment.id;

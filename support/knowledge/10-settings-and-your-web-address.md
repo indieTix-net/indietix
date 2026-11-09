@@ -9,7 +9,7 @@
 | Section | What's in it |
 |---|---|
 | Client Information | Contact name and email for the venue (alerts and IndieTix notices go here), and the main login's password |
-| API Configuration | Google Calendar, the Anthropic key for Insights, the OMDB key for movie lookups, the Sender Email for tickets, an Owner BCC Email that gets a copy of every ticket email, and One Per Email Items |
+| API Configuration | Google Calendar, the Anthropic key for Insights, the OMDB key for movie lookups, the Sender Email for tickets, an Owner BCC Email that gets a copy of every ticket email, a Walk-up Phone saved on register sales with no buyer phone, and One Per Email Items |
 | Square Payment Settings | Your web address, and Connect Square |
 | Theater Settings | Names, logo and the box-office report details |
 | Square Ticket Items | Ticket types, prices and distributors for new movies and events |
