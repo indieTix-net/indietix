@@ -747,7 +747,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     <div class="card-action">
                         <div class="card-action-left">
-                            <button class="btn btn-sm btn-outline-secondary" 
+                            <button class="btn btn-sm btn-outline-secondary card-btn-details" 
                                 onclick="event.stopPropagation(); toggleCardDetails('card-${index}')">
                                 Details
                             </button>
@@ -755,7 +755,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         <div class="card-action-right">
                             ${refundNote || `<div class="dropdown dropup">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle action-dropdown-btn"
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle action-dropdown-btn card-btn-actions"
                                         type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     Actions
                                 </button>
