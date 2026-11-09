@@ -8,7 +8,7 @@ What sold, what checked in, and the nightly box-office reports cinemas send to d
 
 The **Event Report** lists every ticket with its event, showtime, ticket type, price and check-in status. You need view or edit permission.
 
-1. Open **Event Report**.
+1. Open **Event Report**. It covers shows from 30 days ago to 30 days ahead; change **Shows from** and **to** and choose **Show** for other dates. A very long range (thousands of tickets) asks you to choose a shorter one.
 2. Group the list: pick a column under **Add Group** (Event, Event Date, Distributor, Event Type, Event Venue, Seat Code, Check-in Status or Customer) and choose **Add**. Add more groups to nest them, for example Event, then Event Date.
 3. Each group shows its ticket count and totals. **Collapse All** folds them up.
 4. **Live Update** keeps the report refreshing on its own, handy during a show.
