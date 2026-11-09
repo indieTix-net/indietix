@@ -572,7 +572,7 @@ cmd_static_push() {
 # exist. WebP screenshots get their content type set explicitly.
 cmd_static_push_help() {
   local out="$ROOT/QRScanner/src/public/help" reply
-  (cd "$ROOT/help" && npm install --silent --omit=dev && node build.mjs) || { echo "Help build failed." >&2; return 1; }
+  (cd "$ROOT/help" && npm install --silent && node build.mjs) || { echo "Help build failed." >&2; return 1; }
   echo "Will publish $(find "$out" -type f | wc -l | tr -d ' ') files to s3://$STATIC_BUCKET/help/ (replacing what's there)."
   read -r -p "Continue? [y/N] " reply
   [ "$reply" = "y" ] || [ "$reply" = "Y" ] || { echo "Cancelled."; return 1; }
