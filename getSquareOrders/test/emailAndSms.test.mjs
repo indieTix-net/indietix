@@ -90,6 +90,15 @@ test('a customer with active SMS consent gets the ticket texted automatically, n
   const customer = await ctx.pgClient.query(`INSERT INTO "Customer" ("PhoneNumber") VALUES ('+17857491972') RETURNING "ID"`);
   await ctx.pgClient.query(`INSERT INTO "SmsConsent" ("CustomerID", "PhoneNumber", "Status", "OptInMethod", "ConsentText") VALUES ($1, '+17857491972', 'active', 'web_initial', 'I agree')`, [customer.rows[0].ID]);
 
+  squareHandlers.getPayment = async (paymentId) => ({
+    ok: true, status: 200,
+    json: async () => ({ payment: { id: paymentId, status: 'COMPLETED', customer_id: 'SQ-CUST-SMS' } })
+  });
+  squareHandlers.getCustomer = async (customerId) => ({
+    ok: true, status: 200,
+    json: async () => ({ customer: { id: customerId, phone_number: '+17857491972' } })
+  });
+
   let smsSent;
   smsHandlers.sendTextMessage = async (input) => { smsSent = input; return { MessageId: 'mock-id' }; };
   let emailBody;
@@ -187,6 +196,42 @@ test('a walk-up/cash sale with no captured email and no OWNER_BCC_EMAIL configur
 
   const ticket = await ctx.pgClient.query(`SELECT * FROM "QRCodeProduct" WHERE "ProductName" = 'Test Movie'`);
   assert.equal(ticket.rows.length, 1, 'the ticket itself is still created even though no email went out');
+});
+
+test('a walk-up sale with no WALKUP_PHONE set saves no phone (no venue\'s number is hardcoded)', async () => {
+  const event = buildSqsEvent([buildSqsRecord(webhookPayload({ clientId: ctx.clientId, orderId: 'ORDER-WALKUP-NOPHONE', buyerEmail: null }))]);
+  await handler(event);
+  const order = await ctx.pgClient.query(`SELECT "FirstName", "LastName", "PhoneNumber" FROM "Order" WHERE "OrderID" = 'ORDER-WALKUP-NOPHONE'`);
+  assert.equal(order.rows[0].FirstName, 'WALK-UP');
+  assert.equal(order.rows[0].LastName, 'CASH-MASTER');
+  assert.equal(order.rows[0].PhoneNumber, null);
+  const ticket = await ctx.pgClient.query(`SELECT "PhoneNumber" FROM "QRCodeProduct" WHERE "ProductName" = 'Test Movie'`);
+  assert.equal(ticket.rows[0].PhoneNumber, null);
+  const customers = await ctx.pgClient.query(`SELECT count(*)::int AS n FROM "Customer"`);
+  assert.equal(customers.rows[0].n, 0);
+});
+
+test('a walk-up sale uses the venue\'s WALKUP_PHONE when set; a buyer\'s own phone still wins', async () => {
+  await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = "configuration"::jsonb || '{"WALKUP_PHONE": "5555550123"}'::jsonb`);
+  try {
+    await handler(buildSqsEvent([buildSqsRecord(webhookPayload({ clientId: ctx.clientId, orderId: 'ORDER-WALKUP-PHONE', buyerEmail: null }))]));
+    const walkup = await ctx.pgClient.query(`SELECT "PhoneNumber" FROM "Order" WHERE "OrderID" = 'ORDER-WALKUP-PHONE'`);
+    assert.equal(walkup.rows[0].PhoneNumber, '5555550123');
+
+    squareHandlers.getPayment = async (paymentId) => ({
+      ok: true, status: 200,
+      json: async () => ({ payment: { id: paymentId, status: 'COMPLETED', customer_id: 'SQ-CUST-2' } })
+    });
+    squareHandlers.getCustomer = async (customerId) => ({
+      ok: true, status: 200,
+      json: async () => ({ customer: { id: customerId, given_name: 'Card', family_name: 'Holder', phone_number: '+15552224444' } })
+    });
+    await handler(buildSqsEvent([buildSqsRecord(webhookPayload({ clientId: ctx.clientId, orderId: 'ORDER-CARD-PHONE', paymentId: 'PAYMENT-2', buyerEmail: null }))]));
+    const card = await ctx.pgClient.query(`SELECT "PhoneNumber" FROM "Order" WHERE "OrderID" = 'ORDER-CARD-PHONE'`);
+    assert.equal(card.rows[0].PhoneNumber, '+15552224444');
+  } finally {
+    await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = "configuration"::jsonb - 'WALKUP_PHONE'`);
+  }
 });
 
 test('a walk-up/cash sale with no captured email falls back to OWNER_BCC_EMAIL as the recipient when the client has one set', async () => {

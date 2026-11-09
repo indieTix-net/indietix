@@ -885,6 +885,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	document.getElementById('ecommerce_site_url').value = config.ECOMMERCE_SITE_URL || '';
 	document.getElementById('sender_email').value = config.SENDER_EMAIL || '';
 	document.getElementById('owner_bcc_email').value = config.OWNER_BCC_EMAIL || '';
+	document.getElementById('walkup_phone').value = config.WALKUP_PHONE || '';
 	document.getElementById('one_per_email_items').value = config.ONE_PER_EMAIL_ITEMS || '';
 	// Terms & Privacy pages (LEGAL_*); blank fields show the pages' placeholders.
 	LEGAL_FIELDS.forEach(([id, key]) => { document.getElementById(id).value = config[key] || ''; });
@@ -970,6 +971,7 @@ document.addEventListener('DOMContentLoaded', function() {
     	const senderEmail = document.getElementById('sender_email').value.trim();
     	if (senderEmail) config.SENDER_EMAIL = senderEmail;
     	config.OWNER_BCC_EMAIL = document.getElementById('owner_bcc_email').value.trim();
+    	config.WALKUP_PHONE = document.getElementById('walkup_phone').value.trim();
     	config.ONE_PER_EMAIL_ITEMS = document.getElementById('one_per_email_items').value.trim();
     	LEGAL_FIELDS.forEach(([id, key]) => { config[key] = document.getElementById(id).value.trim(); });
 

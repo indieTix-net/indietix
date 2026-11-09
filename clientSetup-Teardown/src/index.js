@@ -1207,6 +1207,7 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       "MARKETING_SES_CONFIGURATION_SET": "",                  // separate from transactional ticket-email sending; set once created
       "SHARE_NUDGE_ENABLED": "false",                         // adds a share/bring-a-friend line to the ticket confirmation email
       "OWNER_BCC_EMAIL": "",                                  // optional: BCC'd (and added as an SES Destination) on every ticket confirmation email for this client, and used as the fallback recipient for a walk-up/cash sale with no captured buyer email. Unset by default -- per-client opt-in monitoring, not a shared/global address.
+      "WALKUP_PHONE": "",                                     // optional: phone stored on a walk-up/cash sale with no captured buyer phone (getSquareOrders); blank = none
       "ONE_PER_EMAIL_ITEMS": "",                              // optional: Square item names (comma-separated) each email can get only one ticket for, e.g. a free sample; enforced by getSquareOrders
       // Terms of Service / Privacy Policy details (QRScanner utils/legal.mjs);
       // blank shows that page's "Your Venue" placeholder.
@@ -1318,6 +1319,7 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
         "TICKET_FILENAME",
         "SENDER_EMAIL",
         "OWNER_BCC_EMAIL",
+        "WALKUP_PHONE",
         "ONE_PER_EMAIL_ITEMS",
         "LEGAL_NAME",
         "LEGAL_SHORT_NAME",
