@@ -190,11 +190,12 @@ for (const [label, datafilters] of [
   });
 }
 
-test('GET /api/dashboard/today: Square not configured returns 500, not a crash', async () => {
+test('GET /api/dashboard/today: Square not configured builds the day from tickets (dashboardWithoutSquare.test.mjs), not a crash', async () => {
   const noTokenCtx = await startTestServer({ clientId: 'NOTOKENCLIENT', clientConfig: { SQUARE_ACCESS_TOKEN: '' } });
   try {
-    const { status } = await noTokenCtx.request('GET', '/api/dashboard/today', { token: noTokenCtx.clientToken });
-    assert.equal(status, 500);
+    const { status, json } = await noTokenCtx.request('GET', '/api/dashboard/today', { token: noTokenCtx.clientToken });
+    assert.equal(status, 200);
+    assert.equal(json.source, 'tickets');
   } finally {
     await stopTestServer(noTokenCtx);
   }
