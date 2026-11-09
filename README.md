@@ -4,17 +4,39 @@ A Square-integrated ticketing platform for independent venues... built to run yo
 
 ## Why IndieTix Exists
 
-Most ticketing platforms take too much of a cut.  Lately, fees from the ticket giants hang in the range of 20% - 30% or more of what the actual base ticket price is. That most of those fees don't go to the people who made the night happen. The artists, musicians, promoters, or venue: very little of the cut goes to them. It goes to a ticketing company that didn't write a note, book a stage, or sweep a floor, but still gets paid like it did.
+Most ticketing platforms take too much of a cut.  Fees from the ticket giants hang in the range of 20% - 30% or more of what the actual base ticket price is. That most of those fees don't go to the people who made the night happen. The artists, musicians, promoters, or venue: very little of the cut goes to them. It goes to a ticketing company that didn't write a note, book a stage, or sweep a floor, but still gets paid like it did. 
 
 IndieTix exists to cut that middleman out.
 
-IndieTix was built as tool for one independent event space and cinema trying to run its own box office without handing a slice of every ticket to a company that had nothing to do with the film, the venue, or the night itself. It's grown into a full ticketing platform, but the principle hasn't changed: **the people putting on the show — the venues, the promoters, the artists — should be the ones deciding what a ticket costs**, not a platform with no stake in whether the show is any good. Fees should fund the event, not a stranger's margin.
+IndieTix was built as tool for one independent event space and cinema trying to run its own box office without handing a slice of every ticket to a company that had nothing to do with the film, the venue, or the night itself. It's grown into a full ticketing platform, but the principle hasn't changed: The people putting on the show, the venues, the promoters, the artists, should be the ones deciding what a ticket costs, not a platform with no stake in whether the show is any good. Fees should fund the event, not a stranger's margin.
 
-IndieTix is free, open source, and yours to self-host and modify with no strings attached — no tier that unlocks "real" control, no cut of your ticket sales baked into the code. If you'd rather not run the infrastructure yourself or need help, hosted and supported plans are available too. 
+IndieTix is free, open source, and yours to self-host and modify with no strings attached... no tier that unlocks "real" control, no cut of your ticket sales baked into the code. If you'd rather not run the infrastructure yourself or need help, hosted and supported plans are available too. 
+
+## Free or hosted: same software either way
+
+| | Self-hosted | Hosted by IndieTix |
+|---|---|---|
+| Software | Free (AGPL) | Included |
+| Features | Everything | Everything |
+| Who runs it | You, on your own AWS account | We do |
+| Running costs | Your AWS bill | A flat monthly plan, see [indietix.net](https://indietix.net) |
+| Fees on ticket buyers | None | None |
+| Updates and backups | You apply them | We handle them |
+| Support | Email support@indietix.net, best effort, no SLA | Email support@indietix.net, best effort, no SLA |
+| Support plans | Available, see [indietix.net](https://indietix.net) | Available, see [indietix.net](https://indietix.net) |
+| Texting | Your own carrier-approved campaign and texting costs | Same: each venue has its own campaign and pays its own texting costs |
+
+There is no paid tier that unlocks features. The hosted plan is for venues that would rather not run servers.
+
+**About email support:** anyone can write to support@indietix.net and we'll do our best to help, but without a support plan there's no guarantee of a response or of how long one takes. Support plans with defined terms are sold on [indietix.net](https://indietix.net).
+
+## Running in production
+
+IndieTix has run Liberty Hall in Lawrence, Kansas, since April 2025: 6,700+ tickets and $79,000+ in sales across 575 showtimes and events, with no fees charged to buyers. [Read the case study](./docs/case-study-liberty-hall.md).
 
 ## What it does
 
-Square handles payment and catalog; IndieTix handles everything around the sale — QR-coded PDF tickets delivered by email and (opt-in) SMS, door check-in via a web scanner, box-office reporting, event and cinema creation and scheduling, a marketing scheduler that posts to email/Facebook/Instagram/TikTok, and an admin console for managing it all. Each venue (client) is fully isolated: its own database, its own S3 buckets, its own Square credentials, its own SMS campaign — share-nothing multi-tenancy, not a shared pool with row-level permissions.
+Square handles payment and catalog; IndieTix handles everything around the sale — QR-coded PDF tickets delivered by email and (opt-in) SMS, door check-in via a web scanner, box-office reporting, event and cinema creation and scheduling, a marketing scheduler that posts to email, Facebook and Instagram (TikTok is waiting on TikTok's approval), self-serve signup with Square sign-in, and an admin console for managing it all. Each venue (client) is fully isolated: its own database, its own S3 buckets, its own Square credentials, its own SMS campaign — share-nothing multi-tenancy, not a shared pool with row-level permissions.
 
 For the full tour of what the platform actually does day to day, see [`infrastructure/FUNCTIONALITY.md`](./infrastructure/FUNCTIONALITY.md).
 
@@ -33,7 +55,7 @@ IndieTix is small enough for a single-screen cinema and built to the standard a 
 - **Monitoring and a status page.** Alarms email when orders, the webhook, the operator app or a background job starts failing, and again when it recovers. A public status page shows each part as working or not.
 - **Backups that have actually been restored.** Point-in-time restore, tested by restoring a live database into a separate copy and matching every table.
 - **Logs that don't pile up.** Kept 30 days by default.
-- **Controlled changes.** Every change goes through a pull request with about 500 automated tests against real Postgres. Production deploys show a diff and save a revert copy first.
+- **Controlled changes.** Every change goes through a pull request with about 730 automated tests against real Postgres. Production deploys show a diff and save a revert copy first.
 
 IndieTix isn't SOC 2 audited yet. The controls above are built with it in mind, and a formal audit will follow when a customer needs one. Setup details for each piece are in [`infrastructure/README.md`](./infrastructure/README.md#security-and-privacy).
 
@@ -71,4 +93,4 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Contributors sign a one-time [Contri
 
 AGPL-3.0-or-later — see [`LICENSE`](./LICENSE). Chosen deliberately: IndieTix's model is free self-hosted code plus optional paid hosting/support, and AGPL keeps a hosted competitor honest about sharing improvements back, the way a permissive license wouldn't.
 
-**Self-hosting comes with no warranty or service commitment.** If you run IndieTix yourself, it's provided as is, as the license says: no guarantee of uptime or availability, that it's error-free, or that it fits your purpose, and no support. Running, securing, backing up and updating your copy is up to you. The hosted service's commitments are in its [Terms of Service](./QRScanner/src/public/indietix-terms.html), which don't apply to self-hosted copies.
+**Self-hosting comes with no warranty or service commitment.** If you run IndieTix yourself, it's provided as is, as the license says: no guarantee of uptime or availability, that it's error-free, or that it fits your purpose, and no support commitment (best-effort email help aside, as above). Running, securing, backing up and updating your copy is up to you. The hosted service's commitments are in its [Terms of Service](./QRScanner/src/public/indietix-terms.html), which don't apply to self-hosted copies.
