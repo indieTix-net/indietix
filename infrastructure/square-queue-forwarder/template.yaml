@@ -26,7 +26,7 @@ Resources:
       QueueName: !Sub "${EnvPrefix}-square-webhook-queue.fifo"
       FifoQueue: true
       MessageRetentionPeriod: 345600 # 4 days, matches SQS default
-      VisibilityTimeout: 90 # must be >= consuming Lambda's timeout (getSquareOrders: 60s)
+      VisibilityTimeout: 90 # must be >= consuming Lambda's timeout (getSquareOrders: 40s, as in production)
 
   SquareQueueForwarderFunction:
     Type: AWS::Serverless::Function

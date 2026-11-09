@@ -22,7 +22,7 @@ Checking people in: the scanner, looking tickets up by hand, today's numbers, co
 When a code won't scan, or the buyer only has their name:
 
 1. Open **Manual Checkin / List Tickets**.
-2. Search by name, email or code, or use **Today Only** and the date filter to narrow the list.
+2. Search by name, email or code, or use **Today Only** and the date filter to narrow the list. Long lists come a page at a time: use **Previous** and **Next**, or choose how many to show per page.
 3. On the ticket's row, open **Actions** and choose **Check In**, then **Confirm Check-in** (or **Confirm Check-in & Print** to print a stub as well).
 
 ![A ticket's Actions menu](images/ticket-actions.webp)

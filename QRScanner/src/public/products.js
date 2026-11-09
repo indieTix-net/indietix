@@ -16,6 +16,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileCardsContainer = document.getElementById('mobile-cards-container');
     const loadingIndicator = document.getElementById('loading');
     
+    // ---- LIST PAGING ----
+    // Tickets load one page at a time from the server. A new search or date
+    // range starts at page 1; reloading after an action stays on the page.
+    let listFilters = null;
+    let listArgs = ['', '', ''];
+    const listPager = window.createListPager({ pageSize: 100, onChange: () => loadEvents(...listArgs) });
+
     // Date filter elements
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
@@ -531,6 +538,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let url = `${API_URL}/api/products`;
         const params = new URLSearchParams();
+        const filters = JSON.stringify([searchTerm, startDate, endDate]);
+        if (filters !== listFilters) { listFilters = filters; listPager.reset(); }
+        listArgs = [searchTerm, startDate, endDate];
+        params.append('page', listPager.page);
+        params.append('pageSize', listPager.pageSize);
         
         if (searchTerm) {
             params.append('search', searchTerm);
@@ -565,6 +577,10 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(products => {
             console.log('Products data received:', products);
+            if (products && !Array.isArray(products) && Array.isArray(products.tickets)) {
+                listPager.update(products.total, products.page, products.pageSize);
+                products = products.tickets;
+            }
             
             loadingIndicator.style.display = 'none';
             console.log("Products received:", products);

@@ -42,6 +42,10 @@ async function sectionUnder(page, text) {
     return el;
   }, text);
 }
+async function allDates(page) {
+  await page.click('#clear-date-filter');
+  await settle(page);
+}
 // The tables also render as phone cards (hidden on a wide screen), so use the
 // first Actions button that's actually visible.
 async function openFirstActions(page) {
@@ -64,8 +68,9 @@ const SHOTS = [
   } },
   { name: 'dashboard', login: 'guest', url: '/dashboard.html', keepHeader: true },
   { name: 'scanner', login: 'guest', url: '/', wait: 2500 },
-  { name: 'tickets', login: 'guest', url: '/products.html' },
-  { name: 'ticket-actions', login: 'guest', url: '/products.html', before: openFirstActions },
+  // The tickets page opens on today, which can be a day with no shows: show all dates.
+  { name: 'tickets', login: 'guest', url: '/products.html', before: allDates },
+  { name: 'ticket-actions', login: 'guest', url: '/products.html', before: async (p) => { await allDates(p); await openFirstActions(p); } },
   { name: 'orders', login: 'guest', url: '/order.html' },
   { name: 'order-actions', login: 'guest', url: '/order.html', before: openFirstActions },
   { name: 'refund-dialog', login: 'guest', url: '/order.html', before: async (p) => {

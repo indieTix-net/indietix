@@ -30,6 +30,17 @@
         </div>
 
         <div class="toolbar">
+            <!-- Date Range Section: which shows the report covers (by show date) -->
+            <div class="toolbar-section">
+                <label for="report-start">Shows from</label>
+                <input type="date" id="report-start" class="form-control form-control-sm" style="width: auto;">
+                <label for="report-end">to</label>
+                <input type="date" id="report-end" class="form-control form-control-sm" style="width: auto;">
+                <button id="report-range-btn" class="btn btn-outline-primary btn-sm">Show</button>
+            </div>
+
+            <div class="toolbar-divider"></div>
+
             <!-- Column Visibility Section -->
             <div class="toolbar-section">
                 <div class="column-selector">

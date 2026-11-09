@@ -4,7 +4,7 @@ Finding an order, resending tickets, fixing contact details, refunds, cancellati
 
 ![List Orders](images/orders.webp)
 
-**List Orders** shows every order, newest first: who bought, when, the total and its status. Search by name, email, phone or order ID, filter by date (**Today Only**, **This Week**, or a range), and open **Order Details** to see the tickets on it. You need view or edit permission.
+**List Orders** shows every order, newest first: who bought, when, the total and its status, a page at a time (**Previous** and **Next**, and how many per page). Search by name, email, phone or order ID, filter by date (**Today Only**, **This Week**, or a range), and open **Order Details** to see the tickets on it. You need view or edit permission.
 
 ![An order's Actions menu](images/order-actions.webp)
 

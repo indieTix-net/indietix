@@ -1500,6 +1500,18 @@ app.get('/api/orders', requireAuth, requirePermission(...PERMS_ORDERS), async (r
     // blob, and an unbounded result set has blown past Lambda's 6MB synchronous
     // response payload limit (crashes with 413 RequestEntityTooLarge before the
     // client ever sees a normal HTTP error).
+    // With ?page, one page plus the total count; without it, the newest 500 as before.
+    const paging = listPaging(req.query);
+    if (paging) {
+      const where = `FROM "Order" o ${joinClause} WHERE 1=1 ${searchClause} ${dateClause} ${dataFilterClause}`;
+      const countResult = await userPool.query(`SELECT count(DISTINCT o."ID")::int AS total ${where}`, queryParams);
+      const pageResult = await userPool.query(
+        `SELECT DISTINCT o.* ${where} ORDER BY o."ID" DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`,
+        [...queryParams, paging.pageSize, paging.offset]);
+      await userPool.end();
+      return res.json({ orders: pageResult.rows, total: countResult.rows[0].total, page: paging.page, pageSize: paging.pageSize, truncated: false });
+    }
+
     const ORDERS_QUERY_LIMIT = 500;
     const limitIdx = queryParams.length + 1;
     queryParams.push(ORDERS_QUERY_LIMIT + 1); // fetch one extra to detect truncation
@@ -1535,6 +1547,41 @@ app.get('/api/orders', requireAuth, requirePermission(...PERMS_ORDERS), async (r
 });
 
 // API route to get all QRCode products with optional search and date filtering
+// ---- LIST PAGING ----
+// The ticket and order lists page on the server when asked (?page=&pageSize=),
+// returning { <items>, total, page, pageSize }. Without ?page the ticket list
+// is returned whole, as before, unless it's too big for one Lambda response
+// (6 MB), in which case it's refused with a message to narrow the dates.
+const LIST_PAGE_SIZES = [25, 50, 100, 200];
+const LIST_DEFAULT_PAGE_SIZE = 100;
+const TICKET_LIST_MAX_ROWS = 7500; // about 650 bytes a ticket, so about 5 MB
+function listPaging(query) {
+  if (query.page === undefined) return null;
+  const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
+  const pageSize = LIST_PAGE_SIZES.includes(Number(query.pageSize)) ? Number(query.pageSize) : LIST_DEFAULT_PAGE_SIZE;
+  return { page, pageSize, offset: (page - 1) * pageSize };
+}
+// The same text the QRCodeProduct model's date getters produce, from one
+// shared formatter each (toLocaleString builds a new one per call, which was
+// most of the time spent listing thousands of tickets).
+const PURCHASE_DATE_FORMAT = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+const SHOW_DATE_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });
+function formatListDate(value, format) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Invalid Date' : format.format(date);
+}
+/** A raw QRCodeProduct row (model attribute names) shaped like the model's toJSON(). */
+function ticketListRow(row) {
+  return {
+    ...row,
+    purchaseDate: formatListDate(row.purchaseDate, PURCHASE_DATE_FORMAT),
+    expirationDate: formatListDate(row.expirationDate, PURCHASE_DATE_FORMAT),
+    productDate: formatListDate(row.productDate, SHOW_DATE_FORMAT)
+  };
+}
+// ---- END LIST PAGING ----
+
 app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (req, res) => {
   try {
     const { search, startDate, endDate } = req.query;
@@ -1671,20 +1718,33 @@ app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (r
     
     console.log('Final where clause:', JSON.stringify(whereClause, null, 2));
     
-    const products = await QRCodeProduct.findAll({
+    const paging = listPaging(req.query);
+    const total = await QRCodeProduct.count({ where: whereClause });
+    if (!paging && total > TICKET_LIST_MAX_ROWS) {
+      return res.status(413).json({
+        error: 'too_many_tickets', total, limit: TICKET_LIST_MAX_ROWS,
+        message: `${total.toLocaleString('en-US')} tickets match, more than can be shown at once (${TICKET_LIST_MAX_ROWS.toLocaleString('en-US')}). Choose a shorter date range.`
+      });
+    }
+    // raw: plain rows under the model's attribute names, without building a
+    // model instance per ticket; ticketListRow formats the dates as before.
+    const products = (await QRCodeProduct.findAll({
       where: whereClause,
-      order: [['id', 'DESC']]
-    });
-    
-    console.log(`Found ${products.length} products`);
+      order: [['id', 'DESC']],
+      raw: true,
+      ...(paging ? { limit: paging.pageSize, offset: paging.offset } : {})
+    })).map(ticketListRow);
+
+    console.log(`Found ${products.length} of ${total} products`);
 
     // Attach who refunded each ticket an order refund invalidated (ORDER REFUND ATTRIBUTION)
     const refundedIds = products.filter(p => p.status === 'refunded').map(p => Number(p.id));
     const orderRefunds = await getOrderRefundsForTickets(QRCodeProduct.sequelize, refundedIds);
-    res.json(products.map(p => {
+    const tickets = products.map(p => {
       const orderRefund = orderRefunds.get(Number(p.id));
-      return orderRefund ? { ...p.toJSON(), orderRefund } : p;
-    }));
+      return orderRefund ? { ...p, orderRefund } : p;
+    });
+    res.json(paging ? { tickets, total, page: paging.page, pageSize: paging.pageSize } : tickets);
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });

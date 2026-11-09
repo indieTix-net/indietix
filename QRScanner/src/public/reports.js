@@ -285,6 +285,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to update checkbox states to match current column visibility (moved down)
 
+    // ---- REPORT DATE RANGE ----
+    // The report covers shows in a date range (default: 30 days back to 30
+    // days ahead, so presales show), instead of every ticket ever sold, which
+    // grows too big to load (the server refuses more than it can send at once).
+    const reportStartInput = document.getElementById('report-start');
+    const reportEndInput = document.getElementById('report-end');
+    const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dayOffset = (days) => { const d = new Date(); d.setDate(d.getDate() + days); return isoDay(d); };
+    reportStartInput.value = dayOffset(-30);
+    reportEndInput.value = dayOffset(30);
+    function reportUrl() {
+        const params = new URLSearchParams();
+        if (reportStartInput.value) params.append('startDate', reportStartInput.value);
+        if (reportEndInput.value) params.append('endDate', reportEndInput.value);
+        return `${API_URL}/api/products${params.toString() ? `?${params}` : ''}`;
+    }
+    function showReportError(message) {
+        document.querySelectorAll('.report-load-error').forEach(el => el.remove());
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-danger report-load-error';
+        alertDiv.role = 'alert';
+        alertDiv.textContent = message;
+        const gridContainer = document.querySelector('#ticket-table');
+        gridContainer.parentNode.insertBefore(alertDiv, gridContainer);
+    }
+    // ---- END REPORT DATE RANGE ----
+
     // Initialize Tabulator with column definitions
     const table = new Tabulator("#ticket-table", {
         height: "fitData", // Auto-size to fit current page data without scrolling
@@ -513,25 +540,24 @@ document.addEventListener('DOMContentLoaded', function() {
             
             return header + "<span style='margin-left: 10px;'>(" + count + " tickets)</span>";
         },
-        ajaxURL: `${API_URL}/api/products`,
+        ajaxURL: reportUrl(),
         ajaxConfig: {
             method: "GET",
             headers: getAuthHeaders(),
         },
         ajaxError: function(error) {
             console.error("Error fetching data:", error);
-            
-            // 401/403 handling now automatic via auth-helper fetch interceptor
-            
-            // Create an alert for error message
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-danger';
-            alertDiv.role = 'alert';
-            alertDiv.textContent = `Error loading events: ${error.message || 'Network error'}. Please try again.`;
-            
-            // Insert before the grid
-            const gridContainer = document.querySelector('#ticket-table');
-            gridContainer.parentNode.insertBefore(alertDiv, gridContainer);
+            loadingIndicator.style.display = 'none';
+            // 401/403 handling now automatic via auth-helper fetch interceptor.
+            // Tabulator passes the failed response; a range with too many
+            // tickets comes back with a message saying to narrow it.
+            if (error && typeof error.json === 'function') {
+                error.json()
+                    .then(body => showReportError(body && body.message ? body.message : `Error loading events (HTTP ${error.status}). Please try again.`))
+                    .catch(() => showReportError(`Error loading events (HTTP ${error.status}). Please try again.`));
+            } else {
+                showReportError(`Error loading events: ${(error && error.message) || 'Network error'}. Please try again.`);
+            }
         },
         ajaxResponse: function(url, params, response) {
             loadingIndicator.style.display = 'none';
@@ -788,6 +814,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Add a new group level
+    // Load the report for the chosen show dates (the Enter key in a date box too).
+    function loadReportRange() {
+        document.querySelectorAll('.report-load-error').forEach(el => el.remove());
+        loadingIndicator.style.display = 'block';
+        table.setData(reportUrl());
+    }
+    document.getElementById('report-range-btn').addEventListener('click', loadReportRange);
+    [reportStartInput, reportEndInput].forEach(input => input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') loadReportRange(); }));
+
     addGroupBtn.addEventListener('click', function() {
         const selectedField = groupSelect.value;
         if (selectedField && !activeGroups.includes(selectedField)) {
@@ -1134,7 +1169,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const scrollTop = tableHolder ? tableHolder.scrollTop : 0;
             const previousIds = new Set(knownRowIds);
             
-            const response = await fetch(`${API_URL}/api/products`, {
+            const response = await fetch(reportUrl(), {
                 method: 'GET',
                 headers: getAuthHeaders()
             });

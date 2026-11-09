@@ -15,6 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loading');
     
     // Date filter elements
+    // ---- LIST PAGING ----
+    // Orders load one page at a time from the server. A new search or date
+    // range starts at page 1; reloading after an action stays on the page.
+    let listFilters = null;
+    let listArgs = ['', '', ''];
+    const listPager = window.createListPager({ pageSize: 100, onChange: () => loadOrders(...listArgs) });
+
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
     const applyDateFilterButton = document.getElementById('apply-date-filter');
@@ -797,6 +804,11 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
         
         let url = `${API_URL}/api/orders`;
         const params = new URLSearchParams();
+        const filters = JSON.stringify([searchTerm, startDate, endDate]);
+        if (filters !== listFilters) { listFilters = filters; listPager.reset(); }
+        listArgs = [searchTerm, startDate, endDate];
+        params.append('page', listPager.page);
+        params.append('pageSize', listPager.pageSize);
         
         if (searchTerm) {
             params.append('search', searchTerm);
@@ -840,6 +852,7 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
             if (!Array.isArray(orders) && orders.orders !== undefined) {
                 truncated = !!orders.truncated;
                 resultLimit = orders.limit;
+                if (orders.total !== undefined) listPager.update(orders.total, orders.page, orders.pageSize);
                 orders = orders.orders || [];
             }
 
