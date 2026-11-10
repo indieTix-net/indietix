@@ -149,7 +149,7 @@
     }
 
     function renderTabs() {
-        document.querySelectorAll('#posts-tabs .nav-link').forEach(link => {
+        document.querySelectorAll('#posts-tabs .posts-tab').forEach(link => {
             link.classList.toggle('active', link.dataset.tab === tab);
             link.setAttribute('aria-selected', String(link.dataset.tab === tab));
         });
@@ -544,6 +544,12 @@
                 case 'delete': return deletePost(id);
             }
         });
+        // A post image that's gone shows as a blank square, not a broken icon.
+        document.getElementById('posts-container').addEventListener('error', (event) => {
+            if (event.target.tagName !== 'IMG') return;
+            event.target.removeAttribute('src');
+            event.target.classList.add('post-thumb-empty');
+        }, true);
         document.getElementById('posts-container').addEventListener('change', (event) => {
             if (!event.target.classList.contains('post-select')) return;
             const id = Number(event.target.dataset.id);

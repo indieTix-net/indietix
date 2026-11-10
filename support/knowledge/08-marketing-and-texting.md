@@ -10,8 +10,10 @@ The **Marketing Schedule** plans posts for each movie or event on email, Faceboo
 
 1. Open **Marketing Schedule**. Your upcoming Square items are listed under **Campaign Schedules**.
 2. Open an item's schedule and choose when posts go out (for example an announcement, reminders and opening day). Presets cover common patterns.
-3. IndieTix makes a draft for each post. Open **Recent Activity** to read them; **Edit Post** changes the caption or replaces the image.
-4. **Approve** the posts you want. **Nothing posts until someone approves it**; approved posts go out at their scheduled time (Central time).
+3. IndieTix makes a draft for each post. Open **Marketing Posts** (in the menu, or from the summary at the bottom of Marketing Schedule) to read them. **Edit** changes the caption or replaces the image.
+4. Approve the posts you want: **Approve** on one post, tick several and choose **Approve selected**, or **Approve all drafts for this show**. Each asks first and says how many posts it will approve. **Nothing posts until someone approves it**; approved posts go out at their scheduled time (Central time).
+
+**Marketing Posts** has four tabs: **Needs review** (drafts) and **Scheduled** (approved) list the soonest first; **Sent** and **Problems** (failed or skipped) list the newest first. Posts are grouped by show, a page at a time, and can be narrowed by show, channel, dates or caption text. Sent posts are kept as history and can't be deleted.
 
 - Captions start from the item's Square description, followed by the price and ticket link. They can be written by AI instead, if turned on for that schedule.
 - The picture is the item's image in Square. Instagram pictures are fitted to Instagram's allowed shape automatically.
