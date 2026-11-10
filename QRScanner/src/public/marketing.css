@@ -36,3 +36,19 @@
     background: #d1e7dd;
     color: #0f5132;
 }
+
+/* Posts summary (the full list is marketing-posts.html) */
+.posts-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+}
+
+.posts-summary-count {
+    text-decoration: none;
+}
+
+.posts-summary-count strong {
+    font-size: 1.25rem;
+    margin-right: 0.25rem;
+}

@@ -7428,6 +7428,191 @@ app.put('/api/marketing/posts/:postId/approve', requireAuth, requirePermission('
   }
 });
 
+// ---- MARKETING POSTS PAGE ----
+// The Posts page (marketing-posts.html): every post, paged, in four tabs --
+// drafts to review and approved posts soonest first, sent history and
+// problems newest first -- plus approving many drafts at once. Same
+// 'marketing' permission as the Marketing page.
+const MARKETING_POST_TABS = {
+  review:    { statuses: ['draft'],              order: 'ASC' },
+  scheduled: { statuses: ['approved'],           order: 'ASC' },
+  sent:      { statuses: ['sent'],               order: 'DESC' },
+  problems:  { statuses: ['failed', 'skipped'],  order: 'DESC' }
+};
+const MARKETING_BULK_APPROVE_MAX = 500;
+const MARKETING_POST_CHANNELS = ['email', 'facebook', 'instagram', 'tiktok'];
+const SQUARE_CATALOG_BATCH_RETRIEVE_URL = `${SQUARE_API_BASE}/v2/catalog/batch-retrieve`;
+
+/**
+ * Show names for a list of post item IDs: { id: name }. Square first (it
+ * still knows archived and deleted items, so old history keeps its names),
+ * then the venue's own tickets (venues without Square, like the demo), and
+ * the digest gets its own label. IDs found nowhere are left out.
+ */
+async function marketingItemNames(pool, itemIds) {
+  const names = {};
+  const ids = [...new Set(itemIds.filter(Boolean))];
+  if (ids.includes('digest')) names.digest = 'Weekly Digest';
+  let remaining = ids.filter(id => id !== 'digest');
+
+  if (remaining.length && globalConfig.SQUARE_ACCESS_TOKEN) {
+    try {
+      for (let i = 0; i < remaining.length; i += 1000) {
+        const response = await fetch(SQUARE_CATALOG_BATCH_RETRIEVE_URL, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${globalConfig.SQUARE_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ object_ids: remaining.slice(i, i + 1000), include_deleted_objects: true })
+        });
+        if (!response.ok) throw new Error(`Square catalog batch-retrieve failed: ${response.status}`);
+        const data = await response.json();
+        for (const obj of data.objects || []) {
+          if (obj.item_data?.name) names[obj.id] = obj.item_data.name;
+        }
+      }
+    } catch (error) {
+      console.error('Error looking up marketing item names in Square:', error.message);
+    }
+    remaining = remaining.filter(id => !names[id]);
+  }
+
+  if (remaining.length) {
+    const result = await pool.query(
+      `SELECT "ProductID", max("ProductName") AS "Name" FROM "QRCodeProduct" WHERE "ProductID" = ANY($1) GROUP BY "ProductID"`,
+      [remaining]
+    );
+    for (const row of result.rows) if (row.Name) names[row.ProductID] = row.Name;
+  }
+  return names;
+}
+
+app.get('/api/marketing/posts', requireAuth, requirePermission('marketing'), async (req, res) => {
+  const tabName = MARKETING_POST_TABS[req.query.tab] ? req.query.tab : 'review';
+  const tab = MARKETING_POST_TABS[tabName];
+  const paging = listPaging({ page: req.query.page || 1, pageSize: req.query.pageSize });
+  const { item, channel, from, to, search } = req.query;
+  const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+
+  const values = [tab.statuses];
+  const conditions = [`"Status" = ANY($1)`];
+  if (item) { values.push(item); conditions.push(`"SquareItemID" = $${values.length}`); }
+  if (MARKETING_POST_CHANNELS.includes(channel)) { values.push(channel); conditions.push(`"Channel" = $${values.length}`); }
+  if (isDate(from)) { values.push(from); conditions.push(`"ScheduledFor" >= $${values.length}::date`); }
+  if (isDate(to)) { values.push(to); conditions.push(`"ScheduledFor" < $${values.length}::date + 1`); }
+  if (typeof search === 'string' && search.trim()) {
+    values.push(`%${search.trim().replace(/[\\%_]/g, '\\$&')}%`);
+    conditions.push(`"PostContent"->>'caption' ILIKE $${values.length}`);
+  }
+  const where = `WHERE ${conditions.join(' AND ')}`;
+
+  let userPool;
+  try {
+    userPool = await createDbConnection(req.user.dbName);
+    await getClientConfiguration(userPool, req.user.dbName);
+
+    const totalResult = await userPool.query(`SELECT count(*)::int AS "Total" FROM "MarketingPost" ${where}`, values);
+    const postsResult = await userPool.query(
+      `SELECT * FROM "MarketingPost" ${where}
+       ORDER BY "ScheduledFor" ${tab.order}, "ID" ${tab.order}
+       LIMIT ${paging.pageSize} OFFSET ${paging.offset}`,
+      values
+    );
+    const posts = postsResult.rows;
+
+    const statusResult = await userPool.query(`SELECT "Status", count(*)::int AS "Count" FROM "MarketingPost" GROUP BY "Status"`);
+    const byStatus = Object.fromEntries(statusResult.rows.map(r => [r.Status, r.Count]));
+    const counts = Object.fromEntries(Object.entries(MARKETING_POST_TABS)
+      .map(([name, t]) => [name, t.statuses.reduce((sum, s) => sum + (byStatus[s] || 0), 0)]));
+
+    // Every draft for each show on this page, whatever the filters, so the
+    // "Approve all drafts for this show" button can say exactly what it does.
+    const itemIds = [...new Set(posts.map(p => p.SquareItemID))];
+    const draftCounts = {};
+    if (itemIds.length) {
+      const draftResult = await userPool.query(
+        `SELECT "SquareItemID", "Channel", count(*)::int AS "Count" FROM "MarketingPost"
+         WHERE "Status" = 'draft' AND "SquareItemID" = ANY($1) GROUP BY "SquareItemID", "Channel"`,
+        [itemIds]
+      );
+      for (const row of draftResult.rows) {
+        const entry = draftCounts[row.SquareItemID] || (draftCounts[row.SquareItemID] = { total: 0, byChannel: {} });
+        entry.total += row.Count;
+        entry.byChannel[row.Channel] = row.Count;
+      }
+    }
+
+    const itemNames = await marketingItemNames(userPool, itemIds);
+    await userPool.end();
+    return res.json({
+      success: true, tab: tabName, posts,
+      total: totalResult.rows[0].Total, page: paging.page, pageSize: paging.pageSize,
+      counts, draftCounts, itemNames
+    });
+  } catch (error) {
+    console.error('Error listing marketing posts:', error);
+    if (userPool) await userPool.end();
+    return res.status(500).json({ success: false, message: 'Error listing marketing posts' });
+  }
+});
+
+// The shows that have posts, for the page's show filter.
+app.get('/api/marketing/posts/items', requireAuth, requirePermission('marketing'), async (req, res) => {
+  let userPool;
+  try {
+    userPool = await createDbConnection(req.user.dbName);
+    await getClientConfiguration(userPool, req.user.dbName);
+    const result = await userPool.query(
+      `SELECT "SquareItemID", count(*)::int AS "Posts" FROM "MarketingPost" GROUP BY "SquareItemID"`
+    );
+    const names = await marketingItemNames(userPool, result.rows.map(r => r.SquareItemID));
+    await userPool.end();
+    const items = result.rows
+      .map(r => ({ id: r.SquareItemID, name: names[r.SquareItemID] || r.SquareItemID, posts: r.Posts }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return res.json({ success: true, items });
+  } catch (error) {
+    console.error('Error listing marketing post items:', error);
+    if (userPool) await userPool.end();
+    return res.status(500).json({ success: false, message: 'Error listing marketing post items' });
+  }
+});
+
+// Approve many drafts at once: { postIds: [...] } or { squareItemId } (every
+// draft for that show). Only drafts change, exactly as the one-post approve.
+app.post('/api/marketing/posts/approve', requireAuth, requirePermission('marketing'), async (req, res) => {
+  const { postIds, squareItemId } = req.body || {};
+  let condition, value;
+  if (Array.isArray(postIds)) {
+    const ids = [...new Set(postIds.map(Number))];
+    if (!ids.length || ids.length > MARKETING_BULK_APPROVE_MAX || !ids.every(id => Number.isInteger(id) && id > 0)) {
+      return res.status(400).json({ success: false, message: `Choose between 1 and ${MARKETING_BULK_APPROVE_MAX} posts to approve.` });
+    }
+    condition = `"ID" = ANY($1)`;
+    value = ids;
+  } else if (typeof squareItemId === 'string' && squareItemId.trim()) {
+    condition = `"SquareItemID" = $1`;
+    value = squareItemId.trim();
+  } else {
+    return res.status(400).json({ success: false, message: 'Send postIds or squareItemId.' });
+  }
+
+  let userPool;
+  try {
+    userPool = await createDbConnection(req.user.dbName);
+    const result = await userPool.query(
+      `UPDATE "MarketingPost" SET "Status" = 'approved', "UpdatedDate" = CURRENT_TIMESTAMP
+       WHERE ${condition} AND "Status" = 'draft' RETURNING "ID"`,
+      [value]
+    );
+    await userPool.end();
+    return res.json({ success: true, approved: result.rows.length, ids: result.rows.map(r => r.ID) });
+  } catch (error) {
+    console.error('Error bulk-approving marketing posts:', error);
+    if (userPool) await userPool.end();
+    return res.status(500).json({ success: false, message: 'Error approving marketing posts' });
+  }
+});
+// ---- END MARKETING POSTS PAGE ----
+
 // Manual, on-demand real send for one approved post -- email only for now
 // (Facebook/Instagram/TikTok real sending is Phase 6, not built). Reuses
 // sendEmailWithMultipleAttachments (AWS SES v2 + mailcomposer), the exact

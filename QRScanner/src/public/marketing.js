@@ -1,4 +1,5 @@
-// marketing.js -- Marquee Engine schedule editor / status page.
+// marketing.js -- Marquee Engine schedule editor, plus a summary of the
+// posts (the full list and approvals are marketing-posts.js).
 // Mirrors client.js's Skeleton Keys section: a list of records with
 // inline create/edit/delete, backed by /api/marketing/* routes.
 (function() {
@@ -659,265 +660,29 @@
     }
 
     // =====================================================
-    // STATUS / HISTORY TABLE
+    // POSTS SUMMARY (the full list is marketing-posts.html)
     // =====================================================
 
-    let statusPosts = []; // cache of the last-loaded status table rows, so the edit modal doesn't need its own fetch
-
-    async function loadStatusTable() {
-        const status = document.getElementById('status-filter').value;
-        const url = new URL(`${API_URL}/api/marketing/status`);
-        if (status) url.searchParams.set('status', status);
-
+    async function loadPostsSummary() {
+        const list = document.getElementById('posts-summary-next');
         try {
-            const response = await fetch(url, { headers: authHeaders() });
-            const data = await response.json();
-            const tbody = document.getElementById('status-table-body');
-            statusPosts = data.posts || [];
-            if (!data.success || !statusPosts.length) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No posts found.</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = statusPosts.map(post => {
-                const item = marketingItems.find(i => i.squareItemId === post.SquareItemID);
-                const scheduledFor = formatWallClockDateTime(post.ScheduledFor);
-                const detail = post.FailureReason || (post.PostContent?.dryRun ? 'dry run -- sender not yet configured' : '');
-                const caption = post.PostContent?.caption || '';
-                const imageUrl = post.PostContent?.imageUrl || '';
-                const aiTag = post.PostContent?.aiRegenerated ? ' <span class="channel-badge enabled">AI</span>' : '';
-                const thumb = imageUrl
-                    ? `<img src="${escapeAttr(imageUrl)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;float:left;margin-right:8px;">`
-                    : '';
-                const actions = [];
-                if (post.Status === 'draft') {
-                    // AI regeneration assumes a single source item -- doesn't apply to a digest, which rounds up everything.
-                    if (post.PostType !== 'digest') {
-                        actions.push(`<button type="button" class="btn btn-outline-secondary btn-sm" onclick="MarketingPage.regenerateCaption(${post.ID}, this)">Regenerate with AI</button>`);
-                    }
-                    actions.push(`<button type="button" class="btn btn-outline-primary btn-sm ms-1" onclick="MarketingPage.approvePost(${post.ID}, this)">Approve</button>`);
-                }
-                if (post.Status === 'approved' && post.Channel === 'email') {
-                    actions.push(`<button type="button" class="btn btn-success btn-sm ms-1" onclick="MarketingPage.sendPostNow(${post.ID}, this)">Send Now</button>`);
-                }
-                if (post.Status === 'draft' || post.Status === 'approved') {
-                    actions.push(`<button type="button" class="btn btn-outline-secondary btn-sm ms-1" onclick="MarketingPage.openEditPostModal(${post.ID})">Edit</button>`);
-                }
-                if (post.Status !== 'sent') {
-                    actions.push(`<button type="button" class="btn btn-outline-danger btn-sm ms-1" onclick="MarketingPage.deletePost(${post.ID})">Delete</button>`);
-                }
-                return `
-                    <tr>
-                        <td>${escapeHtml(item ? item.name : post.SquareItemID)}</td>
-                        <td>${escapeHtml(post.Channel)}</td>
-                        <td>${escapeHtml(post.PostType)}</td>
-                        <td>${escapeHtml(scheduledFor)}</td>
-                        <td><span class="channel-badge ${post.Status === 'sent' ? 'enabled' : ''}">${escapeHtml(post.Status)}</span></td>
-                        <td class="small" style="max-width: 320px;">${thumb}${escapeHtml(caption)}${aiTag}</td>
-                        <td class="text-muted">${escapeHtml(detail)}</td>
-                        <td>${actions.join('')}</td>
-                    </tr>
-                `;
-            }).join('');
-        } catch (error) {
-            console.error('Error loading status table:', error);
-        }
-    }
-
-    // One-off AI touch-up for a single draft post -- distinct from a
-    // schedule's batch UseAiCaptions opt-in. Only ever runs when a human
-    // clicks this button.
-    async function regenerateCaption(postId, buttonEl) {
-        buttonEl.disabled = true;
-        buttonEl.textContent = 'Regenerating…';
-        try {
-            const response = await fetch(`${API_URL}/api/marketing/posts/${postId}/regenerate-caption`, {
-                method: 'POST',
-                headers: authHeaders()
-            });
+            const response = await fetch(`${API_URL}/api/marketing/posts?tab=review&page=1&pageSize=25`, { headers: authHeaders() });
             const data = await response.json();
             if (!data.success) {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't regenerate caption", message: data.message || 'The caption could not be regenerated.' });
-                buttonEl.disabled = false;
-                buttonEl.textContent = 'Regenerate with AI';
+                list.innerHTML = '<li class="text-muted">The posts could not be loaded.</li>';
                 return;
             }
-            await loadStatusTable();
-        } catch (error) {
-            console.error('Error regenerating caption:', error);
-            UIDialogs.showMessage({ type: 'error', title: "Couldn't regenerate caption", message: 'Something went wrong. Please try again.', details: error.message });
-            buttonEl.disabled = false;
-            buttonEl.textContent = 'Regenerate with AI';
-        }
-    }
-
-    // The human-review gate -- a draft can't be sent until approved here.
-    async function approvePost(postId, buttonEl) {
-        buttonEl.disabled = true;
-        try {
-            const response = await fetch(`${API_URL}/api/marketing/posts/${postId}/approve`, {
-                method: 'PUT',
-                headers: authHeaders()
-            });
-            const data = await response.json();
-            if (!data.success) {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't approve post", message: data.message || 'The post could not be approved.' });
-                buttonEl.disabled = false;
-                return;
+            for (const [name, n] of Object.entries(data.counts || {})) {
+                const el = document.querySelector(`[data-summary="${name}"]`);
+                if (el) el.textContent = Number(n).toLocaleString('en-US');
             }
-            await loadStatusTable();
+            const next = data.posts.slice(0, 5);
+            list.innerHTML = next.length
+                ? next.map(post => `<li>${escapeHtml(formatWallClockDateTime(post.ScheduledFor))} &middot; ${escapeHtml((data.itemNames || {})[post.SquareItemID] || post.SquareItemID)} &middot; ${escapeHtml(CHANNEL_LABELS[post.Channel] || post.Channel)}</li>`).join('')
+                : '<li class="text-muted">No drafts waiting for review.</li>';
         } catch (error) {
-            console.error('Error approving post:', error);
-            UIDialogs.showMessage({ type: 'error', title: "Couldn't approve post", message: 'Something went wrong. Please try again.', details: error.message });
-            buttonEl.disabled = false;
-        }
-    }
-
-    // Real send -- email only for now. One message per active email
-    // contact, fired right now rather than waiting on the automatic poller.
-    async function sendPostNow(postId, buttonEl) {
-        if (!await UIDialogs.showConfirm({ title: 'Send email now?', message: 'This sends the email right now to every active contact on your Email List.', confirmText: 'Send Now', danger: true })) return;
-
-        buttonEl.disabled = true;
-        buttonEl.textContent = 'Sending…';
-        try {
-            const response = await fetch(`${API_URL}/api/marketing/posts/${postId}/send-now`, {
-                method: 'POST',
-                headers: authHeaders()
-            });
-            const data = await response.json();
-            if (!data.success) {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't send email", message: data.message || 'The email could not be sent.' });
-                buttonEl.disabled = false;
-                buttonEl.textContent = 'Send Now';
-                return;
-            }
-            UIDialogs.showMessage(data.failed
-                ? { type: 'warning', title: 'Email sent, with failures', message: `Sent to ${data.sent} recipient(s). ${data.failed} could not be sent.` }
-                : { type: 'success', title: 'Email sent', message: `Sent to ${data.sent} recipient(s).` });
-            await loadStatusTable();
-        } catch (error) {
-            console.error('Error sending post:', error);
-            UIDialogs.showMessage({ type: 'error', title: "Couldn't send email", message: 'Something went wrong. Check the post history before trying again, in case some emails went out.', details: error.message });
-            buttonEl.disabled = false;
-            buttonEl.textContent = 'Send Now';
-        }
-    }
-
-    // =====================================================
-    // EDIT / DELETE POST
-    // =====================================================
-
-    let editPostId = null;
-    let editPostImageDataUrl = null; // set only if the admin picked a replacement file
-
-    function openEditPostModal(postId) {
-        const post = statusPosts.find(p => p.ID === postId);
-        if (!post) return;
-
-        editPostId = postId;
-        editPostImageDataUrl = null;
-
-        document.getElementById('edit-post-caption').value = post.PostContent?.caption || '';
-        document.getElementById('edit-post-image-upload').value = '';
-        document.getElementById('edit-post-error').classList.add('d-none');
-
-        const imageUrl = post.PostContent?.imageUrl || '';
-        const previewEl = document.getElementById('edit-post-image-preview');
-        const emptyEl = document.getElementById('edit-post-image-empty');
-        if (imageUrl) {
-            previewEl.src = imageUrl;
-            previewEl.style.display = 'block';
-            emptyEl.style.display = 'none';
-        } else {
-            previewEl.style.display = 'none';
-            emptyEl.style.display = 'block';
-        }
-
-        const modal = new bootstrap.Modal(document.getElementById('edit-post-modal'));
-        modal.show();
-    }
-
-    function handleEditPostImageUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        if (!file.type.startsWith('image/')) {
-            UIDialogs.fieldError(event.target, 'Choose an image file.');
-            event.target.value = '';
-            return;
-        }
-        // 4MB raw, not 5MB -- this gets base64-encoded into a JSON body (not
-        // a presigned S3 PUT, since the server needs to run it through
-        // sharp), and base64 inflates size ~33%. 4MB keeps the encoded
-        // payload safely under the Lambda Function URL's 6MB request limit.
-        if (file.size > 4 * 1024 * 1024) {
-            UIDialogs.fieldError(event.target, 'That image is over 4 MB. Choose a smaller one.');
-            event.target.value = '';
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            editPostImageDataUrl = e.target.result;
-            const previewEl = document.getElementById('edit-post-image-preview');
-            previewEl.src = editPostImageDataUrl;
-            previewEl.style.display = 'block';
-            document.getElementById('edit-post-image-empty').style.display = 'none';
-        };
-        reader.readAsDataURL(file);
-    }
-
-    async function saveEditPost() {
-        const errorEl = document.getElementById('edit-post-error');
-        errorEl.classList.add('d-none');
-        const saveBtn = document.getElementById('edit-post-save-btn');
-        saveBtn.disabled = true;
-
-        const body = { caption: document.getElementById('edit-post-caption').value };
-        if (editPostImageDataUrl) body.imageDataUrl = editPostImageDataUrl;
-
-        try {
-            const response = await fetch(`${API_URL}/api/marketing/posts/${editPostId}`, {
-                method: 'PUT',
-                headers: authHeaders(),
-                body: JSON.stringify(body)
-            });
-            const data = await response.json();
-            if (!data.success) {
-                errorEl.textContent = data.message || 'Could not save changes.';
-                errorEl.classList.remove('d-none');
-                saveBtn.disabled = false;
-                return;
-            }
-            bootstrap.Modal.getInstance(document.getElementById('edit-post-modal')).hide();
-            await loadStatusTable();
-        } catch (error) {
-            console.error('Error saving post edit:', error);
-            errorEl.textContent = 'Could not save changes.';
-            errorEl.classList.remove('d-none');
-        } finally {
-            saveBtn.disabled = false;
-        }
-    }
-
-    async function deletePost(postId) {
-        if (!await UIDialogs.showConfirm({ title: 'Delete post?', message: "Delete this post? This can't be undone.", confirmText: 'Delete Post', danger: true })) return;
-
-        try {
-            const response = await fetch(`${API_URL}/api/marketing/posts/${postId}`, {
-                method: 'DELETE',
-                headers: authHeaders()
-            });
-            const data = await response.json();
-            if (!data.success) {
-                UIDialogs.showMessage({ type: 'error', title: "Couldn't delete post", message: data.message || 'The post could not be deleted.' });
-                return;
-            }
-            await loadStatusTable();
-        } catch (error) {
-            console.error('Error deleting post:', error);
-            UIDialogs.showMessage({ type: 'error', title: "Couldn't delete post", message: 'Something went wrong. Please try again.', details: error.message });
+            console.error('Error loading posts summary:', error);
+            list.innerHTML = '<li class="text-muted">The posts could not be loaded.</li>';
         }
     }
 
@@ -928,15 +693,11 @@
     document.addEventListener('DOMContentLoaded', function() {
         loadDigestSettings();
         loadMarketingItems();
-        loadStatusTable();
+        loadPostsSummary();
         loadCustomPresets();
 
         document.getElementById('save-digest-btn').addEventListener('click', saveDigestSettings);
         document.getElementById('digest-background-upload').addEventListener('change', handleDigestBackgroundUpload);
-        document.getElementById('refresh-status-btn').addEventListener('click', loadStatusTable);
-        document.getElementById('status-filter').addEventListener('change', loadStatusTable);
-        document.getElementById('edit-post-save-btn').addEventListener('click', saveEditPost);
-        document.getElementById('edit-post-image-upload').addEventListener('change', handleEditPostImageUpload);
     });
 
     // Exposed for inline onclick handlers, same pattern as client.js's
@@ -949,11 +710,6 @@
         saveAsPreset,
         deleteSelectedPreset,
         saveChannelSchedule,
-        deleteChannelSchedule,
-        regenerateCaption,
-        approvePost,
-        sendPostNow,
-        openEditPostModal,
-        deletePost
+        deleteChannelSchedule
     };
 })();
