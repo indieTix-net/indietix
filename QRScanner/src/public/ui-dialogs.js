@@ -115,7 +115,10 @@
 
             function onKey(event) {
                 if (event.key === 'Escape') {
+                    // Only this dialog closes, not a Bootstrap modal underneath it
+                    // (which would throw away, say, an unsaved schedule).
                     event.preventDefault();
+                    event.stopPropagation();
                     close(dismissValue);
                 } else if (event.key === 'Enter' && inputEl && document.activeElement === inputEl) {
                     event.preventDefault();
@@ -142,6 +145,11 @@
                 if (event.target === modal) close(dismissValue);
             });
             if (inputEl) inputEl.addEventListener('input', () => inputEl.classList.remove('is-invalid'));
+            // A Bootstrap modal underneath (e.g. Marketing's Edit Schedule) traps
+            // focus by listening for focusin on document and pulling focus back
+            // into itself, so this dialog's input couldn't be typed in. Keep our
+            // focus events from reaching that listener.
+            modal.addEventListener('focusin', (event) => event.stopPropagation());
             document.addEventListener('keydown', onKey, true);
 
             document.body.append(backdrop, modal);
