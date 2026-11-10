@@ -170,6 +170,12 @@ function defaultSquareHandlers() {
       ok: true,
       status: 200,
       json: async () => ({})
+    }),
+    // POST /v2/catalog/batch-retrieve -- the Posts page's show names.
+    batchRetrieveCatalog: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ objects: [] })
     })
   };
 }
@@ -204,6 +210,9 @@ function patchFetch() {
     }
     if (urlStr === 'https://connect.squareup.com/v2/catalog/object' && opts.method === 'POST') {
       return squareHandlers.createCatalogObject(JSON.parse(opts.body));
+    }
+    if (urlStr === 'https://connect.squareup.com/v2/catalog/batch-retrieve' && opts.method === 'POST') {
+      return squareHandlers.batchRetrieveCatalog(JSON.parse(opts.body));
     }
     if (urlStr === 'https://connect.squareup.com/v2/inventory/changes/batch-create' && opts.method === 'POST') {
       return squareHandlers.batchCreateInventory(JSON.parse(opts.body));

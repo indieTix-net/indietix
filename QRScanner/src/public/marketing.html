@@ -204,40 +204,21 @@
                 <div id="marketing-items-container" class="skeleton-keys-container"></div>
             </div>
 
-            <!-- Status / history -->
+            <!-- Posts summary -- the full list is its own page -->
             <div class="form-section">
                 <div class="section-header">
-                    <h4>Recent Activity</h4>
-                    <p class="text-muted">What's gone out, what's pending, and what failed or was skipped.</p>
+                    <h4>Posts</h4>
+                    <p class="text-muted">Drafts to review, what's scheduled, and what's gone out. Review, approve and look back on the <a href="marketing-posts.html">Marketing Posts</a> page.</p>
                 </div>
-                <div class="mb-3">
-                    <select class="form-select" id="status-filter" style="max-width: 240px; display: inline-block;">
-                        <option value="">All statuses</option>
-                        <option value="draft" selected>Draft</option>
-                        <option value="approved">Approved</option>
-                        <option value="sent">Sent</option>
-                        <option value="failed">Failed</option>
-                        <option value="skipped">Skipped</option>
-                    </select>
-                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="refresh-status-btn">Refresh</button>
+                <div class="posts-summary" id="posts-summary">
+                    <a class="posts-summary-count" href="marketing-posts.html?tab=review"><strong data-summary="review">&ndash;</strong> need review</a>
+                    <a class="posts-summary-count" href="marketing-posts.html?tab=scheduled"><strong data-summary="scheduled">&ndash;</strong> scheduled</a>
+                    <a class="posts-summary-count" href="marketing-posts.html?tab=sent"><strong data-summary="sent">&ndash;</strong> sent</a>
+                    <a class="posts-summary-count" href="marketing-posts.html?tab=problems"><strong data-summary="problems">&ndash;</strong> problems</a>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-sm" id="status-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Channel</th>
-                                <th>Type</th>
-                                <th>Scheduled For</th>
-                                <th>Status</th>
-                                <th>Caption</th>
-                                <th>Detail</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="status-table-body"></tbody>
-                    </table>
-                </div>
+                <h6 class="mt-3">Next drafts to review</h6>
+                <ul class="list-unstyled small mb-3" id="posts-summary-next"></ul>
+                <a class="btn btn-primary btn-sm" href="marketing-posts.html">Open Marketing Posts</a>
             </div>
 
         </div>
@@ -263,37 +244,6 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Edit post modal -->
-<div class="modal fade" id="edit-post-modal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Post</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3 text-center">
-                    <img id="edit-post-image-preview" src="" alt="" style="max-width:100%; max-height:200px; display:none; border-radius:8px;">
-                    <div id="edit-post-image-empty" class="text-muted small">No image yet.</div>
-                </div>
-                <div class="mb-3">
-                    <label for="edit-post-image-upload" class="btn btn-outline-secondary btn-sm">Replace Image&hellip;</label>
-                    <input type="file" id="edit-post-image-upload" accept="image/*" style="display:none;">
-                </div>
-                <div class="mb-3">
-                    <label for="edit-post-caption" class="form-label">Caption</label>
-                    <textarea class="form-control" id="edit-post-caption" rows="5"></textarea>
-                </div>
-                <div id="edit-post-error" class="text-danger small d-none"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" id="edit-post-save-btn">Save</button>
             </div>
         </div>
     </div>

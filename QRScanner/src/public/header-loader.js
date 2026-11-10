@@ -31,6 +31,7 @@
         '/getMovieInfo.html':      { perms: ['edit'] },
         '/getEventInfo.html':      { perms: ['edit'] },
         '/marketing.html':         { perms: ['marketing'] },
+        '/marketing-posts.html':   { perms: ['marketing'] },
         '/email-list.html':        { perms: ['marketing'] },
         '/user-management.html':   { clientOnly: true },
         '/client.html':            { clientOnly: true },
@@ -54,6 +55,7 @@
         { href: '/getMovieInfo.html',     label: 'Movie Info Lookup',             perms: ['edit'] },
         { href: '/getEventInfo.html',     label: 'Event Info Entry',              perms: ['edit'] },
         { href: '/marketing.html',        label: 'Marketing Schedule',            perms: ['marketing'] },
+        { href: '/marketing-posts.html',  label: 'Marketing Posts',               perms: ['marketing'] },
         { href: '/email-list.html',       label: 'Email List',                    perms: ['marketing'] },
         { href: '/user-management.html',  label: 'User Management',               clientOnly: true },
         { href: '/client.html',           label: 'Client Settings',               clientOnly: true },
@@ -403,6 +405,7 @@
 	    '/getEventInfo.html': 'Event Info Creation',
             '/insights.html': 'Reporting Insights',
             '/marketing.html': 'Marketing Schedule',
+            '/marketing-posts.html': 'Marketing Posts',
             '/email-list.html': 'Email List',
             '/privacy-requests.html': 'Privacy Requests'
         };
