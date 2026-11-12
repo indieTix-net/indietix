@@ -33,6 +33,7 @@ IndieTix is ticketing for independent cinemas, venues and promoters, built on Sq
 | Manual Checkin / List Tickets | Find any ticket, check in by hand, transfer, print | Door, view or edit permission |
 | List Orders | Find orders, resend, refund, edit contact details | View or edit permission |
 | Event Report | Sales and check-ins, grouped and exported | View or edit permission |
+| Box Office Reports | Download the nightly box-office files for any dates | Edit permission |
 | Insights | Questions about your sales in plain English | Admin permission |
 | Movie Info Lookup | Add a movie and its showtimes | Edit permission |
 | Event Info Entry | Add a live event and its showtimes | Edit permission |

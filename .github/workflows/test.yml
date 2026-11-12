@@ -70,6 +70,7 @@ jobs:
             DailyPgQueryAndSftp:
               - '.github/workflows/test.yml'
               - 'DailyPgQueryAndSftp/**'
+              - 'QRScanner/src/utils/box-office-files.mjs'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             expireQRCodeSquareModifiers:

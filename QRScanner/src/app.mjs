@@ -25,6 +25,8 @@ import { initializeModelForClient as initializeUserModel } from './models/user.m
 import { encryptPasswordResetToken, decryptPasswordResetToken, isPasswordResetTokenValid, sealToken, openToken } from './utils/crypto-utils.mjs';
 import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, eventContainsPattern } from './utils/data-filter-utils.mjs';
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
+import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
+import { buildZip } from './utils/zip.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -7427,6 +7429,102 @@ app.put('/api/marketing/posts/:postId/approve', requireAuth, requirePermission('
     return res.status(500).json({ success: false, message: 'Error approving marketing post' });
   }
 });
+
+// ---- BOX OFFICE REPORTS ----
+// Box Office Reports page (box-office-reports.html): the nightly RTS (BDOR)
+// CSV and FRG (EBOR) XML for any date or range, built on the spot from the
+// same report functions DailyPgQueryAndSftp uses, so staff can send them to a
+// distributor who doesn't get the FTP feeds. Nothing is uploaded anywhere;
+// the files come back as a .zip (base64 in JSON, like the OMDB poster, so it
+// works through the Function URL without binary-response setup). Built live,
+// so a refund made after the nightly run shows here but not in the file the
+// feeds got that night.
+const BOX_OFFICE_MAX_DAYS = 62;
+
+function isReportDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function reportDatesBetween(from, to) {
+  const dates = [];
+  for (let d = new Date(`${from}T00:00:00Z`); d <= new Date(`${to}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+app.get('/api/box-office-reports', requireAuth, requirePermission('edit'), async (req, res) => {
+  // Venue-wide totals: a sub-user limited to some events doesn't get them.
+  if (hasDataFilter(req)) {
+    return res.status(403).json({ success: false, returnStatus: 'failed_forbidden', message: 'Box office reports cover every show, so they aren’t available to logins limited to some events.' });
+  }
+  const from = String(req.query.from || '');
+  const to = String(req.query.to || from);
+  if (!isReportDate(from) || !isReportDate(to)) {
+    return res.status(400).json({ success: false, message: 'Pick a start date (and an end date for a range).' });
+  }
+  if (to < from) {
+    return res.status(400).json({ success: false, message: 'The end date is before the start date.' });
+  }
+  const dates = reportDatesBetween(from, to);
+  if (dates.length > BOX_OFFICE_MAX_DAYS) {
+    return res.status(400).json({ success: false, message: `Pick ${BOX_OFFICE_MAX_DAYS} days or fewer at a time.` });
+  }
+
+  let userPool;
+  try {
+    userPool = await createDbConnection(req.user.dbName);
+    await getClientConfiguration(userPool, req.user.dbName);
+    // Same defaults and query as the nightly job.
+    const theaterId = globalConfig.THEATER_ID || '00000';
+    const theaterName = globalConfig.THEATER_NAME || 'Unknown Theater';
+    const eborTheatreNo = globalConfig.EBOR_THEATRE_NO || '';
+    const sqlQuery = globalConfig.SQL_QUERY || 'SELECT * FROM get_bdor_grouped_for_date($1, $2, $3)';
+    if (!sqlQuery.includes('get_bdor_grouped_for_date')) {
+      await userPool.end();
+      return res.status(409).json({ success: false, message: 'This venue’s nightly report uses a custom query, so it can’t be built here.' });
+    }
+
+    const files = [];
+    const days = [];
+    for (const date of dates) {
+      const names = boxOfficeFileNames(date, theaterId, eborTheatreNo);
+      const rts = await userPool.query(sqlQuery, [theaterId, theaterName, date]);
+      files.push({ name: names.rts, content: buildRtsCsv(rts.rows) });
+      const day = {
+        date,
+        rtsFile: names.rts,
+        rows: rts.rows.length,
+        showtimes: new Set(rts.rows.map(r => `${r['Title']}|${r['Showtime']}|${r['Screen']}`)).size,
+        tickets: rts.rows.reduce((sum, r) => sum + Number(r.Sold || 0), 0),
+        gross: Number(rts.rows.reduce((sum, r) => sum + Number(r.Gross || 0), 0).toFixed(2)),
+        frgFile: null,
+        titles: 0
+      };
+      if (eborTheatreNo) {
+        const ebor = await userPool.query('SELECT * FROM public.get_ebor_engagements_for_date($1, $2)', [eborTheatreNo, date]);
+        files.push({ name: names.frg, content: buildEborXml(ebor.rows, date, eborTheatreNo) });
+        day.frgFile = names.frg;
+        day.titles = ebor.rows.length;
+      }
+      days.push(day);
+    }
+    await userPool.end();
+
+    const fileName = from === to ? `box-office-${from}.zip` : `box-office-${from}-to-${to}.zip`;
+    return res.json({
+      success: true, from, to, theaterId, eborTheatreNo: eborTheatreNo || null,
+      days, fileName, zip: buildZip(files).toString('base64')
+    });
+  } catch (error) {
+    console.error('Error building box office reports:', error);
+    if (userPool) await userPool.end();
+    return res.status(500).json({ success: false, message: 'Couldn’t build the box office reports' });
+  }
+});
+// ---- END BOX OFFICE REPORTS ----
 
 // ---- MARKETING POSTS PAGE ----
 // The Posts page (marketing-posts.html): every post, paged, in four tabs --

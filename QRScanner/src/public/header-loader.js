@@ -27,6 +27,7 @@
         '/dashboard.html':         { perms: ['view', 'edit', 'checkIn'] },
         '/order.html':             { perms: ['view', 'edit'] },
         '/reports.html':           { perms: ['view', 'edit'] },
+        '/box-office-reports.html': { perms: ['edit'] },
         '/insights.html':          { perms: ['admin'] },
         '/getMovieInfo.html':      { perms: ['edit'] },
         '/getEventInfo.html':      { perms: ['edit'] },
@@ -51,6 +52,7 @@
         { href: '/products.html',         label: 'Manual Checkin / List Tickets', perms: ['view', 'edit', 'checkIn'] },
         { href: '/order.html',            label: 'List Orders',                   perms: ['view', 'edit'] },
         { href: '/reports.html',          label: 'Event Report',                  perms: ['view', 'edit'] },
+        { href: '/box-office-reports.html', label: 'Box Office Reports',          perms: ['edit'] },
         { href: '/insights.html',         label: 'Insights',                      perms: ['admin'] },
         { href: '/getMovieInfo.html',     label: 'Movie Info Lookup',             perms: ['edit'] },
         { href: '/getEventInfo.html',     label: 'Event Info Entry',              perms: ['edit'] },
@@ -406,6 +408,7 @@
             '/insights.html': 'Reporting Insights',
             '/marketing.html': 'Marketing Schedule',
             '/marketing-posts.html': 'Marketing Posts',
+            '/box-office-reports.html': 'Box Office Reports',
             '/email-list.html': 'Email List',
             '/privacy-requests.html': 'Privacy Requests'
         };

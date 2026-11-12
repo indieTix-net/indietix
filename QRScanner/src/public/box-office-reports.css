@@ -1,0 +1,53 @@
+/* box-office-reports.css -- the Box Office Reports page. */
+
+.bor-form,
+.bor-quick {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.bor-date {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.bor-date input {
+    width: auto;
+}
+
+.bor-summary {
+    margin-top: 1rem;
+}
+
+.bor-table-wrap {
+    overflow-x: auto;
+}
+
+.bor-table td.num,
+.bor-table th.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.bor-table .bor-files {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+}
+
+.bor-no-shows td {
+    color: var(--lh-muted, #6c757d);
+}
+
+/* On a phone the file names (also inside the .zip) squeeze the numbers. */
+@media (max-width: 575px) {
+    .bor-table .bor-files-col {
+        display: none;
+    }
+}
