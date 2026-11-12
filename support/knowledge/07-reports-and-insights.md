@@ -34,3 +34,14 @@ Cinemas that report to film-industry services (for example comScore/Rentrak) can
 2. Under **FTP Settings**, turn on **Enable FTP uploads** and enter each destination your reporting services gave you.
 
 If a delivery fails, the venue's contact email gets an alert saying what failed.
+
+## Box Office Reports (download the files yourself)
+
+Some distributors don't get the nightly files automatically and ask the venue to send them. **Box Office Reports** downloads them for any date or range. You need edit permission (staff limited to some events can't use it, since the files cover every show).
+
+1. Open **Box Office Reports**.
+2. Pick the dates in **From** and **To**, or choose **Yesterday**, **Last weekend**, **Last 7 days** or **Last month**. Up to 62 days at a time.
+3. Choose **Download**. You get one .zip file holding, for each day, the RTS spreadsheet (`RTS_<Theater ID>_<date>0000.csv`) and the FRG file (`FRG_<EBOR Theatre No.>_<date>0000.xml`), named and laid out exactly like the nightly files. A day with no shows still gets its two files, marked as having no data.
+4. The page lists each day's showtimes, tickets and gross. **Download again** saves the same .zip again.
+
+The files are built from your records as they are now, so a ticket refunded after its show night is left out, while the file sent that night still counted it. Downloading never sends anything to the reporting services. There's no FRG file without an **EBOR Theatre No.** in Client Settings.

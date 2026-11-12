@@ -22,7 +22,7 @@ They log in with the venue's Client ID, their username and their password.
 |---|---|
 | Check-In | Ticket Scanner, Today's Dashboard, Manual Checkin / List Tickets |
 | View | The above, plus List Orders and Event Report |
-| Edit | The above, plus Movie Info Lookup and Event Info Entry |
+| Edit | The above, plus Movie Info Lookup, Event Info Entry and Box Office Reports |
 | Marketing | Marketing Schedule and Email List |
 | Admin | Insights |
 
