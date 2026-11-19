@@ -1310,8 +1310,32 @@ async function processWebhook(event) {
   console.log('Webhook data:', JSON.stringify(webhookData));
 
   
+  // ---- VENUE FROM WEBHOOK URL ----
+  // A venue's own Square webhook subscription can carry its IndieTix client
+  // ID in the URL (.../webhook/square?client=indietix), so a venue's ID
+  // doesn't have to equal its Square merchant ID, with no shared lookup
+  // across venues. Square signs the full URL including the query string
+  // (proven against the Square sandbox 2026-11-19), so changing client=
+  // breaks the signature. A URL-routed venue must verify signatures and
+  // match its stored SQUARE_MERCHANT_ID; see the check after its config
+  // loads. No client= -> merchant_id is the client ID, exactly as before
+  // (Liberty Hall, and every Square-OAuth/hosted-signup venue, whose ID is
+  // their merchant ID by construction).
+  const urlClientId = event.queryStringParameters?.client;
+  const routedByUrl = urlClientId !== undefined && urlClientId !== null;
+  if (routedByUrl && !/^[A-Za-z0-9]{1,64}$/.test(urlClientId)) {
+    console.error(`SQUARE_WEBHOOK_REJECTED: malformed client= in webhook URL (${String(urlClientId).slice(0, 80)})`);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: 'Invalid client in webhook URL' })
+    };
+  }
+  // ---- END VENUE FROM WEBHOOK URL ----
+
   try {
-    if (webhookData.merchant_id) {
+    if (routedByUrl) {
+      clientId = urlClientId;
+    } else if (webhookData.merchant_id) {
       // Fallback to alternative ID extraction
       clientId = webhookData.merchant_id;
     }
@@ -1362,6 +1386,27 @@ async function processWebhook(event) {
     const TEMPLATE_PDF_SMS_KEY = clientConfig.TICKET_SMS_FILENAME || "ticket_vertical.pdf";
 
     
+    // ---- URL-ROUTED VENUE CHECKS ----
+    // Only honor client= for a venue that verifies Square signatures (so the
+    // ID in the URL is authenticated by Square) and whose stored Square
+    // merchant matches the webhook's.
+    if (routedByUrl) {
+      const problem =
+        clientConfig.ENV_TYPE !== 'prod' ? 'venue does not verify Square signatures (ENV_TYPE is not "prod")'
+        : !clientConfig.SQUARE_MERCHANT_ID ? 'venue has no SQUARE_MERCHANT_ID stored'
+        : clientConfig.SQUARE_MERCHANT_ID !== webhookData.merchant_id ? `webhook merchant ${webhookData.merchant_id} is not this venue's Square account`
+        : null;
+      if (problem) {
+        console.error(`SQUARE_WEBHOOK_REJECTED: client=${clientId}: ${problem}`);
+        await clientPool.end();
+        return {
+          statusCode: 401,
+          body: JSON.stringify({ message: 'Unauthorized: webhook does not match this venue' })
+        };
+      }
+    }
+    // ---- END URL-ROUTED VENUE CHECKS ----
+
     // Get signature verification details from client config
     let sigKey = clientConfig.SQUARE_SIGNATURE_KEY;
     let notURL = clientConfig.SQUARE_WEBHOOK_URL;
@@ -1383,7 +1428,7 @@ async function processWebhook(event) {
       
       // Early exit if signature header is missing
       if (!squareSignature) {
-        console.log('Request rejected: Missing Square signature header');
+        console.error(`SQUARE_WEBHOOK_REJECTED: client=${clientId}: missing Square signature header`);
         return {
           statusCode: 401,
           body: JSON.stringify({ message: 'Unauthorized' })
@@ -1408,6 +1453,10 @@ async function processWebhook(event) {
           console.info("Request body authorized: " + requestBody);
           
         } else {
+          // Square doesn't retry this (the forwarder already answered 200),
+          // so a rejected real order needs replaying by hand; the
+          // SQUARE_WEBHOOK_REJECTED alarm makes sure someone notices.
+          console.error(`SQUARE_WEBHOOK_REJECTED: client=${clientId}: signature did not verify against this venue's SQUARE_WEBHOOK_URL and SQUARE_SIGNATURE_KEY`);
           return {
             statusCode: 401,
             body: JSON.stringify({ message: 'Unauthorized square sigKey' })

@@ -26,7 +26,7 @@ REQUIRED = ["username", "clientSecret", "contactName", "clientEmail", "square_ac
 # bucket suffix, so S3 bucket naming rules apply.
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 # Fields bootstrap.sh fills in itself, never taken from the file.
-MANAGED = {"s3_bucket_prefix", "square_webhook_url", "delete_flag"}
+MANAGED = {"s3_bucket_prefix", "square_webhook_url", "square_merchant_id", "env_type", "delete_flag"}
 
 
 def fail(message):
@@ -90,7 +90,10 @@ def payload(path, out, env):
     body["s3_bucket_prefix"] = env["ENV_PREFIX"] + "-"
     body["square_webhook_url"] = env.get("SQUARE_WEBHOOK_URL", "")
     # A managed webhook's signature key and location win over the file.
-    for key, var in (("square_signature_key", "SQUARE_SIGNATURE_KEY"), ("square_location_id", "SQUARE_LOCATION_ID")):
+    # A managed webhook's signature key, location, merchant and signature
+    # checking (env_type "prod") win over the file.
+    for key, var in (("square_signature_key", "SQUARE_SIGNATURE_KEY"), ("square_location_id", "SQUARE_LOCATION_ID"),
+                     ("square_merchant_id", "SQUARE_MERCHANT_ID"), ("env_type", "ENV_TYPE")):
         if env.get(var):
             body[key] = env[var]
     body.setdefault("settings", {}).setdefault("STATIC_WEBSITE_URL", env["STATIC_WEBSITE_URL"])

@@ -230,12 +230,27 @@ export function buildSqsEvent(records) {
   return { Records: records };
 }
 
-export function buildSqsRecord(squareWebhookPayload, headers = {}) {
+// extra: other forwarded API Gateway fields, e.g. { queryStringParameters:
+// { client: 'abc' } } for a webhook URL that carries the venue's client ID.
+export function buildSqsRecord(squareWebhookPayload, headers = {}, extra = {}) {
   return {
     messageId: `msg-${crypto.randomBytes(8).toString('hex')}`,
     body: JSON.stringify({
       headers,
-      body: JSON.stringify(squareWebhookPayload)
+      body: JSON.stringify(squareWebhookPayload),
+      ...extra
+    })
+  };
+}
+
+// Production's square-queue-forwarder (NODE_ENV=development) wraps the whole
+// API Gateway event as the SQS message's `body`; this builds that shape.
+export function buildWrappedSqsRecord(squareWebhookPayload, headers = {}, extra = {}) {
+  return {
+    messageId: `msg-${crypto.randomBytes(8).toString('hex')}`,
+    body: JSON.stringify({
+      body: { headers, body: JSON.stringify(squareWebhookPayload), ...extra },
+      receivedAt: new Date().toISOString()
     })
   };
 }

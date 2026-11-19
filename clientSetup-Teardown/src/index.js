@@ -1077,7 +1077,7 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
     
    // Create configuration JSON
     const configuration = {
-      "ENV_TYPE": "dev",
+      "ENV_TYPE": clientData.env_type || "dev",
       "SQUARE_ACCESS_TOKEN": clientData.square_access_token,
       "SQUARE_SIGNATURE_KEY": clientData.square_signature_key,
       "SQUARE_WEBHOOK_URL": clientData.square_webhook_url || "", // this deployment's own webhook endpoint (square-queue-forwarder's ApiEndpoint output); optional at onboarding, bootstrap.sh passes it -- was hardcoded to production's URL, found 2026-10-27 during a real bootstrap verification run
@@ -1374,6 +1374,11 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
     // with Square's sign-in: its access token is square_access_token above,
     // its refresh token is already in Secrets Manager. These keys aren't
     // user-definable, so they can't come in through `settings`.
+    // Personal-token venue whose webhook bootstrap.sh set up: record its
+    // merchant (getSquareOrders checks it for a ?client= webhook URL).
+    if (clientData.square_merchant_id) {
+      configuration.SQUARE_MERCHANT_ID = clientData.square_merchant_id;
+    }
     if (clientData.square_oauth && clientData.square_oauth.merchant_id) {
       configuration.SQUARE_AUTH_MODE = 'oauth';
       configuration.SQUARE_MERCHANT_ID = clientData.square_oauth.merchant_id;
@@ -1927,6 +1932,8 @@ exports.handler = async (event, context) => {
       square_signature_key,
       square_webhook_url,
       square_location_id,
+      square_merchant_id,
+      env_type,
       square_oauth,
       settings,
       sender_email,
@@ -1953,6 +1960,17 @@ exports.handler = async (event, context) => {
             required: ['username', 'clientSecret', 'contactName', 'clientEmail', 'square_access_token', 'square_signature_key']
           })
         };
+      }
+
+      // Optional: bootstrap.sh sends these for a webhook subscription it just
+      // made for this venue (exact URL, fresh signature key), so signature
+      // checking can start on day one, and the merchant is recorded for
+      // getSquareOrders' ?client= check.
+      if (env_type !== undefined && env_type !== 'dev' && env_type !== 'prod') {
+        return { statusCode: 400, body: JSON.stringify({ error: 'env_type must be "dev" or "prod"' }) };
+      }
+      if (square_merchant_id !== undefined && !/^[A-Za-z0-9]{1,64}$/.test(String(square_merchant_id))) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'square_merchant_id must be letters and numbers' }) };
       }
 
       if (settings !== undefined && (settings === null || typeof settings !== 'object' || Array.isArray(settings))) {
@@ -2022,6 +2040,8 @@ exports.handler = async (event, context) => {
       square_signature_key,
       square_webhook_url,
       square_location_id,
+      square_merchant_id,
+      env_type,
       square_oauth,
       settings,
       sender_email: sender_email || `${contactName.replace(/\s+/g, '').toLowerCase()}@indietix.net`,

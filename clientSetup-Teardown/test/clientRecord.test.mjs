@@ -117,3 +117,29 @@ test('insertClientRecord: without square_oauth the venue stays on a personal tok
   assert.equal(config.SQUARE_AUTH_MODE, undefined);
   assert.equal(config.SIGNUP_SOURCE, undefined);
 });
+
+// ---- ?client= webhook URL venues (2026-11-19) ----
+// bootstrap.sh add-client sends square_merchant_id + env_type "prod" when it
+// just made the venue's webhook subscription, so getSquareOrders can check a
+// ?client= webhook against the right Square account from day one.
+
+test('insertClientRecord: square_merchant_id and env_type from a managed webhook land in the config', async () => {
+  await insertClientRecord(dbConfig, DB_NAME, clientData({
+    username: 'indietixurl',
+    square_webhook_url: 'https://example.execute-api.us-west-1.amazonaws.com/webhook/square?client=indietixurl',
+    square_merchant_id: 'MLKWY4Z0MMWA5',
+    env_type: 'prod'
+  }));
+  const config = await configFor('indietixurl');
+  assert.equal(config.SQUARE_MERCHANT_ID, 'MLKWY4Z0MMWA5');
+  assert.equal(config.ENV_TYPE, 'prod');
+  assert.equal(config.SQUARE_WEBHOOK_URL, 'https://example.execute-api.us-west-1.amazonaws.com/webhook/square?client=indietixurl');
+  assert.equal(config.SQUARE_AUTH_MODE, undefined, 'still a personal-token venue, not OAuth');
+});
+
+test('insertClientRecord: without them, ENV_TYPE stays "dev" and no SQUARE_MERCHANT_ID is set (unchanged default)', async () => {
+  await insertClientRecord(dbConfig, DB_NAME, clientData({ username: 'CLIENTDEFAULTENV' }));
+  const config = await configFor('CLIENTDEFAULTENV');
+  assert.equal(config.ENV_TYPE, 'dev');
+  assert.equal(config.SQUARE_MERCHANT_ID, undefined);
+});

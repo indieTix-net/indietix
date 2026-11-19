@@ -140,3 +140,35 @@ test('handler: a missing WEBHOOK_QUEUE_URL is caught and still returns 200, not 
   const result = await handler(apiGatewayEvent());
   assert.equal(result.statusCode, 200);
 });
+
+// ---- venue grouping (2026-11-19) ----
+
+test('handler: development mode (production\'s setting) on a FIFO queue groups by the payload\'s merchant_id, not a shared group', async () => {
+  process.env.NODE_ENV = 'development';
+  process.env.WEBHOOK_QUEUE_URL = 'https://sqs.us-east-2.amazonaws.com/123456789/webhook-queue.fifo';
+
+  await handler(apiGatewayEvent());
+
+  const call = sqsMock.commandCalls(SendMessageCommand)[0];
+  assert.equal(call.args[0].input.MessageGroupId, 'MERCHANT-1');
+});
+
+test('handler: a webhook URL carrying ?client= groups by that venue ID, in either mode', async () => {
+  process.env.WEBHOOK_QUEUE_URL = 'https://sqs.us-east-2.amazonaws.com/123456789/webhook-queue.fifo';
+  for (const mode of ['production', 'development']) {
+    sqsMock.reset();
+    sqsMock.on(SendMessageCommand).resolves({ MessageId: 'm' });
+    process.env.NODE_ENV = mode;
+    await handler(apiGatewayEvent({ queryStringParameters: { client: 'indietix' } }));
+    assert.equal(sqsMock.commandCalls(SendMessageCommand)[0].args[0].input.MessageGroupId, 'indietix', mode);
+  }
+});
+
+test('handler: a malformed ?client= is ignored for grouping (falls back to merchant_id)', async () => {
+  process.env.NODE_ENV = 'production';
+  process.env.WEBHOOK_QUEUE_URL = 'https://sqs.us-east-2.amazonaws.com/123456789/webhook-queue.fifo';
+
+  await handler(apiGatewayEvent({ queryStringParameters: { client: '../x' } }));
+
+  assert.equal(sqsMock.commandCalls(SendMessageCommand)[0].args[0].input.MessageGroupId, 'MERCHANT-1');
+});

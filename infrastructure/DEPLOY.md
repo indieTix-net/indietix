@@ -62,6 +62,7 @@ The user deploys exclusively via the AWS Console/CLI by hand, never `serverless 
 Separate from this script: one CloudFormation stack, `indietix-prod-alarms` (us-east-2), holding only CloudWatch alarms, one log metric filter and the SNS topic that emails them. It's the one piece of production made by IaC, because alarms touch nothing a function runs on. It emails when an alarm fires and again when it clears:
 
 - ticket orders: getSquareOrders logs an `ERROR` line, crashes, or an order waits in `webhook_square_processing.fifo` over 5 minutes
+- a refused Square webhook (`SQUARE_WEBHOOK_REJECTED`: bad signature, or a `?client=` venue whose settings don't match), which Square won't resend
 - the Square webhook: square-queue-forwarder crashes, or the `getSquareOrders/prod` API returns 5xx
 - QRScanner: 2+ server errors (Function URL 5xx) in 5 minutes, or a crash
 - any crash of the inbound SMS handler, expireQRCodeSquareModifiers, DailyPgQueryAndSftp, marketingEngine or the indietix.net mail forwarder
