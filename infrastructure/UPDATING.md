@@ -60,7 +60,7 @@ Every client has a `Client.configuration` JSON blob — this is how almost all p
 
 ## Example 4: update a shared Lambda layer
 
-`sms-utils` and `ticket-pdf-lib` are real npm packages (their own repos), built into Lambda layers and attached to every Lambda that uses them — not copy-pasted per-repo. Changing one means rebuilding the layer, then re-attaching it to each consumer so they actually pick up the new version (an attached layer version doesn't auto-update).
+`sms-utils`, `ticket-pdf-lib` and `square-catalog-lib` are real npm packages (their own folders), built into Lambda layers and attached to every Lambda that uses them — not copy-pasted per-repo. Changing one means rebuilding the layer, then re-attaching it to each consumer so they actually pick up the new version (an attached layer version doesn't auto-update).
 
 ```bash
 cd sms-utils
@@ -73,6 +73,8 @@ cd ../infrastructure
 ```
 
 Why three separate `attach-layer` calls for one `deploy-layer`: `sms-utils` is one package but three different Lambdas consume it (see `infrastructure/lib/repo-config.sh` — `sms-utils-qrscanner`, `sms-utils-get-square-orders`, `sms-utils-sms-opt-in-opt-out` all share the same `LAYER_NAME`, built from the same source). One publish, multiple attaches — `./deploy.sh status` will flag any function still running an older layer version than what's published, if you want to double check nothing got missed.
+
+`square-catalog-lib` works the same way, with two consumers: `./deploy.sh deploy-layer square-catalog-lib`, then `attach-layer square-catalog-lib` (expireQRCodeSquareModifiers) and `attach-layer square-catalog-lib-marketing-engine`. When a Lambda first starts using a shared layer, attach the layer **before** deploying that Lambda's new code -- the code imports the package at load time and fails without it.
 
 ## Example 5: stand up a second environment to test something bigger
 

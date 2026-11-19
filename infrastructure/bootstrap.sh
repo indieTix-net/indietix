@@ -787,19 +787,22 @@ cmd_up() {
     echo
   fi
 
-  # 3b. Shared layers (sms-utils, ticket-pdf-lib) -- built and published
-  # fresh into THIS environment, before any of their 3 consumers deploy.
+  # 3b. Shared layers (sms-utils, ticket-pdf-lib, square-catalog-lib) --
+  # built and published fresh into THIS environment, before any of their
+  # consumers deploy.
   # Several repo-config.sh keys share one underlying LAYER_NAME (e.g.
   # sms-utils-qrscanner / sms-utils-sms-opt-in-opt-out / sms-utils-
   # get-square-orders are all "smsUtils") -- publish each distinct layer
   # exactly once and reuse the ARN, rather than rebuilding/republishing
   # per consumer.
   echo "=== Publishing shared layers for this environment ==="
-  local sms_utils_layer_arn ticket_pdf_lib_layer_arn
+  local sms_utils_layer_arn ticket_pdf_lib_layer_arn square_catalog_lib_layer_arn
   sms_utils_layer_arn=$(publish_layer_sandbox "sms-utils-qrscanner")
   echo "sms-utils: $sms_utils_layer_arn"
   ticket_pdf_lib_layer_arn=$(publish_layer_sandbox "ticket-pdf-lib")
   echo "ticket-pdf-lib: $ticket_pdf_lib_layer_arn"
+  square_catalog_lib_layer_arn=$(publish_layer_sandbox "square-catalog-lib")
+  echo "square-catalog-lib: $square_catalog_lib_layer_arn"
   echo
 
   # 4. The 7 VPC-attached Lambdas (need step 1's exports). Each one's
@@ -831,14 +834,16 @@ cmd_up() {
   deploy_stack "daily-pg-sftp" "daily-pg-sftp"
 
   sync_stack_source "expire-modifiers" "expireQRCodeSquareModifiers"
-  deploy_stack "expire-modifiers" "expire-modifiers"
+  deploy_stack "expire-modifiers" "expire-modifiers" \
+    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
 
   sync_stack_source "square-token-refresher" "squareTokenRefresher"
   deploy_stack "square-token-refresher" "square-token-refresher"
 
   sync_stack_source "marketing-engine" "marketingEngine"
   deploy_stack "marketing-engine" "marketing-engine" \
-    "EnablePollerSchedule=${ENABLE_MARKETING_POLLER}"
+    "EnablePollerSchedule=${ENABLE_MARKETING_POLLER}" \
+    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
 
   # 5. Inbound SMS.
   sync_stack_source "sms-inbound" "smsOptInOptOut"

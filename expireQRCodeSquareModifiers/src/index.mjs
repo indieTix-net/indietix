@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import * as squareCatalog from 'square-catalog-lib';
 
 // Initialize AWS clients
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
@@ -12,7 +13,6 @@ const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION 
 const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
 // ---- END SQUARE API BASE ----
 const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
-const SQUARE_CATALOG_OBJECT_API_URL = `${SQUARE_API_BASE}/v2/catalog/object`;
 
 // Global variable to store current client configuration
 let currentClientConfig = {};
@@ -591,138 +591,28 @@ async function getItemsByCategoryNames(categoryNames = ['Cinema', 'Event']) {
   }
 }
 
-/**
- * Retrieve catalog object
- */
-async function retrieveCatalogObject(objectId) {
-  try {
-    const response = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${objectId}?include_related_objects=true`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to retrieve catalog object ${objectId}: ${response.status} ${errorText}`);
-    }
-
-    const objectData = await response.json();
-    return objectData;
-  } catch (error) {
-    console.error(`Error retrieving catalog object ${objectId}:`, error);
-    throw error;
-  }
+// ---- SQUARE CATALOG HELPERS (shared: square-catalog-lib) ----
+// These four used to be full fetch implementations here (and
+// retrieveCatalogObject was duplicated in marketingEngine). They now live in
+// the shared square-catalog-lib layer, which takes the Square token as an
+// argument; these wrappers keep this file's names and call sites unchanged
+// and pass in the current venue's token.
+function retrieveCatalogObject(objectId) {
+  return squareCatalog.retrieveCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
 
-/**
- * Delete catalog object
- */
-async function deleteCatalogObject(objectId) {
-  try {
-    console.log(`Deleting catalog object: ${objectId}`);
-    
-    const response = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${objectId}`, {
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to delete catalog object ${objectId}: ${response.status} ${errorText}`);
-    }
-
-    const deleteData = await response.json();
-    console.log(`Successfully deleted catalog object: ${objectId}`);
-    return deleteData;
-  } catch (error) {
-    console.error(`Error deleting catalog object ${objectId}:`, error);
-    throw error;
-  }
+function deleteCatalogObject(objectId) {
+  return squareCatalog.deleteCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
 
-/**
- * Archive item with correct field names for REST API
- */
-async function archiveItem(itemId) {
-  try {
-    console.log(`Archiving item: ${itemId}`);
-    
-    // First get the current item to get the version and data
-    const currentItem = await retrieveCatalogObject(itemId);
-    
-    if (!currentItem.object) {
-      throw new Error(`Could not retrieve item ${itemId} for archiving`);
-    }
-    
-    // Use snake_case for REST API
-    const updatePayload = {
-      idempotency_key: `archive-${itemId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      object: {
-        type: "ITEM",
-        id: itemId,
-        version: currentItem.object.version,
-        item_data: {
-          ...currentItem.object.item_data,
-          is_archived: true
-        }
-      }
-    };
-
-    const response = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(updatePayload)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to archive item ${itemId}: ${response.status} ${errorText}`);
-    }
-
-    const archiveData = await response.json();
-    console.log(`Successfully archived item: ${itemId}`);
-    return archiveData;
-  } catch (error) {
-    console.error(`Error archiving item ${itemId}:`, error);
-    throw error;
-  }
+function archiveItem(itemId) {
+  return squareCatalog.archiveItem(currentClientConfig.SQUARE_ACCESS_TOKEN, itemId);
 }
 
-/**
- * Update catalog object
- */
-async function updateCatalogObject(catalogObject) {
-  try {
-    const response = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(catalogObject)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to update catalog object: ${response.status} ${errorText}`);
-    }
-
-    const updateData = await response.json();
-    return updateData;
-  } catch (error) {
-    console.error(`Error updating catalog object:`, error);
-    throw error;
-  }
+function updateCatalogObject(catalogObject) {
+  return squareCatalog.upsertCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, catalogObject);
 }
+// ---- END SQUARE CATALOG HELPERS ----
 
 /**
  * Filter items by custom attribute

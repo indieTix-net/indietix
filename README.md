@@ -81,6 +81,7 @@ Each folder below is one piece of the platform, with its own README and tests. S
 | [`printer`](./printer) | Optional local agent for printing physical ticket stubs on a LAN label printer |
 | [`sms-utils`](./sms-utils) | Shared phone normalization + SMS-sending Lambda layer |
 | [`ticket-pdf-lib`](./ticket-pdf-lib) | Shared QR-code + ticket-PDF rendering Lambda layer |
+| [`square-catalog-lib`](./square-catalog-lib) | Shared Square Catalog API helpers (retrieve, delete, archive, upsert) Lambda layer |
 | [`test-db-harness`](./test-db-harness) | Disposable local Postgres containers for the test suites |
 
 ## Setup & Deploy

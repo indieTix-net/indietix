@@ -172,6 +172,29 @@ load_config() {
       LAYER_INCLUDE_SELF="true"
       DEV_FN="indietix-sandbox-get-square-orders"
       ;;
+    square-catalog-lib)
+      # Shared Square Catalog helpers layer (retrieve/delete/archive/upsert)
+      # -- not a Lambda of its own, so deliberately NOT in ALL_REPOS (same
+      # reasoning as ticket-pdf-lib). One entry per consuming function,
+      # both sharing LAYER_NAME: this one attaches to the expire Lambda,
+      # square-catalog-lib-marketing-engine below to marketingEngine.
+      AWS_FN="expireQRCodeSquareModifiers"
+      SRC_DIR=""
+      FILES=""
+      LAYER_NAME="squareCatalogLib"
+      LAYER_PKG_DIR="$ROOT/square-catalog-lib"
+      LAYER_INCLUDE_SELF="true"
+      DEV_FN="indietix-sandbox-expire-modifiers"
+      ;;
+    square-catalog-lib-marketing-engine)
+      AWS_FN="marketingEngine"
+      SRC_DIR=""
+      FILES=""
+      LAYER_NAME="squareCatalogLib"
+      LAYER_PKG_DIR="$ROOT/square-catalog-lib"
+      LAYER_INCLUDE_SELF="true"
+      DEV_FN="indietix-sandbox-marketing-engine"
+      ;;
     *)
       echo "Unknown repo: '$1'" >&2
       echo "Known repos: $ALL_REPOS" >&2
