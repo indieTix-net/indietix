@@ -24,6 +24,7 @@
     "pg": "^8.13.3",
     "sms-utils": "file:../sms-utils",
     "square": "^42.0.0",
+    "square-catalog-lib": "file:../square-catalog-lib",
     "ticket-pdf-lib": "file:../ticket-pdf-lib"
   },
   "devDependencies": {

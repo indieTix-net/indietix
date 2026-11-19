@@ -103,7 +103,7 @@ Runs `src/local-server.mjs` on `$PORT` (default `3000`) — same app code as pro
 npm test
 ```
 
-Runs `node --test test/*.test.mjs` — 15 files covering auth, orders, listing routes, transfers, ticket lifecycle, Square item/showtime creation, Marquee Engine, Insights, password reset, static routes, and the public opt-in/email-signup endpoints. Unlike local dev above, tests don't touch real AWS: they use `aws-sdk-client-mock` for Secrets Manager/S3, `nock` for Square's REST API, and `test-db-harness` for an ephemeral, per-test Postgres 16 container (needs Docker running locally). `sms-utils`, `ticket-pdf-lib`, and `test-db-harness` are `file:../...`-linked sibling repos — clone them alongside this one at the same directory level before running tests.
+Runs `node --test test/*.test.mjs` — 15 files covering auth, orders, listing routes, transfers, ticket lifecycle, Square item/showtime creation, Marquee Engine, Insights, password reset, static routes, and the public opt-in/email-signup endpoints. Unlike local dev above, tests don't touch real AWS: they use `aws-sdk-client-mock` for Secrets Manager/S3, `nock` for Square's REST API, and `test-db-harness` for an ephemeral, per-test Postgres 16 container (needs Docker running locally). `sms-utils`, `ticket-pdf-lib`, `square-catalog-lib`, and `test-db-harness` are `file:../...`-linked sibling folders — clone them alongside this one at the same directory level before running tests.
 
 ## Architecture notes worth knowing before you dig in
 

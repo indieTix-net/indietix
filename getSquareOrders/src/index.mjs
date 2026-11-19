@@ -28,6 +28,7 @@ import { sendSms, buildMessageBody, normalizeToE164 } from 'sms-utils';
 // equivalent to this file's old generateQRCode/overlayQRCodeOnPdf/
 // getPdfFromS3/savePdfToS3 (now removed) before switching over.
 import { generateQRCode, renderTicketPdf, fetchPdfFromS3, savePdfToS3 } from 'ticket-pdf-lib';
+import * as squareCatalog from 'square-catalog-lib';
 
 const { Pool } = pg;
 
@@ -167,7 +168,7 @@ const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareu
 
 // Square API URLs
 const SQUARE_API_URL = `${SQUARE_API_BASE}/v2/orders/`;
-const SQUARE_CATALOG_API_URL = `${SQUARE_API_BASE}/v2/catalog/batch-retrieve`;
+// Catalog calls go through the shared square-catalog-lib (same SQUARE_API_BASE).
 const SQUARE_CUSTOMER_API_URL = `${SQUARE_API_BASE}/v2/customers/`;
 
 /**
@@ -363,17 +364,13 @@ async function fetchSelectionValue(definitionId, selectionId) {
 
     console.log(`Fetching selection value for definitionId: ${definitionId}, selectionId: ${selectionId}`);
     
-    // Direct API call to get the definition
-    const url = `${SQUARE_API_BASE}/v2/catalog/object/${definitionId}`;
+    // Direct API call to get the definition (shared square-catalog-lib)
+    const path = `/v2/catalog/object/${definitionId}`;
     
-    console.log(`Making API call to: ${url}`);
+    console.log(`Making API call to: ${path}`);
     
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
+    const response = await squareCatalog.catalogFetch(clientConfig.SQUARE_ACCESS_TOKEN, path, {
+      method: "GET"
     });
 
     if (!response.ok) {
@@ -887,12 +884,8 @@ async function fetchCatalogItems(catalogObjectIds) {
 
     console.log(`Fetching catalog details for ${catalogObjectIds.length} items`);
     
-    const response = await fetch(SQUARE_CATALOG_API_URL, {
+    const response = await squareCatalog.catalogFetch(clientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/batch-retrieve', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_ids: catalogObjectIds,
         include_related_objects: true

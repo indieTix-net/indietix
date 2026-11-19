@@ -47,6 +47,7 @@ jobs:
               - 'QRScanner/**'
               - 'sms-utils/**'
               - 'ticket-pdf-lib/**'
+              - 'square-catalog-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             getSquareOrders:
@@ -54,6 +55,7 @@ jobs:
               - 'getSquareOrders/**'
               - 'sms-utils/**'
               - 'ticket-pdf-lib/**'
+              - 'square-catalog-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             smsOptInOptOut:
@@ -155,7 +157,7 @@ jobs:
           SUITE: ${{ matrix.suite }}
         run: |
           case "$SUITE" in
-            QRScanner|getSquareOrders) siblings="sms-utils ticket-pdf-lib test-db-harness clientSetup-Teardown" ;;
+            QRScanner|getSquareOrders) siblings="sms-utils ticket-pdf-lib square-catalog-lib test-db-harness clientSetup-Teardown" ;;
             smsOptInOptOut)            siblings="sms-utils test-db-harness clientSetup-Teardown" ;;
             marketingEngine|expireQRCodeSquareModifiers)
                                        siblings="square-catalog-lib test-db-harness clientSetup-Teardown" ;;

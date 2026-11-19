@@ -20,6 +20,9 @@ Parameters:
   TicketPdfLibLayerArn:
     Type: String
     Description: LayerVersion ARN for this environment's ticket-pdf-lib layer (published by bootstrap.sh before this stack deploys)
+  SquareCatalogLibLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's square-catalog-lib layer (published by bootstrap.sh before this stack deploys)
 
 Resources:
   QrScannerLayer:
@@ -44,6 +47,7 @@ Resources:
         - !Ref QrScannerLayer
         - !Ref SmsUtilsLayerArn
         - !Ref TicketPdfLibLayerArn
+        - !Ref SquareCatalogLibLayerArn
       VpcConfig:
         SecurityGroupIds:
           - !ImportValue

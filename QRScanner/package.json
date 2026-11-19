@@ -38,6 +38,7 @@
     "serverless-http": "^3.2.0",
     "sharp": "^0.35.5",
     "sms-utils": "file:../sms-utils",
+    "square-catalog-lib": "file:../square-catalog-lib",
     "ticket-pdf-lib": "file:../ticket-pdf-lib"
   },
   "devDependencies": {

@@ -5,14 +5,9 @@ import * as squareCatalog from 'square-catalog-lib';
 // Initialize AWS clients
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
 
-// Square API URLs
-// ---- SQUARE API BASE ----
-// Square's production API unless SQUARE_API_BASE says otherwise: an
-// environment pointed at Square's sandbox sets it to
-// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
-const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
-// ---- END SQUARE API BASE ----
-const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
+// Square API: every Square call here goes through the shared
+// square-catalog-lib, which reads SQUARE_API_BASE (Square's sandbox when
+// bootstrap.sh sets SQUARE_ENVIRONMENT) and defaults to production.
 
 // Global variable to store current client configuration
 let currentClientConfig = {};
@@ -368,12 +363,8 @@ async function getAllCategories() {
   try {
     console.log('Getting ALL categories for debugging...');
     
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_types: ['CATEGORY'],
         include_related_objects: false
@@ -464,12 +455,8 @@ async function getItemsByCategoryIds(categoryIds) {
       try {
         console.log(`Searching for items in category ID: ${categoryId}`);
         
-        const categoryResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+        const categoryResponse = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-            "Content-Type": "application/json"
-          },
           body: JSON.stringify({
             object_types: ['ITEM'],
             query: {
@@ -530,12 +517,8 @@ async function getAllCatalogItems() {
   try {
     console.log('Fallback: Getting ALL catalog items...');
     
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         include_related_objects: true

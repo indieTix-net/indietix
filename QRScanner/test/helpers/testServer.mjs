@@ -171,6 +171,15 @@ function defaultSquareHandlers() {
       status: 200,
       json: async () => ({})
     }),
+    // POST /v2/catalog/images (multipart) -- the Add Movie / Add Event
+    // poster upload, via square-catalog-lib's uploadCatalogImage. Gets the
+    // FormData as sent.
+    uploadCatalogImage: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ image: { id: 'MOCK_IMAGE_ID' } }),
+      text: async () => JSON.stringify({ image: { id: 'MOCK_IMAGE_ID' } })
+    }),
     // POST /v2/catalog/batch-retrieve -- the Posts page's show names.
     batchRetrieveCatalog: async () => ({
       ok: true,
@@ -210,6 +219,9 @@ function patchFetch() {
     }
     if (urlStr === 'https://connect.squareup.com/v2/catalog/object' && opts.method === 'POST') {
       return squareHandlers.createCatalogObject(JSON.parse(opts.body));
+    }
+    if (urlStr === 'https://connect.squareup.com/v2/catalog/images' && opts.method === 'POST') {
+      return squareHandlers.uploadCatalogImage(opts.body, opts.headers);
     }
     if (urlStr === 'https://connect.squareup.com/v2/catalog/batch-retrieve' && opts.method === 'POST') {
       return squareHandlers.batchRetrieveCatalog(JSON.parse(opts.body));

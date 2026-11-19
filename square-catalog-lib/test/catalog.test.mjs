@@ -6,7 +6,9 @@ import {
   retrieveCatalogObject,
   deleteCatalogObject,
   upsertCatalogObject,
-  archiveItem
+  archiveItem,
+  catalogFetch,
+  uploadCatalogImage
 } from '../src/index.mjs';
 
 // Every call goes through the global fetch, so a URL/method-recording stub on
@@ -27,7 +29,8 @@ beforeEach(() => {
   originalBase = process.env.SQUARE_API_BASE;
   delete process.env.SQUARE_API_BASE;
   globalThis.fetch = async (url, options = {}) => {
-    const call = { url: String(url), method: options.method, headers: options.headers, body: options.body ? JSON.parse(options.body) : undefined };
+    const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+    const call = { url: String(url), method: options.method, headers: options.headers, body };
     calls.push(call);
     return responder(call);
   };
@@ -129,4 +132,51 @@ test('archiveItem: throws if Square returns no object to archive', async () => {
   responder = () => jsonResponse({});
   await assert.rejects(archiveItem('tok', 'ITEM1'), /Could not retrieve item ITEM1 for archiving/);
   assert.equal(calls.length, 1);
+});
+
+test('catalogFetch: builds the URL from the path (query strings kept) and returns the raw response', async () => {
+  const raw = jsonResponse({ objects: [] }, { ok: false, status: 503 });
+  responder = () => raw;
+  const response = await catalogFetch('tok', '/v2/catalog/list?types=CATEGORY&cursor=abc');
+  assert.equal(response, raw, 'caller gets the response itself, not a thrown error');
+  assert.equal(calls[0].url, 'https://connect.squareup.com/v2/catalog/list?types=CATEGORY&cursor=abc');
+  assert.equal(calls[0].headers.Authorization, 'Bearer tok');
+});
+
+test('catalogFetch: JSON Content-Type only when there is a body; extra headers are merged in', async () => {
+  await catalogFetch('tok', '/v2/catalog/object/OBJ1', { method: 'GET' });
+  await catalogFetch('tok', '/v2/catalog/search', { method: 'POST', body: JSON.stringify({ object_types: ['ITEM'] }), headers: { 'X-Extra': '1' } });
+  assert.deepEqual(calls[0].headers, { Authorization: 'Bearer tok' });
+  assert.deepEqual(calls[1].headers, { Authorization: 'Bearer tok', 'Content-Type': 'application/json', 'X-Extra': '1' });
+  assert.equal(calls[1].method, 'POST');
+  assert.deepEqual(calls[1].body, { object_types: ['ITEM'] });
+});
+
+test('catalogFetch: honors SQUARE_API_BASE (sandbox)', async () => {
+  process.env.SQUARE_API_BASE = 'https://connect.squareupsandbox.com';
+  await catalogFetch('tok', '/v2/catalog/batch-retrieve', { method: 'POST', body: '{}' });
+  assert.equal(calls[0].url, 'https://connect.squareupsandbox.com/v2/catalog/batch-retrieve');
+});
+
+test('uploadCatalogImage: multipart POST with the image file then the JSON request part', async () => {
+  const raw = jsonResponse({ image: { id: 'IMG1' } });
+  responder = () => raw;
+  const request = { idempotency_key: 'k', image: { id: '#img', type: 'IMAGE', image_data: { caption: 'Poster' } } };
+  const response = await uploadCatalogImage('tok', {
+    imageBuffer: Buffer.from([0xff, 0xd8, 0xff]),
+    filename: 'poster.jpg',
+    request
+  });
+  assert.equal(response, raw);
+  const call = calls[0];
+  assert.equal(call.method, 'POST');
+  assert.equal(call.url, 'https://connect.squareup.com/v2/catalog/images');
+  assert.deepEqual(call.headers, { Authorization: 'Bearer tok' }, 'no Content-Type: fetch sets the multipart boundary');
+  assert.ok(call.body instanceof FormData);
+  assert.deepEqual([...call.body.keys()], ['file', 'request']);
+  const file = call.body.get('file');
+  assert.equal(file.name, 'poster.jpg');
+  assert.equal(file.type, 'image/jpeg');
+  assert.deepEqual([...new Uint8Array(await file.arrayBuffer())], [0xff, 0xd8, 0xff]);
+  assert.deepEqual(JSON.parse(call.body.get('request')), request);
 });

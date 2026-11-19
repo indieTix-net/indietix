@@ -32,8 +32,9 @@ A Square order only produces tickets if its line items have the `UseQRCode` cust
 
 - **`sms-utils`** — E.164 phone normalization and centralized SMS sending with consent gating. Shared with `QRScanner` and `smsOptInOptOut` so the three repos don't each carry their own slightly-different copy.
 - **`ticket-pdf-lib`** — QR code generation and PDF overlay rendering (drawing the QR code + event details onto a venue's ticket template). Shared with `QRScanner` (used there for the ticket-transfer feature).
+- **`square-catalog-lib`** — every Square Catalog API call (custom-attribute lookups, batch-retrieve of the ordered items). Shared with `QRScanner`, `expireQRCodeSquareModifiers` and `marketingEngine`.
 
-Both used to be code living directly in this repo; they're separate npm packages now, built into Lambda layers. See the `infrastructure` repo's `UPDATING.md` for how to change one and redeploy every consumer.
+All three used to be code living directly in this repo; they're separate npm packages now, built into Lambda layers. See the `infrastructure` repo's `UPDATING.md` for how to change one and redeploy every consumer.
 
 ## Environment variables
 

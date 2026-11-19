@@ -1,14 +1,21 @@
-// square-catalog-lib -- shared Square Catalog API helpers for IndieTix.
+// square-catalog-lib -- shared Square Catalog API access for IndieTix.
 //
-// Extracted from expireQRCodeSquareModifiers (retrieve/delete/archive/update)
-// and marketingEngine (retrieve), which carried their own copies. Behavior is
-// unchanged from those copies; the one deliberate difference is that the
-// Square access token is passed in on every call instead of being read from a
-// module-level `currentClientConfig`, so one venue's token can never leak into
-// another venue's call from inside a shared module.
+// Every Square Catalog call in the platform goes through this package:
+// getSquareOrders, QRScanner, expireQRCodeSquareModifiers and marketingEngine
+// each used to build their own URLs and headers.
 //
-// Uses the global `fetch` (Node 22), looked up at call time, so callers' tests
-// can keep stubbing `globalThis.fetch` exactly as before.
+// Two layers:
+//  - catalogFetch(token, path, init): builds the URL from SQUARE_API_BASE,
+//    adds the auth header, and returns Square's raw Response. Callers keep
+//    their own response.ok handling, which differs a lot by call site (throw,
+//    return "Unknown", send a 500 to the browser, ...).
+//  - retrieve/delete/upsert/archive and uploadCatalogImage: helpers on top.
+//
+// The Square access token is passed on every call, never read from module
+// state, so one venue's token can't leak into another venue's call.
+//
+// Uses the global `fetch` (Node 22), looked up at call time, so callers'
+// tests can keep stubbing `globalThis.fetch` (or intercepting with nock).
 
 // ---- SQUARE API BASE ----
 // Square's production API unless SQUARE_API_BASE says otherwise: an
@@ -21,19 +28,26 @@ export function squareApiBase() {
 }
 // ---- END SQUARE API BASE ----
 
-function catalogObjectUrl(objectId) {
-  const base = `${squareApiBase()}/v2/catalog/object`;
-  return objectId ? `${base}/${objectId}` : base;
-}
-
-// No missing-token check here on purpose: the copies this replaced sent
-// whatever token they had and let Square answer 401, and this package keeps
-// their behavior exactly.
-function headers(accessToken) {
-  return {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json'
-  };
+/**
+ * Call a Square Catalog endpoint and return the raw fetch Response.
+ *
+ * @param {string} accessToken  the venue's Square access token
+ * @param {string} path         e.g. '/v2/catalog/search' or
+ *                              `/v2/catalog/object/${id}?include_related_objects=true`
+ * @param {object} [init]       fetch init: { method, body, headers }. A string
+ *                              body is sent as JSON (Content-Type added). Any
+ *                              headers given are added to the auth header.
+ *
+ * No missing-token check on purpose: the call sites this replaced sent
+ * whatever token they had and let Square answer 401.
+ */
+export function catalogFetch(accessToken, path, init = {}) {
+  const headers = { 'Authorization': `Bearer ${accessToken}` };
+  if (typeof init.body === 'string') headers['Content-Type'] = 'application/json';
+  return fetch(`${squareApiBase()}${path}`, {
+    ...init,
+    headers: { ...headers, ...(init.headers || {}) }
+  });
 }
 
 /**
@@ -43,9 +57,8 @@ function headers(accessToken) {
  */
 export async function retrieveCatalogObject(accessToken, objectId) {
   try {
-    const response = await fetch(`${catalogObjectUrl(objectId)}?include_related_objects=true`, {
-      method: 'GET',
-      headers: headers(accessToken)
+    const response = await catalogFetch(accessToken, `/v2/catalog/object/${objectId}?include_related_objects=true`, {
+      method: 'GET'
     });
 
     if (!response.ok) {
@@ -69,9 +82,8 @@ export async function deleteCatalogObject(accessToken, objectId) {
   try {
     console.log(`Deleting catalog object: ${objectId}`);
 
-    const response = await fetch(catalogObjectUrl(objectId), {
-      method: 'DELETE',
-      headers: headers(accessToken)
+    const response = await catalogFetch(accessToken, `/v2/catalog/object/${objectId}`, {
+      method: 'DELETE'
     });
 
     if (!response.ok) {
@@ -96,9 +108,8 @@ export async function deleteCatalogObject(accessToken, objectId) {
  */
 export async function upsertCatalogObject(accessToken, catalogObjectRequest) {
   try {
-    const response = await fetch(catalogObjectUrl(), {
+    const response = await catalogFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: headers(accessToken),
       body: JSON.stringify(catalogObjectRequest)
     });
 
@@ -145,9 +156,8 @@ export async function archiveItem(accessToken, itemId) {
       }
     };
 
-    const response = await fetch(catalogObjectUrl(), {
+    const response = await catalogFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: headers(accessToken),
       body: JSON.stringify(updatePayload)
     });
 
@@ -163,4 +173,33 @@ export async function archiveItem(accessToken, itemId) {
     console.error(`Error archiving item ${itemId}:`, error);
     throw error;
   }
+}
+
+/**
+ * Upload an image to the catalog (multipart): POST /v2/catalog/images.
+ * Returns the raw Response, like catalogFetch, so the caller decides what a
+ * failure means (QRScanner's Add Movie / Add Event just log and carry on
+ * without a poster).
+ *
+ * Replaces QRScanner's two copies of a form-data `.submit()` upload. Same
+ * parts, same order ("file" then "request"), now over the global fetch, which
+ * also makes it testable.
+ *
+ * @param {string} accessToken
+ * @param {object} upload
+ * @param {Buffer|Uint8Array} upload.imageBuffer
+ * @param {string} upload.filename      e.g. 'the_glass_orchard_poster.jpg'
+ * @param {string} [upload.contentType] defaults to 'image/jpeg'
+ * @param {object} upload.request       { idempotency_key, image: { id, type: 'IMAGE', image_data } }
+ */
+export function uploadCatalogImage(accessToken, { imageBuffer, filename, contentType = 'image/jpeg', request }) {
+  const form = new FormData();
+  form.append('file', new Blob([imageBuffer], { type: contentType }), filename);
+  form.append('request', JSON.stringify(request));
+  // No Content-Type here: fetch sets multipart/form-data with its boundary.
+  return fetch(`${squareApiBase()}/v2/catalog/images`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+    body: form
+  });
 }

@@ -74,7 +74,7 @@ cd ../infrastructure
 
 Why three separate `attach-layer` calls for one `deploy-layer`: `sms-utils` is one package but three different Lambdas consume it (see `infrastructure/lib/repo-config.sh` — `sms-utils-qrscanner`, `sms-utils-get-square-orders`, `sms-utils-sms-opt-in-opt-out` all share the same `LAYER_NAME`, built from the same source). One publish, multiple attaches — `./deploy.sh status` will flag any function still running an older layer version than what's published, if you want to double check nothing got missed.
 
-`square-catalog-lib` works the same way, with two consumers: `./deploy.sh deploy-layer square-catalog-lib`, then `attach-layer square-catalog-lib` (expireQRCodeSquareModifiers) and `attach-layer square-catalog-lib-marketing-engine`. When a Lambda first starts using a shared layer, attach the layer **before** deploying that Lambda's new code -- the code imports the package at load time and fails without it.
+`square-catalog-lib` works the same way, with four consumers: `./deploy.sh deploy-layer square-catalog-lib`, then `attach-layer` for `square-catalog-lib` (expireQRCodeSquareModifiers), `square-catalog-lib-marketing-engine`, `square-catalog-lib-qrscanner` and `square-catalog-lib-get-square-orders`. When a Lambda first starts using a shared layer, attach the layer **before** deploying that Lambda's new code -- the code imports the package at load time and fails without it.
 
 ## Example 5: stand up a second environment to test something bigger
 

@@ -34,6 +34,7 @@ import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-
 // node_modules. getSquareOrders is NOT touched by this and keeps running
 // its own original copy of this logic for every real order.
 import { generateQRCode, renderTicketPdf } from 'ticket-pdf-lib';
+import * as squareCatalog from 'square-catalog-lib';
 
 
 const ses = new AWS.SES();
@@ -44,15 +45,13 @@ const { Pool } = pkg;
 // https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
 const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
 // ---- END SQUARE API BASE ----
-const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
-const SQUARE_CATALOG_OBJECT_API_URL = `${SQUARE_API_BASE}/v2/catalog/object`;
-const SQUARE_CATALOG_LIST_API_URL = `${SQUARE_API_BASE}/v2/catalog/list`;
+// Square Catalog calls go through the shared square-catalog-lib (catalogFetch,
+// uploadCatalogImage), which builds its URLs from the same SQUARE_API_BASE.
 const SQUARE_INVENTORY_BATCH_CREATE = `${SQUARE_API_BASE}/v2/inventory/changes/batch-create`;
 // The seller dashboard lives on squareupsandbox.com for a sandbox account.
 const SQUARE_ITEM_LIBRARY_URL = SQUARE_API_BASE.includes('squareupsandbox')
   ? 'https://squareupsandbox.com/dashboard/items/library'
   : 'https://squareup.com/dashboard/items/library';
-const SQUARE_IMAGE_UPLOAD_URL = new URL(SQUARE_API_BASE).host;
 const SQUARE_REFUND_API_URL = `${SQUARE_API_BASE}/v2/refunds`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1772,7 +1771,7 @@ app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (r
  *
  *      app, requireAuth, createClientDbConnection, getClientConfiguration,
  *      getDatabaseCredentials, initializeModelForClient, Sequelize,
- *      globalConfig, SQUARE_CATALOG_SEARCH_API_URL,
+ *      globalConfig, squareCatalog (square-catalog-lib),
  *      parseShowtimeString(), extractRuntime()
  *
  *  parseShowtimeString / extractRuntime are function declarations, so they are
@@ -1847,12 +1846,8 @@ const EXCLUDED_TICKET_STATUSES = ['refunded', 'cancelled', 'canceled', 'transfer
  * which is what a ticket's ProductMetadata.modifiers[].catalog_object_id holds.
  */
 async function getShowtimesForDate(accessToken, dateStr) {
-  const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+  const searchResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
     body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true })
   });
 
@@ -5137,11 +5132,10 @@ app.post('/api/orders/:orderId/delete', requireAuth, requirePermission(...PERMS_
 // of the category list (the list endpoint is paginated) and matches the
 // name exactly, same as before.
 async function findOrCreateSquareCategory(accessToken, name) {
-  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
   let cursor;
   do {
-    const url = SQUARE_CATALOG_LIST_API_URL + '?types=CATEGORY' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
-    const response = await fetch(url, { method: 'GET', headers });
+    const url = '/v2/catalog/list?types=CATEGORY' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+    const response = await squareCatalog.catalogFetch(accessToken, url, { method: 'GET' });
     const data = await response.json();
     for (const cat of data.objects || []) {
       if (cat.category_data?.name === name) {
@@ -5152,9 +5146,8 @@ async function findOrCreateSquareCategory(accessToken, name) {
     cursor = data.cursor;
   } while (cursor);
 
-  const createResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+  const createResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/object', {
     method: 'POST',
-    headers,
     body: JSON.stringify({
       idempotency_key: crypto.randomUUID(),
       object: { type: 'CATEGORY', id: '#new_category', category_data: { name } }
@@ -5254,12 +5247,11 @@ function ticketVariations(itemId, ticketTypes, locationId) {
 // or { error } when UseQRCode itself can't be found or created (an item
 // without it would sell but never make tickets, so don't create one).
 async function ensureTicketAttributes(accessToken, settings) {
-  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
   const definitions = [];
   let cursor;
   do {
-    const url = SQUARE_CATALOG_LIST_API_URL + '?types=CUSTOM_ATTRIBUTE_DEFINITION' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
-    const response = await fetch(url, { method: 'GET', headers });
+    const url = '/v2/catalog/list?types=CUSTOM_ATTRIBUTE_DEFINITION' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+    const response = await squareCatalog.catalogFetch(accessToken, url, { method: 'GET' });
     if (!response.ok) {
       console.error(`Failed to list Square custom attributes: ${response.status}`);
       return { error: 'Could not read the custom attributes from Square' };
@@ -5280,7 +5272,7 @@ async function ensureTicketAttributes(accessToken, settings) {
     const name = settings.names[spec.role];
     let definition = definitions.find(d => d.custom_attribute_definition_data?.name === name);
     if (!definition) {
-      definition = await createTicketAttribute(headers, name, spec);
+      definition = await createTicketAttribute(accessToken, name, spec);
       if (!definition) {
         if (spec.role === 'useQRCode') return { error: `Could not create the ${name} custom attribute in Square` };
         result.warnings.push(`The ${name} custom attribute couldn't be created in Square, so it isn't set on this item.`);
@@ -5301,7 +5293,7 @@ async function ensureTicketAttributes(accessToken, settings) {
   return result;
 }
 
-async function createTicketAttribute(headers, name, spec) {
+async function createTicketAttribute(accessToken, name, spec) {
   const definitionData = {
     name,
     type: spec.type,
@@ -5316,9 +5308,8 @@ async function createTicketAttribute(headers, name, spec) {
       allowed_selections: spec.choices.map((choice, index) => ({ uid: `#choice_${index}`, name: choice }))
     };
   }
-  const response = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+  const response = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/object', {
     method: 'POST',
-    headers,
     body: JSON.stringify({
       idempotency_key: crypto.randomUUID(),
       object: { type: 'CUSTOM_ATTRIBUTE_DEFINITION', id: `#${spec.key}`, custom_attribute_definition_data: definitionData }
@@ -5389,12 +5380,8 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     }
     
     // 1. Check if item already exists
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         query: {
@@ -5455,12 +5442,8 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       present_at_location_ids: [locationId]
     };
     
-    const createModifierResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    const createModifierResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `${movieData.imdbID}-modifier-${Date.now()}`,
         object: modifierListObject
@@ -5501,9 +5484,6 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
         }
 
         if (posterFetchOk && posterBuffer) {
-          const FormData = (await import('form-data')).default;
-          const formData = new FormData();
-
           // Create safer filename
           const safeFilename = movieData.title
             .replace(/[^a-z0-9]/gi, '_')
@@ -5513,11 +5493,6 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
 
           console.log(`Safe filename: ${safeFilename}_poster.jpg`);
 
-          formData.append('file', posterBuffer, {
-            filename: `${safeFilename}_poster.jpg`,
-            contentType: 'image/jpeg'
-          });
-          
           const requestMetadata = {
             idempotency_key: `${movieData.imdbID}-image-${Date.now()}`,
             image: {
@@ -5529,27 +5504,16 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
             }
           };
           
-          formData.append('request', JSON.stringify(requestMetadata));
-          
           console.log('Uploading image to Square...');
           console.log('Request metadata:', JSON.stringify(requestMetadata, null, 2));
 
-          // Alternative approach using streams (more reliable with FormData)
-          const imageResponse = await new Promise((resolve, reject) => {
-            formData.submit({
-              protocol: 'https:',
-              host: SQUARE_IMAGE_UPLOAD_URL,
-              path: '/v2/catalog/images',
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`
-              }
-            }, (err, res) => {
-              if (err) return reject(err);
-              let data = '';
-              res.on('data', chunk => data += chunk);
-              res.on('end', () => resolve({ ok: res.statusCode === 200, status: res.statusCode, text: () => data }));
-            });
+          // Multipart upload via the shared square-catalog-lib (was a
+          // form-data .submit() copy here and in create-event-item).
+          const imageResponse = await squareCatalog.uploadCatalogImage(accessToken, {
+            imageBuffer: posterBuffer,
+            filename: `${safeFilename}_poster.jpg`,
+            contentType: 'image/jpeg',
+            request: requestMetadata
           });
           
           const imageResponseText = await imageResponse.text();
@@ -5631,12 +5595,8 @@ console.log('=== CUSTOM ATTRIBUTES BEING SENT ===');
 console.log(JSON.stringify(itemObject.custom_attribute_values, null, 2));
 console.log('=== END CUSTOM ATTRIBUTES ===');
 
-const createItemResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+const createItemResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/object', {
   method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json'
-  },
   body: JSON.stringify({
     idempotency_key: `${movieData.imdbID}-${Date.now()}`,
     object: itemObject
@@ -5699,12 +5659,8 @@ if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALE
     let squareItemUrl = null;
     try {
       const itemId = createItemData.catalog_object.id;
-      const itemDetailsResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL+`/${itemId}?include_related_objects=true`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
+      const itemDetailsResponse = await squareCatalog.catalogFetch(accessToken, `/v2/catalog/object/${itemId}?include_related_objects=true`, {
+        method: 'GET'
       });
       
       if (itemDetailsResponse.ok) {
@@ -5868,12 +5824,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     }
     
     // 1. Check if item already exists
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         query: {
@@ -5941,12 +5893,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       present_at_location_ids: [locationId]
     };
     
-    const createModifierResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    const createModifierResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-modifier-${Date.now()}`,
         object: modifierListObject
@@ -5982,9 +5930,6 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
         const posterBuffer = normalized.buffer;
 
         // Upload to Square
-        const FormData = (await import('form-data')).default;
-        const formData = new FormData();
-        
         const safeFilename = eventData.title
           .replace(/[^a-z0-9]/gi, '_')
           .replace(/_+/g, '_')
@@ -5992,12 +5937,7 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
           .substring(0, 100);
         
         console.log(`Safe filename: ${safeFilename}_poster.jpg`);
-        
-        formData.append('file', posterBuffer, {
-          filename: `${safeFilename}_poster.jpg`,
-          contentType: 'image/jpeg'
-        });
-        
+
         const requestMetadata = {
           idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-image-${Date.now()}`,
           image: {
@@ -6009,25 +5949,14 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
           }
         };
         
-        formData.append('request', JSON.stringify(requestMetadata));
-        
         console.log('Uploading image to Square...');
-        
-        const imageResponse = await new Promise((resolve, reject) => {
-          formData.submit({
-            protocol: 'https:',
-            host: SQUARE_IMAGE_UPLOAD_URL,
-            path: '/v2/catalog/images',
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-            }
-          }, (err, res) => {
-            if (err) return reject(err);
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => resolve({ ok: res.statusCode === 200, status: res.statusCode, text: () => data }));
-          });
+
+        // Multipart upload via the shared square-catalog-lib.
+        const imageResponse = await squareCatalog.uploadCatalogImage(accessToken, {
+          imageBuffer: posterBuffer,
+          filename: `${safeFilename}_poster.jpg`,
+          contentType: 'image/jpeg',
+          request: requestMetadata
         });
         
         const imageResponseText = await imageResponse.text();
@@ -6112,12 +6041,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     console.log(`   - Distributor key: ${distributorKey || 'NOT SET'} (UID: ${distributorSelectionUid || 'NOT SET'})`);
     console.log('=== END CUSTOM ATTRIBUTES ===');
 
-    const createItemResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    const createItemResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-item-${Date.now()}`,
         object: itemObject
@@ -6184,12 +6109,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
         let squareItemUrl = null;
         try {
           const itemId = createItemData.catalog_object.id;
-          const itemDetailsResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL+`/${itemId}?include_related_objects=true`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            }
+          const itemDetailsResponse = await squareCatalog.catalogFetch(accessToken, `/v2/catalog/object/${itemId}?include_related_objects=true`, {
+            method: 'GET'
           });
           
           if (itemDetailsResponse.ok) {
@@ -6909,12 +6830,8 @@ const MARKETING_CHANNELS = ['email', 'facebook', 'instagram', 'tiktok'];
 // Search calls elsewhere (e.g. create-movie-item) rather than sharing a
 // helper, so this matches this file's own existing convention.
 async function searchMarketingCatalogItems(accessToken, targetCategories) {
-  const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+  const searchResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
     body: JSON.stringify({
       object_types: ['ITEM'],
       include_related_objects: false
@@ -6989,12 +6906,8 @@ app.get('/api/marketing/items', requireAuth, requirePermission('marketing'), asy
 // dates next to each day-offset instead of only the abstract "-28 days" --
 // matches the Marquee Engine design doc's "generated preview" decision.
 async function getItemShowtimeWindow(accessToken, squareItemId) {
-  const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+  const searchResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
     body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true })
   });
 
@@ -7240,9 +7153,7 @@ app.post('/api/marketing/posts/:postId/regenerate-caption', requireAuth, require
       return res.status(500).json({ success: false, message: 'Square API not configured' });
     }
 
-    const itemResponse = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${post.SquareItemID}`, {
-      headers: { 'Authorization': `Bearer ${globalConfig.SQUARE_ACCESS_TOKEN}` }
-    });
+    const itemResponse = await squareCatalog.catalogFetch(globalConfig.SQUARE_ACCESS_TOKEN, `/v2/catalog/object/${post.SquareItemID}`);
     if (!itemResponse.ok) {
       await userPool.end();
       return res.status(502).json({ success: false, message: 'Could not fetch the Square item' });
@@ -7321,9 +7232,7 @@ async function resolveItemImageUrl(accessToken, item) {
   const imageId = item.item_data?.image_ids?.[0];
   if (!imageId) return null;
   try {
-    const response = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${imageId}`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
+    const response = await squareCatalog.catalogFetch(accessToken, `/v2/catalog/object/${imageId}`);
     if (!response.ok) return null;
     const data = await response.json();
     return data.object?.image_data?.url || null;
@@ -7539,7 +7448,6 @@ const MARKETING_POST_TABS = {
 };
 const MARKETING_BULK_APPROVE_MAX = 500;
 const MARKETING_POST_CHANNELS = ['email', 'facebook', 'instagram', 'tiktok'];
-const SQUARE_CATALOG_BATCH_RETRIEVE_URL = `${SQUARE_API_BASE}/v2/catalog/batch-retrieve`;
 
 /**
  * Show names for a list of post item IDs: { id: name }. Square first (it
@@ -7556,9 +7464,8 @@ async function marketingItemNames(pool, itemIds) {
   if (remaining.length && globalConfig.SQUARE_ACCESS_TOKEN) {
     try {
       for (let i = 0; i < remaining.length; i += 1000) {
-        const response = await fetch(SQUARE_CATALOG_BATCH_RETRIEVE_URL, {
+        const response = await squareCatalog.catalogFetch(globalConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/batch-retrieve', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${globalConfig.SQUARE_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ object_ids: remaining.slice(i, i + 1000), include_deleted_objects: true })
         });
         if (!response.ok) throw new Error(`Square catalog batch-retrieve failed: ${response.status}`);
@@ -7752,9 +7659,7 @@ app.post('/api/marketing/posts/:postId/send-now', requireAuth, requirePermission
       // Re-check the source item is still active before firing, same safety
       // net the automatic poller uses (marketingEngine/src/index.mjs
       // sendDuePosts) -- a schedule can outlive the showtime it was built for.
-      const itemResponse = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${post.SquareItemID}`, {
-        headers: { 'Authorization': `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}` }
-      });
+      const itemResponse = await squareCatalog.catalogFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/catalog/object/${post.SquareItemID}`);
       if (!itemResponse.ok) {
         await userPool.end();
         return res.status(502).json({ success: false, message: 'Could not fetch the Square item' });
@@ -8544,9 +8449,8 @@ async function listCatalogShowtimes(accessToken) {
   const showtimes = [];
   let cursor;
   do {
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true, ...(cursor ? { cursor } : {}) })
     });
     if (!response.ok) throw new Error(`Square catalog search failed: ${response.status}`);
@@ -9036,12 +8940,8 @@ app.get('/api/square/showtimes-for-date', requireAuth, requirePermission('edit')
     console.log(`📅 Fetching showtimes for date: ${date}, location: ${location || 'all'}`);
     
     // Search for all cinema items (using the working query format from index.mjs)
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         include_related_objects: true
@@ -9151,12 +9051,8 @@ app.get('/api/square/showtimes-for-date', requireAuth, requirePermission('edit')
   const EXCLUDED_TICKET_STATUSES = ['refunded', 'cancelled', 'canceled', 'transferred'];
 
   async function getShowtimesForDate(accessToken, dateStr) {
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareCatalog.catalogFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true })
     });
 

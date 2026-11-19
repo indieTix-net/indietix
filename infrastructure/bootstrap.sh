@@ -821,11 +821,13 @@ cmd_up() {
 
   sync_stack_source "get-square-orders" "getSquareOrders"
   deploy_stack "get-square-orders" "get-square-orders" \
-    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}"
+    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}" \
+    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
 
   sync_stack_source "qrscanner" "QRScanner"
   deploy_stack "qrscanner" "qrscanner" \
-    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}"
+    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}" \
+    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
 
   sync_stack_source "client-reporting" "clientReporting"
   deploy_stack "client-reporting" "client-reporting"
