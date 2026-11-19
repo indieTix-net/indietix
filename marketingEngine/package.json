@@ -16,7 +16,7 @@
     "mailcomposer": "^4.0.2",
     "pg": "^8.16.3",
     "sharp": "^0.35.5",
-    "square-catalog-lib": "file:../square-catalog-lib"
+    "square-api-lib": "file:../square-api-lib"
   },
   "devDependencies": {
     "aws-sdk-client-mock": "^4.0.0",

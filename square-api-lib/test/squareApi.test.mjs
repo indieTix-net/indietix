@@ -7,7 +7,7 @@ import {
   deleteCatalogObject,
   upsertCatalogObject,
   archiveItem,
-  catalogFetch,
+  squareFetch,
   uploadCatalogImage
 } from '../src/index.mjs';
 
@@ -134,27 +134,27 @@ test('archiveItem: throws if Square returns no object to archive', async () => {
   assert.equal(calls.length, 1);
 });
 
-test('catalogFetch: builds the URL from the path (query strings kept) and returns the raw response', async () => {
+test('squareFetch: builds the URL from the path (query strings kept) and returns the raw response', async () => {
   const raw = jsonResponse({ objects: [] }, { ok: false, status: 503 });
   responder = () => raw;
-  const response = await catalogFetch('tok', '/v2/catalog/list?types=CATEGORY&cursor=abc');
+  const response = await squareFetch('tok', '/v2/catalog/list?types=CATEGORY&cursor=abc');
   assert.equal(response, raw, 'caller gets the response itself, not a thrown error');
   assert.equal(calls[0].url, 'https://connect.squareup.com/v2/catalog/list?types=CATEGORY&cursor=abc');
   assert.equal(calls[0].headers.Authorization, 'Bearer tok');
 });
 
-test('catalogFetch: JSON Content-Type only when there is a body; extra headers are merged in', async () => {
-  await catalogFetch('tok', '/v2/catalog/object/OBJ1', { method: 'GET' });
-  await catalogFetch('tok', '/v2/catalog/search', { method: 'POST', body: JSON.stringify({ object_types: ['ITEM'] }), headers: { 'X-Extra': '1' } });
+test('squareFetch: JSON Content-Type only when there is a body; extra headers are merged in', async () => {
+  await squareFetch('tok', '/v2/catalog/object/OBJ1', { method: 'GET' });
+  await squareFetch('tok', '/v2/catalog/search', { method: 'POST', body: JSON.stringify({ object_types: ['ITEM'] }), headers: { 'X-Extra': '1' } });
   assert.deepEqual(calls[0].headers, { Authorization: 'Bearer tok' });
   assert.deepEqual(calls[1].headers, { Authorization: 'Bearer tok', 'Content-Type': 'application/json', 'X-Extra': '1' });
   assert.equal(calls[1].method, 'POST');
   assert.deepEqual(calls[1].body, { object_types: ['ITEM'] });
 });
 
-test('catalogFetch: honors SQUARE_API_BASE (sandbox)', async () => {
+test('squareFetch: honors SQUARE_API_BASE (sandbox)', async () => {
   process.env.SQUARE_API_BASE = 'https://connect.squareupsandbox.com';
-  await catalogFetch('tok', '/v2/catalog/batch-retrieve', { method: 'POST', body: '{}' });
+  await squareFetch('tok', '/v2/catalog/batch-retrieve', { method: 'POST', body: '{}' });
   assert.equal(calls[0].url, 'https://connect.squareupsandbox.com/v2/catalog/batch-retrieve');
 });
 
@@ -179,4 +179,28 @@ test('uploadCatalogImage: multipart POST with the image file then the JSON reque
   assert.equal(file.type, 'image/jpeg');
   assert.deepEqual([...new Uint8Array(await file.arrayBuffer())], [0xff, 0xd8, 0xff]);
   assert.deepEqual(JSON.parse(call.body.get('request')), request);
+});
+
+test('squareFetch: any Square endpoint, not just the catalog', async () => {
+  await squareFetch('tok', '/v2/orders/ORDER1');
+  await squareFetch('tok', '/v2/refunds', { method: 'POST', body: JSON.stringify({ payment_id: 'P1' }) });
+  assert.equal(calls[0].url, 'https://connect.squareup.com/v2/orders/ORDER1');
+  assert.equal(calls[1].url, 'https://connect.squareup.com/v2/refunds');
+  assert.deepEqual(calls[1].body, { payment_id: 'P1' });
+});
+
+test('squareFetch: a null token (OAuth token endpoint) sends no Authorization header', async () => {
+  await squareFetch(null, '/oauth2/token', { method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token' }) });
+  assert.equal(calls[0].url, 'https://connect.squareup.com/oauth2/token');
+  assert.deepEqual(calls[0].headers, { 'Content-Type': 'application/json' });
+});
+
+test('squareFetch: uses an injected fetch instead of the global one', async () => {
+  const injected = [];
+  const fakeFetch = async (url, init) => { injected.push({ url, init }); return jsonResponse({ access_token: 'new' }); };
+  const response = await squareFetch(null, '/oauth2/token', { method: 'POST', body: '{}' }, { fetch: fakeFetch });
+  assert.deepEqual(await response.json(), { access_token: 'new' });
+  assert.equal(injected.length, 1);
+  assert.equal(injected[0].url, 'https://connect.squareup.com/oauth2/token');
+  assert.equal(calls.length, 0, 'global fetch not used');
 });

@@ -56,7 +56,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import sharp from 'sharp';
 import mailcomposer from 'mailcomposer';
-import * as squareCatalog from 'square-catalog-lib';
+import * as squareApi from 'square-api-lib';
 
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
 const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-2' });
@@ -95,7 +95,7 @@ try {
 }
 
 // Square API: every Square call here goes through the shared
-// square-catalog-lib, which reads SQUARE_API_BASE (Square's sandbox when
+// square-api-lib, which reads SQUARE_API_BASE (Square's sandbox when
 // bootstrap.sh sets SQUARE_ENVIRONMENT) and defaults to production.
 
 // Mirrors the module-level pattern in expireQRCodeSquareModifiers/src/index.mjs --
@@ -227,7 +227,7 @@ async function getAllClientsWithConfigurations(baseDbConfig) {
 
 async function getAllCategories() {
   try {
-    const response = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
       body: JSON.stringify({
         object_types: ['CATEGORY'],
@@ -280,7 +280,7 @@ async function getItemsByCategoryIds(categoryIds) {
     // Square doesn't support OR queries, so each category is searched separately.
     for (const categoryId of categoryIds) {
       try {
-        const categoryResponse = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
+        const categoryResponse = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
           method: "POST",
           body: JSON.stringify({
             object_types: ['ITEM'],
@@ -329,7 +329,7 @@ async function getItemsByCategoryIds(categoryIds) {
 
 async function getAllCatalogItems() {
   try {
-    const response = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
       body: JSON.stringify({
         object_types: ['ITEM'],
@@ -368,11 +368,11 @@ async function getItemsByCategoryNames(categoryNames = ['Cinema', 'Events']) {
   }
 }
 
-// ---- SQUARE CATALOG HELPER (shared: square-catalog-lib) ----
+// ---- SQUARE CATALOG HELPER (shared: square-api-lib) ----
 // Used to be a full copy of expireQRCodeSquareModifiers' fetch code; now the
-// shared square-catalog-lib layer, given the current venue's token.
+// shared square-api-lib layer, given the current venue's token.
 function retrieveCatalogObject(objectId) {
-  return squareCatalog.retrieveCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
+  return squareApi.retrieveCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
 // ---- END SQUARE CATALOG HELPER ----
 

@@ -3,7 +3,7 @@
 # `changes` works out which test suites a push or PR affects; `test` runs
 # each of those suites in its own job. A folder's suite runs when the folder
 # itself changes OR when anything it depends on at test time changes, so a
-# change to a shared package (sms-utils, ticket-pdf-lib, square-catalog-lib,
+# change to a shared package (sms-utils, ticket-pdf-lib, square-api-lib,
 # test-db-harness, or clientSetup-Teardown's schema) re-tests every consumer.
 #
 # When adding a dependency between folders, update BOTH places below:
@@ -33,7 +33,7 @@ jobs:
       suites: ${{ github.event_name == 'workflow_dispatch' && steps.all.outputs.suites || steps.filter.outputs.changes }}
     steps:
       - id: all
-        run: echo 'suites=["QRScanner","getSquareOrders","smsOptInOptOut","marketingEngine","DailyPgQueryAndSftp","expireQRCodeSquareModifiers","clientReporting","clientSetup-Teardown","test-db-harness","square-queue-forwarder","sms-utils","ticket-pdf-lib","square-catalog-lib","squareTokenRefresher","support","demo-data","help"]' >> "$GITHUB_OUTPUT"
+        run: echo 'suites=["QRScanner","getSquareOrders","smsOptInOptOut","marketingEngine","DailyPgQueryAndSftp","expireQRCodeSquareModifiers","clientReporting","clientSetup-Teardown","test-db-harness","square-queue-forwarder","sms-utils","ticket-pdf-lib","square-api-lib","squareTokenRefresher","support","demo-data","help"]' >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         if: github.event_name != 'workflow_dispatch'
       - id: filter
@@ -47,7 +47,7 @@ jobs:
               - 'QRScanner/**'
               - 'sms-utils/**'
               - 'ticket-pdf-lib/**'
-              - 'square-catalog-lib/**'
+              - 'square-api-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             getSquareOrders:
@@ -55,7 +55,7 @@ jobs:
               - 'getSquareOrders/**'
               - 'sms-utils/**'
               - 'ticket-pdf-lib/**'
-              - 'square-catalog-lib/**'
+              - 'square-api-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             smsOptInOptOut:
@@ -67,7 +67,7 @@ jobs:
             marketingEngine:
               - '.github/workflows/test.yml'
               - 'marketingEngine/**'
-              - 'square-catalog-lib/**'
+              - 'square-api-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             DailyPgQueryAndSftp:
@@ -79,7 +79,7 @@ jobs:
             expireQRCodeSquareModifiers:
               - '.github/workflows/test.yml'
               - 'expireQRCodeSquareModifiers/**'
-              - 'square-catalog-lib/**'
+              - 'square-api-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             clientReporting:
@@ -104,12 +104,13 @@ jobs:
             ticket-pdf-lib:
               - '.github/workflows/test.yml'
               - 'ticket-pdf-lib/**'
-            square-catalog-lib:
+            square-api-lib:
               - '.github/workflows/test.yml'
-              - 'square-catalog-lib/**'
+              - 'square-api-lib/**'
             squareTokenRefresher:
               - '.github/workflows/test.yml'
               - 'squareTokenRefresher/**'
+              - 'square-api-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
             support:
@@ -157,11 +158,11 @@ jobs:
           SUITE: ${{ matrix.suite }}
         run: |
           case "$SUITE" in
-            QRScanner|getSquareOrders) siblings="sms-utils ticket-pdf-lib square-catalog-lib test-db-harness clientSetup-Teardown" ;;
+            QRScanner|getSquareOrders) siblings="sms-utils ticket-pdf-lib square-api-lib test-db-harness clientSetup-Teardown" ;;
             smsOptInOptOut)            siblings="sms-utils test-db-harness clientSetup-Teardown" ;;
-            marketingEngine|expireQRCodeSquareModifiers)
-                                       siblings="square-catalog-lib test-db-harness clientSetup-Teardown" ;;
-            DailyPgQueryAndSftp|clientReporting|squareTokenRefresher|demo-data)
+            marketingEngine|expireQRCodeSquareModifiers|squareTokenRefresher)
+                                       siblings="square-api-lib test-db-harness clientSetup-Teardown" ;;
+            DailyPgQueryAndSftp|clientReporting|demo-data)
                                        siblings="test-db-harness clientSetup-Teardown" ;;
             clientSetup-Teardown|support) siblings="test-db-harness" ;;
             test-db-harness)           siblings="clientSetup-Teardown" ;;

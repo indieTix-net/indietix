@@ -1,21 +1,24 @@
-// square-catalog-lib -- shared Square Catalog API access for IndieTix.
+// square-api-lib -- shared Square API access for IndieTix.
 //
-// Every Square Catalog call in the platform goes through this package:
-// getSquareOrders, QRScanner, expireQRCodeSquareModifiers and marketingEngine
-// each used to build their own URLs and headers.
+// Every call IndieTix makes to Square's REST API goes through this package:
+// catalog, orders, payments, refunds, customers, locations, inventory and the
+// OAuth token endpoint, from getSquareOrders, QRScanner,
+// expireQRCodeSquareModifiers, marketingEngine and squareTokenRefresher. Each
+// of those used to build its own URLs and headers.
 //
-// Two layers:
-//  - catalogFetch(token, path, init): builds the URL from SQUARE_API_BASE,
+// Two levels:
+//  - squareFetch(token, path, init): builds the URL from SQUARE_API_BASE,
 //    adds the auth header, and returns Square's raw Response. Callers keep
 //    their own response.ok handling, which differs a lot by call site (throw,
 //    return "Unknown", send a 500 to the browser, ...).
-//  - retrieve/delete/upsert/archive and uploadCatalogImage: helpers on top.
+//  - catalog helpers on top: retrieve/delete/upsert/archive, uploadCatalogImage.
 //
 // The Square access token is passed on every call, never read from module
 // state, so one venue's token can't leak into another venue's call.
 //
 // Uses the global `fetch` (Node 22), looked up at call time, so callers'
-// tests can keep stubbing `globalThis.fetch` (or intercepting with nock).
+// tests can keep stubbing `globalThis.fetch`. A caller that injects its own
+// fetch (squareTokenRefresher) passes it as squareFetch's 4th argument.
 
 // ---- SQUARE API BASE ----
 // Square's production API unless SQUARE_API_BASE says otherwise: an
@@ -26,25 +29,38 @@
 export function squareApiBase() {
   return (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
 }
+
+// True when SQUARE_API_BASE points at Square's sandbox (its seller dashboard
+// and OAuth pages then live on squareupsandbox.com too).
+export function isSquareSandbox() {
+  return squareApiBase().includes('squareupsandbox');
+}
 // ---- END SQUARE API BASE ----
 
 /**
- * Call a Square Catalog endpoint and return the raw fetch Response.
+ * Call any Square REST endpoint and return the raw fetch Response.
  *
- * @param {string} accessToken  the venue's Square access token
- * @param {string} path         e.g. '/v2/catalog/search' or
- *                              `/v2/catalog/object/${id}?include_related_objects=true`
+ * @param {string|null} accessToken  the venue's Square access token, sent as
+ *                              `Authorization: Bearer ...`. Pass null for the
+ *                              OAuth token endpoint, which authenticates with
+ *                              the app's client secret in the body instead.
+ * @param {string} path         e.g. '/v2/catalog/search', `/v2/orders/${id}`,
+ *                              '/oauth2/token' (query string allowed)
  * @param {object} [init]       fetch init: { method, body, headers }. A string
  *                              body is sent as JSON (Content-Type added). Any
- *                              headers given are added to the auth header.
+ *                              headers given are added last.
+ * @param {object} [options]
+ * @param {Function} [options.fetch]  fetch implementation (default: global fetch)
  *
  * No missing-token check on purpose: the call sites this replaced sent
- * whatever token they had and let Square answer 401.
+ * whatever token they had and let Square answer 401. (Only null/undefined
+ * leaves the header off; Square answers 401 to that just the same.)
  */
-export function catalogFetch(accessToken, path, init = {}) {
-  const headers = { 'Authorization': `Bearer ${accessToken}` };
+export function squareFetch(accessToken, path, init = {}, { fetch: fetchImpl } = {}) {
+  const headers = {};
+  if (accessToken != null) headers['Authorization'] = `Bearer ${accessToken}`;
   if (typeof init.body === 'string') headers['Content-Type'] = 'application/json';
-  return fetch(`${squareApiBase()}${path}`, {
+  return (fetchImpl || fetch)(`${squareApiBase()}${path}`, {
     ...init,
     headers: { ...headers, ...(init.headers || {}) }
   });
@@ -57,7 +73,7 @@ export function catalogFetch(accessToken, path, init = {}) {
  */
 export async function retrieveCatalogObject(accessToken, objectId) {
   try {
-    const response = await catalogFetch(accessToken, `/v2/catalog/object/${objectId}?include_related_objects=true`, {
+    const response = await squareFetch(accessToken, `/v2/catalog/object/${objectId}?include_related_objects=true`, {
       method: 'GET'
     });
 
@@ -82,7 +98,7 @@ export async function deleteCatalogObject(accessToken, objectId) {
   try {
     console.log(`Deleting catalog object: ${objectId}`);
 
-    const response = await catalogFetch(accessToken, `/v2/catalog/object/${objectId}`, {
+    const response = await squareFetch(accessToken, `/v2/catalog/object/${objectId}`, {
       method: 'DELETE'
     });
 
@@ -108,7 +124,7 @@ export async function deleteCatalogObject(accessToken, objectId) {
  */
 export async function upsertCatalogObject(accessToken, catalogObjectRequest) {
   try {
-    const response = await catalogFetch(accessToken, '/v2/catalog/object', {
+    const response = await squareFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
       body: JSON.stringify(catalogObjectRequest)
     });
@@ -156,7 +172,7 @@ export async function archiveItem(accessToken, itemId) {
       }
     };
 
-    const response = await catalogFetch(accessToken, '/v2/catalog/object', {
+    const response = await squareFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
       body: JSON.stringify(updatePayload)
     });
@@ -177,7 +193,7 @@ export async function archiveItem(accessToken, itemId) {
 
 /**
  * Upload an image to the catalog (multipart): POST /v2/catalog/images.
- * Returns the raw Response, like catalogFetch, so the caller decides what a
+ * Returns the raw Response, like squareFetch, so the caller decides what a
  * failure means (QRScanner's Add Movie / Add Event just log and carry on
  * without a poster).
  *

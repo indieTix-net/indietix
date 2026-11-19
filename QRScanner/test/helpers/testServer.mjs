@@ -172,7 +172,7 @@ function defaultSquareHandlers() {
       json: async () => ({})
     }),
     // POST /v2/catalog/images (multipart) -- the Add Movie / Add Event
-    // poster upload, via square-catalog-lib's uploadCatalogImage. Gets the
+    // poster upload, via square-api-lib's uploadCatalogImage. Gets the
     // FormData as sent.
     uploadCatalogImage: async () => ({
       ok: true,

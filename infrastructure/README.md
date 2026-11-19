@@ -357,11 +357,11 @@ npm install
 npm test
 ```
 
-Shared packages (`sms-utils`, `ticket-pdf-lib`, `square-catalog-lib`, `test-db-harness`, and `clientSetup-Teardown` for the schema) are pulled in from their sibling folders, which is one more reason the folder names have to match exactly.
+Shared packages (`sms-utils`, `ticket-pdf-lib`, `square-api-lib`, `test-db-harness`, and `clientSetup-Teardown` for the schema) are pulled in from their sibling folders, which is one more reason the folder names have to match exactly.
 
 ### Continuous integration (GitHub Actions)
 
-One workflow, `.github/workflows/test.yml` at the repo root, runs on **every push to `main` and every pull request against `main`**. It works out which folders the change touched and runs each affected test suite in its own job: it sets up Node 22, installs the suite's sibling packages and its own dependencies, then runs `npm test`. A change to shared code (`sms-utils`, `ticket-pdf-lib`, `square-catalog-lib`, `test-db-harness`, or the schema in `clientSetup-Teardown`) re-runs every suite that depends on it. **Run workflow** on the Actions tab tests everything.
+One workflow, `.github/workflows/test.yml` at the repo root, runs on **every push to `main` and every pull request against `main`**. It works out which folders the change touched and runs each affected test suite in its own job: it sets up Node 22, installs the suite's sibling packages and its own dependencies, then runs `npm test`. A change to shared code (`sms-utils`, `ticket-pdf-lib`, `square-api-lib`, `test-db-harness`, or the schema in `clientSetup-Teardown`) re-runs every suite that depends on it. **Run workflow** on the Actions tab tests everything.
 
 Docker comes preinstalled on GitHub's Ubuntu runners, so the throwaway Postgres containers work there with no extra setup. A typical run takes 2–3 minutes.
 

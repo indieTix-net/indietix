@@ -172,8 +172,8 @@ load_config() {
       LAYER_INCLUDE_SELF="true"
       DEV_FN="indietix-sandbox-get-square-orders"
       ;;
-    square-catalog-lib)
-      # Shared Square Catalog helpers layer (retrieve/delete/archive/upsert)
+    square-api-lib)
+      # Shared Square API layer (every Square REST call goes through it)
       # -- not a Lambda of its own, so deliberately NOT in ALL_REPOS (same
       # reasoning as ticket-pdf-lib). One entry per consuming function,
       # all sharing LAYER_NAME: this one attaches to the expire Lambda; the
@@ -182,35 +182,35 @@ load_config() {
       AWS_FN="expireQRCodeSquareModifiers"
       SRC_DIR=""
       FILES=""
-      LAYER_NAME="squareCatalogLib"
-      LAYER_PKG_DIR="$ROOT/square-catalog-lib"
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
       LAYER_INCLUDE_SELF="true"
       DEV_FN="indietix-sandbox-expire-modifiers"
       ;;
-    square-catalog-lib-marketing-engine)
+    square-api-lib-marketing-engine)
       AWS_FN="marketingEngine"
       SRC_DIR=""
       FILES=""
-      LAYER_NAME="squareCatalogLib"
-      LAYER_PKG_DIR="$ROOT/square-catalog-lib"
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
       LAYER_INCLUDE_SELF="true"
       DEV_FN="indietix-sandbox-marketing-engine"
       ;;
-    square-catalog-lib-qrscanner)
+    square-api-lib-qrscanner)
       AWS_FN="QRScanner"
       SRC_DIR=""
       FILES=""
-      LAYER_NAME="squareCatalogLib"
-      LAYER_PKG_DIR="$ROOT/square-catalog-lib"
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
       LAYER_INCLUDE_SELF="true"
       DEV_FN="indietix-sandbox-qrscanner"
       ;;
-    square-catalog-lib-get-square-orders)
+    square-api-lib-get-square-orders)
       AWS_FN="getSquareOrders"
       SRC_DIR=""
       FILES=""
-      LAYER_NAME="squareCatalogLib"
-      LAYER_PKG_DIR="$ROOT/square-catalog-lib"
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
       LAYER_INCLUDE_SELF="true"
       DEV_FN="indietix-sandbox-get-square-orders"
       ;;

@@ -26,6 +26,7 @@ import {
   SecretsManagerClient, GetSecretValueCommand, PutSecretValueCommand, ListSecretsCommand
 } from '@aws-sdk/client-secrets-manager';
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
+import * as squareApi from 'square-api-lib';
 
 const REFRESH_SECRET_PREFIX = 'indieTix/square/clients/';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -36,9 +37,6 @@ const region = process.env.AWS_REGION || 'us-east-2';
 const secretsClient = new SecretsManagerClient({ region });
 const sesClient = new SESClient({ region });
 
-function squareApiBase() {
-  return (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
-}
 
 // ---- VENUES ----
 
@@ -127,16 +125,17 @@ export async function refreshVenue(clientId, { secrets = secretsClient, db, appI
     const { refresh_token: refreshToken } = await readSecretJson(secrets, secretName);
     if (!refreshToken) throw new Error('the refresh-token secret is empty');
 
-    const response = await fetchFn(`${squareApiBase()}/oauth2/token`, {
+    // Shared square-api-lib: no bearer token here (the app's client secret is
+    // in the body); fetchFn stays injectable for tests.
+    const response = await squareApi.squareFetch(null, '/oauth2/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id: appId,
         client_secret: appSecret,
         grant_type: 'refresh_token',
         refresh_token: refreshToken
       })
-    });
+    }, { fetch: fetchFn });
     const tokens = await response.json().catch(() => ({}));
     if (!response.ok || !tokens.access_token) {
       const codes = (tokens.errors || []).map(e => e.code).filter(Boolean);

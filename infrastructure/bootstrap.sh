@@ -787,7 +787,7 @@ cmd_up() {
     echo
   fi
 
-  # 3b. Shared layers (sms-utils, ticket-pdf-lib, square-catalog-lib) --
+  # 3b. Shared layers (sms-utils, ticket-pdf-lib, square-api-lib) --
   # built and published fresh into THIS environment, before any of their
   # consumers deploy.
   # Several repo-config.sh keys share one underlying LAYER_NAME (e.g.
@@ -796,13 +796,13 @@ cmd_up() {
   # exactly once and reuse the ARN, rather than rebuilding/republishing
   # per consumer.
   echo "=== Publishing shared layers for this environment ==="
-  local sms_utils_layer_arn ticket_pdf_lib_layer_arn square_catalog_lib_layer_arn
+  local sms_utils_layer_arn ticket_pdf_lib_layer_arn square_api_lib_layer_arn
   sms_utils_layer_arn=$(publish_layer_sandbox "sms-utils-qrscanner")
   echo "sms-utils: $sms_utils_layer_arn"
   ticket_pdf_lib_layer_arn=$(publish_layer_sandbox "ticket-pdf-lib")
   echo "ticket-pdf-lib: $ticket_pdf_lib_layer_arn"
-  square_catalog_lib_layer_arn=$(publish_layer_sandbox "square-catalog-lib")
-  echo "square-catalog-lib: $square_catalog_lib_layer_arn"
+  square_api_lib_layer_arn=$(publish_layer_sandbox "square-api-lib")
+  echo "square-api-lib: $square_api_lib_layer_arn"
   echo
 
   # 4. The 7 VPC-attached Lambdas (need step 1's exports). Each one's
@@ -822,12 +822,12 @@ cmd_up() {
   sync_stack_source "get-square-orders" "getSquareOrders"
   deploy_stack "get-square-orders" "get-square-orders" \
     "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}" \
-    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "qrscanner" "QRScanner"
   deploy_stack "qrscanner" "qrscanner" \
     "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}" \
-    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "client-reporting" "clientReporting"
   deploy_stack "client-reporting" "client-reporting"
@@ -837,15 +837,16 @@ cmd_up() {
 
   sync_stack_source "expire-modifiers" "expireQRCodeSquareModifiers"
   deploy_stack "expire-modifiers" "expire-modifiers" \
-    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "square-token-refresher" "squareTokenRefresher"
-  deploy_stack "square-token-refresher" "square-token-refresher"
+  deploy_stack "square-token-refresher" "square-token-refresher" \
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "marketing-engine" "marketingEngine"
   deploy_stack "marketing-engine" "marketing-engine" \
     "EnablePollerSchedule=${ENABLE_MARKETING_POLLER}" \
-    "SquareCatalogLibLayerArn=${square_catalog_lib_layer_arn}"
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   # 5. Inbound SMS.
   sync_stack_source "sms-inbound" "smsOptInOptOut"

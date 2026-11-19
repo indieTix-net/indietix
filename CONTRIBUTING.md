@@ -11,7 +11,7 @@ Everyone contributing code or docs signs the [Contributor License Agreement](./C
 Every folder is one piece of the platform, with its own README and tests. Start with [`infrastructure/README.md`](./infrastructure/README.md) for the big picture and local setup.
 
 - **Run the tests** for any folder you change: `cd <folder> && npm install && npm test`. You need Docker running and Node 22.
-- **CI** runs the suites your change affects on every pull request, including everything downstream of shared code (`sms-utils`, `ticket-pdf-lib`, `square-catalog-lib`, `test-db-harness`, and the schema in `clientSetup-Teardown`).
+- **CI** runs the suites your change affects on every pull request, including everything downstream of shared code (`sms-utils`, `ticket-pdf-lib`, `square-api-lib`, `test-db-harness`, and the schema in `clientSetup-Teardown`).
 - **Keep pull requests small and focused.** Change existing code in place rather than restructuring it, and put a new feature in its own clearly commented block.
 - **Schema changes must be safe to re-run.** Update `createDatabaseObjects` for new venues and `migrations.sql` for existing ones, together.
 - **Never commit secrets.** Credentials belong in AWS Secrets Manager or a venue's Client Settings, never in code, docs or examples.

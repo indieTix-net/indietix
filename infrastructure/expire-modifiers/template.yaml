@@ -11,9 +11,9 @@ Parameters:
     Type: String
     Default: indietix-sandbox
     Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
-  SquareCatalogLibLayerArn:
+  SquareApiLibLayerArn:
     Type: String
-    Description: LayerVersion ARN for this environment's square-catalog-lib layer (published by bootstrap.sh before this stack deploys)
+    Description: LayerVersion ARN for this environment's square-api-lib layer (published by bootstrap.sh before this stack deploys)
 
 Resources:
   ExpireModifiersLayer:
@@ -36,7 +36,7 @@ Resources:
       MemorySize: 2560  # matches production
       Layers:
         - !Ref ExpireModifiersLayer
-        - !Ref SquareCatalogLibLayerArn
+        - !Ref SquareApiLibLayerArn
       VpcConfig:
         SecurityGroupIds:
           - !ImportValue

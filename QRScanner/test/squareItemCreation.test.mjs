@@ -333,7 +333,7 @@ test('ticket items: ticket types and prices come from the venue\'s settings, els
 });
 
 
-// ---- poster upload (square-catalog-lib uploadCatalogImage) ----
+// ---- poster upload (square-api-lib uploadCatalogImage) ----
 // The upload used to go through form-data's raw .submit(), which this
 // harness couldn't intercept, so posters were never tested. It now goes
 // through fetch, so both routes' poster paths are covered here. A data: URL

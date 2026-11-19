@@ -1,7 +1,7 @@
 {
-  "name": "square-catalog-lib",
+  "name": "square-api-lib",
   "version": "1.0.0",
-  "description": "Shared Square Catalog API helpers (retrieve, delete, archive, upsert) for IndieTix, packaged as a Lambda layer. Extracted from the copies in expireQRCodeSquareModifiers and marketingEngine.",
+  "description": "Shared Square REST API access for IndieTix (squareFetch for any endpoint, plus catalog helpers), packaged as a Lambda layer. Every Square call from getSquareOrders, QRScanner, expireQRCodeSquareModifiers, marketingEngine and squareTokenRefresher goes through it.",
   "type": "module",
   "main": "src/index.mjs",
   "scripts": {
@@ -10,7 +10,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/indieTix-net/indietix.git",
-    "directory": "square-catalog-lib"
+    "directory": "square-api-lib"
   },
   "keywords": [],
   "author": "",

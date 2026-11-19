@@ -1,12 +1,12 @@
 import { Client } from 'pg';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
-import * as squareCatalog from 'square-catalog-lib';
+import * as squareApi from 'square-api-lib';
 
 // Initialize AWS clients
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
 
 // Square API: every Square call here goes through the shared
-// square-catalog-lib, which reads SQUARE_API_BASE (Square's sandbox when
+// square-api-lib, which reads SQUARE_API_BASE (Square's sandbox when
 // bootstrap.sh sets SQUARE_ENVIRONMENT) and defaults to production.
 
 // Global variable to store current client configuration
@@ -363,7 +363,7 @@ async function getAllCategories() {
   try {
     console.log('Getting ALL categories for debugging...');
     
-    const response = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
       body: JSON.stringify({
         object_types: ['CATEGORY'],
@@ -455,7 +455,7 @@ async function getItemsByCategoryIds(categoryIds) {
       try {
         console.log(`Searching for items in category ID: ${categoryId}`);
         
-        const categoryResponse = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
+        const categoryResponse = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
           method: "POST",
           body: JSON.stringify({
             object_types: ['ITEM'],
@@ -517,7 +517,7 @@ async function getAllCatalogItems() {
   try {
     console.log('Fallback: Getting ALL catalog items...');
     
-    const response = await squareCatalog.catalogFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
       body: JSON.stringify({
         object_types: ['ITEM'],
@@ -574,26 +574,26 @@ async function getItemsByCategoryNames(categoryNames = ['Cinema', 'Event']) {
   }
 }
 
-// ---- SQUARE CATALOG HELPERS (shared: square-catalog-lib) ----
+// ---- SQUARE CATALOG HELPERS (shared: square-api-lib) ----
 // These four used to be full fetch implementations here (and
 // retrieveCatalogObject was duplicated in marketingEngine). They now live in
-// the shared square-catalog-lib layer, which takes the Square token as an
+// the shared square-api-lib layer, which takes the Square token as an
 // argument; these wrappers keep this file's names and call sites unchanged
 // and pass in the current venue's token.
 function retrieveCatalogObject(objectId) {
-  return squareCatalog.retrieveCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
+  return squareApi.retrieveCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
 
 function deleteCatalogObject(objectId) {
-  return squareCatalog.deleteCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
+  return squareApi.deleteCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
 
 function archiveItem(itemId) {
-  return squareCatalog.archiveItem(currentClientConfig.SQUARE_ACCESS_TOKEN, itemId);
+  return squareApi.archiveItem(currentClientConfig.SQUARE_ACCESS_TOKEN, itemId);
 }
 
 function updateCatalogObject(catalogObject) {
-  return squareCatalog.upsertCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, catalogObject);
+  return squareApi.upsertCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, catalogObject);
 }
 // ---- END SQUARE CATALOG HELPERS ----
 

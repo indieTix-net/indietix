@@ -28,7 +28,7 @@ import { sendSms, buildMessageBody, normalizeToE164 } from 'sms-utils';
 // equivalent to this file's old generateQRCode/overlayQRCodeOnPdf/
 // getPdfFromS3/savePdfToS3 (now removed) before switching over.
 import { generateQRCode, renderTicketPdf, fetchPdfFromS3, savePdfToS3 } from 'ticket-pdf-lib';
-import * as squareCatalog from 'square-catalog-lib';
+import * as squareApi from 'square-api-lib';
 
 const { Pool } = pg;
 
@@ -159,17 +159,12 @@ const transporter = nodemailer.createTransport({
 // a hardcoded Liberty Hall personal address shared across every client;
 // see clientSetup-Teardown's 2026-10-25 OWNER_BCC_EMAIL migration.
 
-// ---- SQUARE API BASE ----
-// Square's production API unless SQUARE_API_BASE says otherwise: an
-// environment pointed at Square's sandbox sets it to
-// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
-const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
-// ---- END SQUARE API BASE ----
-
-// Square API URLs
-const SQUARE_API_URL = `${SQUARE_API_BASE}/v2/orders/`;
-// Catalog calls go through the shared square-catalog-lib (same SQUARE_API_BASE).
-const SQUARE_CUSTOMER_API_URL = `${SQUARE_API_BASE}/v2/customers/`;
+// ---- SQUARE API ----
+// Every Square API call (orders, payments, customers, catalog) goes through
+// the shared square-api-lib, which reads SQUARE_API_BASE: Square's
+// production API unless an environment points it at the sandbox
+// (bootstrap.sh, SQUARE_ENVIRONMENT).
+// ---- END SQUARE API ----
 
 /**
  * Generates a presigned URL for S3 object download
@@ -364,12 +359,12 @@ async function fetchSelectionValue(definitionId, selectionId) {
 
     console.log(`Fetching selection value for definitionId: ${definitionId}, selectionId: ${selectionId}`);
     
-    // Direct API call to get the definition (shared square-catalog-lib)
+    // Direct API call to get the definition (shared square-api-lib)
     const path = `/v2/catalog/object/${definitionId}`;
     
     console.log(`Making API call to: ${path}`);
     
-    const response = await squareCatalog.catalogFetch(clientConfig.SQUARE_ACCESS_TOKEN, path, {
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, path, {
       method: "GET"
     });
 
@@ -849,12 +844,8 @@ async function saveQRCodeToDatabase(pool, qrCode, productDetails = '', createJun
 
 async function getCustomer(customerId) {
   try {
-    const response = await fetch(SQUARE_CUSTOMER_API_URL + customerId, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/customers/${customerId}`, {
+      method: "GET"
     });
 
     if (!response.ok) {
@@ -884,7 +875,7 @@ async function fetchCatalogItems(catalogObjectIds) {
 
     console.log(`Fetching catalog details for ${catalogObjectIds.length} items`);
     
-    const response = await squareCatalog.catalogFetch(clientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/batch-retrieve', {
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/batch-retrieve', {
       method: "POST",
       body: JSON.stringify({
         object_ids: catalogObjectIds,
@@ -1479,14 +1470,9 @@ async function processWebhook(event) {
     console.log('BigTimeQ2:', JSON.stringify(webhookData));
 
     const paymentId = webhookData.data.object.payment.id;
-    const SQUARE_PAYMENT_API_URL = `${SQUARE_API_BASE}/v2/payments/`;
 // Make a fresh API call to get complete payment data
-const paymentResponse = await fetch(`${SQUARE_PAYMENT_API_URL}${paymentId}`, {
-  method: "GET",
-  headers: {
-    "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-    "Content-Type": "application/json"
-  }
+const paymentResponse = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/payments/${paymentId}`, {
+  method: "GET"
 });
 
 const currentPaymentData = await paymentResponse.json();
@@ -1533,12 +1519,8 @@ console.log('customerId:', customerId);
       console.error("Could not extract order ID", body);
       throw new Error("Invalid body structure: Cannot extract order ID");
     }
-    const response = await fetch(`${SQUARE_API_URL}${orderId}`, {
-      method: "GET",
-      headers: {
-          "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-      }
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/orders/${orderId}`, {
+      method: "GET"
     });
 
     if (!response.ok) {
