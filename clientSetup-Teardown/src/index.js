@@ -825,6 +825,19 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
     await pgClient.query(createPrivacyRequestTable);
     console.log('PrivacyRequest table created');
 
+    // 17. NoTicketOrder -- Square orders getSquareOrders already found to
+    // have no ticketed items (concession sales), so Square's repeat
+    // webhooks for them are skipped like a ticket sale's are (via its
+    // Order row). Square IDs only, no personal data; pruned after 90 days.
+    const createNoTicketOrderTable = `
+      CREATE TABLE public."NoTicketOrder" (
+        "OrderID" VARCHAR(255) PRIMARY KEY,
+        "CreatedDate" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await pgClient.query(createNoTicketOrderTable);
+    console.log('NoTicketOrder table created');
+
     // ===========================================================
     // FUNCTIONS
     // ===========================================================

@@ -1297,3 +1297,21 @@ CREATE TABLE IF NOT EXISTS public."PrivacyRequest" (
 );
 
 COMMIT;
+
+
+-- ============================================================
+-- 2026-11-20: NoTicketOrder -- concession sales already seen
+-- ============================================================
+-- getSquareOrders records each Square order it found to have no ticketed
+-- items, so Square's ~3 repeat webhooks per sale skip straight out instead
+-- of re-fetching everything. Square IDs only, no personal data. Must match
+-- createDatabaseObjects in src/index.js. getSquareOrders works without it
+-- (skips the check), so this can run before or after that deploy.
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public."NoTicketOrder" (
+  "OrderID" VARCHAR(255) PRIMARY KEY,
+  "CreatedDate" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMIT;

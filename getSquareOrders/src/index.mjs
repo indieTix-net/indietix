@@ -894,8 +894,33 @@ async function fetchCatalogItems(catalogObjectIds) {
   }
   catch (error) {
     console.error(`Error fetching catalog items:`, error);
-    return {};
+    // Still an empty catalog to the caller (no ticketed items found), but
+    // flagged so the order isn't recorded as having none.
+    return { fetchFailed: true };
   } 
+}
+
+// ---- NoTicketOrder helpers (see NO-TICKET ORDER GUARD in processWebhook) ----
+// 42P01 = table doesn't exist: a venue database from before 2026-11-20 that
+// hasn't run that migration yet. Both helpers then do nothing.
+async function isKnownNoTicketOrder(pool, orderId) {
+  try {
+    const result = await pool.query(`SELECT 1 FROM "NoTicketOrder" WHERE "OrderID" = $1`, [orderId]);
+    return result.rows.length > 0;
+  } catch (error) {
+    if (error.code !== '42P01') console.error('NoTicketOrder lookup failed (processing the order anyway):', error.message);
+    return false;
+  }
+}
+
+async function rememberNoTicketOrder(pool, orderId) {
+  try {
+    await pool.query(`INSERT INTO "NoTicketOrder" ("OrderID") VALUES ($1) ON CONFLICT ("OrderID") DO NOTHING`, [orderId]);
+    // Square stops sending updates for a sale long before this; keeps the table small.
+    await pool.query(`DELETE FROM "NoTicketOrder" WHERE "CreatedDate" < NOW() - INTERVAL '90 days'`);
+  } catch (error) {
+    if (error.code !== '42P01') console.error('NoTicketOrder insert failed (harmless; a repeat webhook will reprocess):', error.message);
+  }
 }
 
 /**
@@ -1506,6 +1531,20 @@ async function processWebhook(event) {
           })
         };
       }
+      // ---- NO-TICKET ORDER GUARD ----
+      // A sale with no ticketed items (concessions) never gets an Order row,
+      // so the check above can't catch Square's repeat webhooks for it
+      // (~3 per sale, each a new payment version). NoTicketOrder remembers
+      // it instead. A venue whose database predates the table just skips
+      // this check (same behavior as before).
+      if (await isKnownNoTicketOrder(clientPool, earlyOrderId)) {
+        console.log(`Order ${earlyOrderId} already seen with no ticketed items; duplicate webhook event, skipping.`);
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ message: 'No ticketed items in this order; already seen (idempotent no-op)', order_id: earlyOrderId })
+        };
+      }
+      // ---- END NO-TICKET ORDER GUARD ----
       console.log(`Order ${earlyOrderId} not yet in DB; proceeding with full webhook processing.`);
     }
     // ---- end idempotency check --------------------------------------------
@@ -1999,6 +2038,14 @@ console.log('customerId:', customerId);
         // (that gap crashed the SQS handler and backed up the whole FIFO
         // queue on 2026-10-21).
         console.log(`Order ${orderId} has no ticketed items -- nothing to process.`);
+        // Remember it so Square's repeat webhooks skip straight out (see
+        // NO-TICKET ORDER GUARD). Never after a failed catalog fetch: then
+        // "no tickets" may be wrong, and the next webhook must try again.
+        if (catalogItems.fetchFailed) {
+          console.log(`Catalog fetch failed for order ${orderId}; not recording it as a no-ticket order, so a later webhook retries.`);
+        } else {
+          await rememberNoTicketOrder(clientPool, orderId);
+        }
         return {
           statusCode: 200,
           body: JSON.stringify({ message: 'No ticketed items in this order; nothing to process.' }),

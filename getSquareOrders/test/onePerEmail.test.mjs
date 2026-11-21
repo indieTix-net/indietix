@@ -27,7 +27,7 @@ beforeEach(async () => {
   resetS3Handlers(Buffer.from(await doc.save()));
   emailsSent = 0;
   sesHandlers.sendRawEmail = async () => { emailsSent++; return { MessageId: 'mock-id' }; };
-  for (const table of ['QRCodeProductToOrder', 'QRCodeProduct', 'Order', 'Customer', 'SmsConsent']) {
+  for (const table of ['QRCodeProductToOrder', 'QRCodeProduct', 'Order', 'Customer', 'SmsConsent', 'NoTicketOrder']) {
     await ctx.pgClient.query(`DELETE FROM "${table}"`);
   }
   await setLimit(null);

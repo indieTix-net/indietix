@@ -64,7 +64,7 @@ beforeEach(async () => {
   resetSesHandlers();
   resetSmsHandlers();
   resetS3Handlers(await blankTemplate());
-  for (const table of ['QRCodeProductToOrder', 'QRCodeProduct', 'Order', 'Customer', 'SmsConsent']) {
+  for (const table of ['QRCodeProductToOrder', 'QRCodeProduct', 'Order', 'Customer', 'SmsConsent', 'NoTicketOrder']) {
     await ctx.pgClient.query(`DELETE FROM "${table}"`);
   }
 });
@@ -74,9 +74,9 @@ const notFound = () => ({ ok: false, status: 404, json: async () => ({ errors: [
 
 // Square answers exactly what it answered in production.
 function installRecording(fx) {
-  const calls = { catalogIds: null, customers: [], definitions: [] };
+  const calls = { catalogIds: null, customers: [], definitions: [], orders: 0 };
   squareHandlers.getPayment = async (id) => (id === fx.payment.payment.id ? ok(fx.payment) : notFound());
-  squareHandlers.getOrder = async (id) => (id === fx.order.order.id ? ok(fx.order) : notFound());
+  squareHandlers.getOrder = async (id) => { calls.orders++; return id === fx.order.order.id ? ok(fx.order) : notFound(); };
   squareHandlers.getCustomer = async (id) => {
     calls.customers.push(id);
     return fx.customer && fx.customer.customer?.id === id ? ok(fx.customer) : notFound();
@@ -132,6 +132,11 @@ for (const fx of fixtures) {
       assert.equal(tickets.rows.length, 0);
       assert.equal(outbound.emails.length, 0, 'no email for a sale with no tickets');
       assert.equal(outbound.texts.length, 0);
+      // Square's repeat webhooks for it skip straight out (NoTicketOrder).
+      await handler(buildSqsEvent([signedRecord(fx.webhook)]));
+      await handler(buildSqsEvent([signedRecord(fx.webhook)]));
+      assert.equal(calls.orders, 1, 'Square order fetched once, not once per webhook');
+      assert.equal((await ctx.pgClient.query(`SELECT COUNT(*)::int AS n FROM "Order"`)).rows[0].n, 0);
       return;
     }
 
@@ -171,6 +176,7 @@ for (const fx of fixtures) {
     await handler(buildSqsEvent([signedRecord(fx.webhook)]));
     assert.equal((await ctx.pgClient.query(`SELECT COUNT(*)::int AS n FROM "QRCodeProduct"`)).rows[0].n, fx.expected.tickets.length);
     assert.equal(outbound.emails.length, 1);
+    assert.equal(calls.orders, 1, 'the repeat webhook stops before asking Square again');
   });
 }
 
