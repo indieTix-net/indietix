@@ -29,6 +29,7 @@ import { sendSms, buildMessageBody, normalizeToE164 } from 'sms-utils';
 // getPdfFromS3/savePdfToS3 (now removed) before switching over.
 import { generateQRCode, renderTicketPdf, fetchPdfFromS3, savePdfToS3 } from 'ticket-pdf-lib';
 import * as squareApi from 'square-api-lib';
+import { lookupShowings, enforceCapacity } from './native-events.mjs';
 
 const { Pool } = pg;
 
@@ -714,7 +715,7 @@ async function saveQRCodeToDatabase(pool, qrCode, productDetails = '', createJun
     await client.query('BEGIN');
     
     // First insert - QR code product with added Distributor, ProductVenue, ProductSeatCode, CustomerID columns
-    const productQuery = `
+    let productQuery = `
       INSERT INTO "QRCodeProduct" ("QRCode", "CheckedIn", "CreatedDate", "ExpirationDate", "LastEditedDate",
       "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductPrice",
        "ProductID", "ProductMetadata", "EmailAddress", "FirstName", "LastName", "PhoneNumber", "Distributor", "ProductVenue", "ProductSeatCode", "Status", "CustomerID")
@@ -749,6 +750,13 @@ async function saveQRCodeToDatabase(pool, qrCode, productDetails = '', createJun
       productDetails.customerId || null // CustomerID (NEW for SMS opt-in)
     ];
     
+    // NATIVE EVENTS: ShowingID only when known, so a venue database that
+    // predates the column keeps working.
+    if (productDetails.showingId) {
+      productValues.push(productDetails.showingId);
+      productQuery = productQuery.replace('"Status", "CustomerID")', '"Status", "CustomerID", "ShowingID")')
+        .replace('$21, $22)', '$21, $22, $23)');
+    }
     const productResult = await client.query(productQuery, productValues);
     const productId = productResult.rows[0].ID;
     console.log(`QR code saved to database with ID: ${productId}`);
@@ -1640,6 +1648,23 @@ console.log('customerId:', customerId);
 
     let qrCodeItems = getCatalogItemsDetailsForQR(orderDetailsT, catalogItems);
     let finalItemArray = [];
+
+    // ---- NATIVE EVENTS: which IndieTix showing each ticket line is for ----
+    // By the line's showtime modifier id (every Liberty Hall ticket line has
+    // exactly one). Unknown = the ticket is made from the showtime text, as
+    // before; flagged when the item IS one of ours (a showtime added in
+    // Square's dashboard instead of the Showtimes page).
+    const nativeShowings = await lookupShowings(clientPool, qrCodeItems.map(item => ({
+      variationId: item.catalog_object_id,
+      modifierId: item.modifiers?.[0]?.catalog_object_id
+    })));
+    for (const item of qrCodeItems) {
+      const modifierId = item.modifiers?.[0]?.catalog_object_id;
+      if (!nativeShowings.byModifier.has(modifierId) && nativeShowings.knownVariations.has(item.catalog_object_id)) {
+        console.error(`UNMATCHED_SHOWTIME: order ${orderId}, "${item.name}" showtime "${item.modifiers?.[0]?.name}" (${modifierId}) isn't one IndieTix knows. Ticket issued from the showtime text. Add showtimes on the Showtimes page, not in Square.`);
+      }
+    }
+    // ---- END NATIVE EVENTS lookup ----
     console.log("WTF", JSON.stringify(qrCodeItems));
     qrCodeItems.forEach(item => {
       // Process each item based on quantity
@@ -1667,7 +1692,9 @@ console.log('customerId:', customerId);
           // Add the eventTypeInfo if it exists
           eventTypeInfo: item.eventTypeInfo,
           // Generate a unique QR code data string
-          qrCodeData: `${item.name}_${item.variation_name}_${orderId}_${item.uid}_${i}_${Date.now()}`
+          qrCodeData: `${item.name}_${item.variation_name}_${orderId}_${item.uid}_${i}_${Date.now()}`,
+          // NATIVE EVENTS: the IndieTix showing, or undefined
+          showing: nativeShowings.byModifier.get(item.modifiers?.[0]?.catalog_object_id)
         });
         console.log("finalItemArray:", JSON.stringify(finalItemArray));
       }
@@ -1752,6 +1779,7 @@ console.log('customerId:', customerId);
    
       // Process each line item to create tickets
       const ticketResults = [];
+      const soldShowingIds = []; // NATIVE EVENTS: showings that got a ticket, for the capacity check
       const emailAttachments = []; // Array to hold all attachments
       const venueNameForEmail = clientConfig.WEB_HEADER_COMPANY || 'the venue';
       let emailSubject = `Your ${venueNameForEmail} Tickets`;
@@ -1791,8 +1819,10 @@ console.log('customerId:', customerId);
           
           // NEW: Parse itemModifierValues to extract datetime and venue
           const modifierParsed = parseItemModifierValues(lineItem.itemModifierValues);
-          const eventDateTime = modifierParsed.datetime;
-          const eventVenue = modifierParsed.eventVenue;
+          // NATIVE EVENTS: a known showing's own time and room win over the text
+          // (they match it by construction; see QRScanner parseShowtimeLabel).
+          const eventDateTime = lineItem.showing ? lineItem.showing.startsAt : modifierParsed.datetime;
+          const eventVenue = lineItem.showing ? lineItem.showing.venue : modifierParsed.eventVenue;
           
           console.log(`Parsed modifier values for ${itemName}: DateTime: ${eventDateTime}, Venue: ${eventVenue}`);
           
@@ -1831,11 +1861,13 @@ console.log('customerId:', customerId);
               // Only the FIRST ticket in the order (createJunctionAndOrder=true) writes the
               // Order row and consumes the OptInToken; subsequent tickets just get CustomerID.
               optInToken: optInToken,
-              customerId: dbCustomerId
+              customerId: dbCustomerId,
+              showingId: lineItem.showing?.showingId ?? null
             }, 
             createJunctionAndOrder,
             expirationWindow);
             console.log(`QR code saved to database: ${sku}`);
+            if (lineItem.showing) soldShowingIds.push(lineItem.showing.showingId);
           } catch (error) {
             console.error("Failed to save QR code to database:", error);
             return {
@@ -2016,10 +2048,21 @@ console.log('customerId:', customerId);
         }
       }
 
+      // ---- NATIVE EVENTS: stop selling showings this order filled ----
+      // After the tickets and email: it can never delay or fail the order.
+      // Off unless the venue turns on ENFORCE_CAPACITY (Client Settings).
+      const enforceCapacityOn = clientConfig.ENFORCE_CAPACITY === true || clientConfig.ENFORCE_CAPACITY === 'true';
+      let capacityResults = [];
+      if (enforceCapacityOn && soldShowingIds.length > 0) {
+        capacityResults = await enforceCapacity(clientPool, clientConfig.SQUARE_ACCESS_TOKEN, soldShowingIds);
+      }
+      // ---- END NATIVE EVENTS capacity ----
+
       return {
         statusCode: 200,
         body: JSON.stringify({
           message: "PDF tickets with order details sent successfully",
+          sold_out_showings: capacityResults.filter(r => r.soldOut).map(r => r.showingId),
           tickets: ticketResults,
           recipient: recipientEmail,
           ticketCount: emailAttachments.length,

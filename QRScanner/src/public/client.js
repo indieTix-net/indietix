@@ -117,6 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const modifierNameFilterInput = document.getElementById('modifier-name-filter');
     const targetCategoriesInput = document.getElementById('target-categories');
     const sendSmsInput = document.getElementById('send-sms');
+    const enforceCapacityInput = document.getElementById('enforce-capacity');
     const useFtpInput = document.getElementById('use-ftp');
     
     // FTP fields
@@ -847,6 +848,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Checkbox fields
         sendSmsInput.checked = config.SEND_SMS === 'true';
+        enforceCapacityInput.checked = config.ENFORCE_CAPACITY === true || config.ENFORCE_CAPACITY === 'true';
         useFtpInput.checked = config.USE_FTP === 'true';
         
         // Show/hide FTP settings based on checkbox
@@ -943,6 +945,7 @@ document.addEventListener('DOMContentLoaded', function() {
         config.MODIFIER_NAME_FILTER = modifierNameFilterInput.value.trim();
         config.TARGET_CATEGORIES = targetCategoriesInput.value.trim();
         config.SEND_SMS = sendSmsInput.checked ? 'true' : 'false';
+        config.ENFORCE_CAPACITY = enforceCapacityInput.checked ? 'true' : 'false';
         config.USE_FTP = useFtpInput.checked ? 'true' : 'false';
         
         // FTP settings

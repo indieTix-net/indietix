@@ -152,6 +152,36 @@ Resources:
       AlarmActions: [!Ref AlarmTopic]
       OKActions: [!Ref AlarmTopic]
 
+  # NATIVE EVENTS: a sale for one of IndieTix's events whose showtime IndieTix
+  # doesn't know (added in Square's dashboard), or a full showing that
+  # couldn't be taken off sale. Tickets are issued either way.
+  ShowtimeSyncFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${GetSquareOrdersFunction}'
+      FilterPattern: '?"UNMATCHED_SHOWTIME" ?"CAPACITY_ENFORCEMENT_FAILED"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  ShowtimeSyncAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${EnvPrefix}-showtime-out-of-sync'
+      AlarmDescription: A ticket sold for a showtime IndieTix doesn't know (someone added it in Square instead of the Showtimes page), or a full showtime couldn't be taken off sale in Square. Tickets were issued. Search getSquareOrders' log for UNMATCHED_SHOWTIME or CAPACITY_ENFORCEMENT_FAILED, then fix the showtime on the Showtimes page or in Square.
+      Namespace: IndieTix
+      MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
   OrderCrashAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
