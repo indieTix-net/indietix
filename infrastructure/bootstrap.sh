@@ -591,6 +591,12 @@ sync_stack_source() {
   local stack_dir="$1" repo_key="$2"
   echo "--- Syncing $stack_dir/src from the real $repo_key repo ---"
   stage_source_files "$repo_key" "$SCRIPT_DIR/$stack_dir/src"
+  # Same syntax + local-import check deploy.sh's builds run (2026-11-20: a
+  # new file missing from FILES shipped a QRScanner that couldn't start).
+  if ! lint_build "$repo_key" "$SCRIPT_DIR/$stack_dir/src"; then
+    echo "ERROR: $repo_key's code failed lint (see above); not deploying it. Add any new file to FILES in lib/repo-config.sh." >&2
+    exit 1
+  fi
 }
 
 # publish_layer_sandbox <repo-config-key> -- builds and publishes a new
