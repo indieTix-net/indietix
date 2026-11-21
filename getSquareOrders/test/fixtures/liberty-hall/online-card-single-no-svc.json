@@ -1,0 +1,738 @@
+{
+  "shape": "online-card-single-no-svc",
+  "description": "Square Online, card, one ticket, no service charge.",
+  "recorded": "2026-11-16, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "e2db15ab-8702-355e-be8b-260c64c150ca",
+    "created_at": "2026-11-16T20:55:35.341Z",
+    "data": {
+      "type": "payment",
+      "id": "Iz63pxY6AwE2jVUhlzvyUWaWJUJZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "application_details": {
+            "application_id": "sq0idp-w46nJ_NCNDMSOywaCY0mwA",
+            "square_product": "ECOMMERCE_API"
+          },
+          "approved_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "billing_address": {
+            "address_line_1": "redacted-13",
+            "address_line_2": "redacted-14",
+            "administrative_district_level_1": "redacted-07",
+            "country": "US",
+            "first_name": "Given03",
+            "last_name": "Family03",
+            "locality": "redacted-08",
+            "postal_code": "redacted-09"
+          },
+          "buyer_email_address": "buyer02@example.com",
+          "card_details": {
+            "auth_result_code": "115152",
+            "avs_status": "AVS_ACCEPTED",
+            "card": {
+              "bin": "000000",
+              "card_brand": "VISA",
+              "card_type": "DEBIT",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "last_4": "0000",
+              "payment_account_reference": "FIXTUREPAR",
+              "prepaid_type": "NOT_PREPAID"
+            },
+            "card_payment_timeline": {
+              "authorized_at": "2026-11-16T20:55:31.345Z",
+              "captured_at": "2026-11-16T20:55:34.029Z"
+            },
+            "cvv_status": "CVV_NOT_CHECKED",
+            "entry_method": "KEYED",
+            "statement_description": "SQ *LIBERTY HALL",
+            "status": "CAPTURED"
+          },
+          "created_at": "2026-11-16T20:55:30.863Z",
+          "customer_id": "FIXTURECUSTOMER04",
+          "delay_action": "CANCEL",
+          "delay_duration": "PT168H",
+          "delayed_until": "2026-11-23T20:55:30.863Z",
+          "id": "Iz63pxY6AwE2jVUhlzvyUWaWJUJZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "ePLeBkGI6QFTmi2aSw7grsD2ifZZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "reference_id": "redacted-15",
+          "risk_evaluation": {
+            "created_at": "2026-11-16T20:55:31.503Z",
+            "risk_level": "NORMAL"
+          },
+          "shipping_address": {
+            "first_name": "Given03",
+            "last_name": "Family03"
+          },
+          "source_type": "CARD",
+          "status": "COMPLETED",
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-16T20:55:34.918Z",
+          "version": 4
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "Iz63pxY6AwE2jVUhlzvyUWaWJUJZY",
+      "created_at": "2026-11-16T20:55:30.863Z",
+      "updated_at": "2026-11-16T20:55:34.918Z",
+      "amount_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "delay_duration": "PT168H",
+      "source_type": "CARD",
+      "card_details": {
+        "status": "CAPTURED",
+        "card": {
+          "card_brand": "VISA",
+          "last_4": "0000",
+          "exp_month": 12,
+          "exp_year": 2030,
+          "fingerprint": "sq-1-fixture-fingerprint",
+          "card_type": "DEBIT",
+          "prepaid_type": "NOT_PREPAID",
+          "bin": "000000",
+          "payment_account_reference": "FIXTUREPAR"
+        },
+        "entry_method": "KEYED",
+        "cvv_status": "CVV_NOT_CHECKED",
+        "avs_status": "AVS_ACCEPTED",
+        "auth_result_code": "115152",
+        "statement_description": "SQ *LIBERTY HALL",
+        "card_payment_timeline": {
+          "authorized_at": "2026-11-16T20:55:31.345Z",
+          "captured_at": "2026-11-16T20:55:34.029Z"
+        }
+      },
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "ePLeBkGI6QFTmi2aSw7grsD2ifZZY",
+      "reference_id": "redacted-15",
+      "risk_evaluation": {
+        "created_at": "2026-11-16T20:55:31.503Z",
+        "risk_level": "NORMAL"
+      },
+      "buyer_email_address": "buyer02@example.com",
+      "billing_address": {
+        "address_line_1": "redacted-13",
+        "address_line_2": "redacted-14",
+        "locality": "redacted-08",
+        "administrative_district_level_1": "redacted-07",
+        "postal_code": "redacted-09",
+        "country": "US",
+        "first_name": "Given03",
+        "last_name": "Family03"
+      },
+      "shipping_address": {
+        "first_name": "Given03",
+        "last_name": "Family03"
+      },
+      "customer_id": "FIXTURECUSTOMER04",
+      "total_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "approved_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "delay_action": "CANCEL",
+      "delayed_until": "2026-11-23T20:55:30.863Z",
+      "application_details": {
+        "square_product": "ECOMMERCE_API",
+        "application_id": "sq0idp-w46nJ_NCNDMSOywaCY0mwA"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": {
+    "customer": {
+      "id": "FIXTURECUSTOMER04",
+      "created_at": "2023-12-29T00:58:53.682Z",
+      "updated_at": "2026-11-16T20:55:35Z",
+      "given_name": "Given03",
+      "family_name": "Family03",
+      "email_address": "buyer02@example.com",
+      "address": {
+        "address_line_1": "redacted-13",
+        "address_line_2": "redacted-14",
+        "locality": "redacted-08",
+        "administrative_district_level_1": "redacted-07",
+        "postal_code": "redacted-09",
+        "country": "US"
+      },
+      "phone_number": "+15555550012",
+      "preferences": {
+        "email_unsubscribed": false
+      },
+      "creation_source": "INSTANT_PROFILE",
+      "segment_ids": [
+        "M5E5N7KAHZA7Q.REACHABLE",
+        "gv2:7TP9XAFKP95R55WR8N48BXBH4M",
+        "gv2:BEC52WQAD562Q0WDTGXAF15R6W"
+      ],
+      "version": 2
+    }
+  },
+  "order": {
+    "order": {
+      "id": "ePLeBkGI6QFTmi2aSw7grsD2ifZZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "9aiV8VbT1Jy8P6Tqz08rbB",
+          "catalog_object_id": "K2GCSP7GLXHZTCF5NCFIXOTQ",
+          "catalog_version": 1794814732091,
+          "quantity": "1",
+          "name": "La Bola Negra (2026)",
+          "variation_name": "Adult",
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "jsVem03f8p15mHFy8XyLSC",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Thu 11-19-2026 6:30 PM (Main Auditorium)",
+              "catalog_object_id": "DKVVCTU2EPAPSGEGRNDTVDXN",
+              "catalog_version": 1794814732091,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "fulfillments": [
+        {
+          "uid": "034ymYzhYM8cW3OSjMehMa",
+          "type": "PICKUP",
+          "state": "PROPOSED",
+          "pickup_details": {
+            "pickup_at": "2026-11-19T20:15:00.000Z",
+            "placed_at": "2026-11-16T20:55:31.738Z",
+            "schedule_type": "ASAP",
+            "recipient": {
+              "display_name": "redacted-16",
+              "email_address": "buyer02@example.com",
+              "phone_number": "+15555550012",
+              "address": {
+                "first_name": "Given03",
+                "last_name": "Family03"
+              }
+            },
+            "pickup_window_duration": "PT6H45M",
+            "prep_time_duration": "PT15M",
+            "is_curbside_pickup": false
+          }
+        }
+      ],
+      "created_at": "2026-11-16T20:54:16.359Z",
+      "updated_at": "2026-11-16T20:55:34.932Z",
+      "state": "OPEN",
+      "version": 16,
+      "reference_id": "redacted-17",
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "tenders": [
+        {
+          "id": "Iz63pxY6AwE2jVUhlzvyUWaWJUJZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "ePLeBkGI6QFTmi2aSw7grsD2ifZZY",
+          "created_at": "2026-11-16T20:55:30Z",
+          "amount_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "type": "CARD",
+          "card_details": {
+            "status": "CAPTURED",
+            "card": {
+              "card_brand": "VISA",
+              "last_4": "0000",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "card_type": "DEBIT",
+              "prepaid_type": "NOT_PREPAID",
+              "bin": "000000"
+            },
+            "entry_method": "KEYED"
+          },
+          "payment_id": "Iz63pxY6AwE2jVUhlzvyUWaWJUJZY"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 1250,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {
+        "name": "Square Online"
+      },
+      "pricing_options": {
+        "auto_apply_discounts": true,
+        "auto_apply_taxes": true
+      },
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      }
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "K2GCSP7GLXHZTCF5NCFIXOTQ",
+        "updated_at": "2026-11-02T20:33:37.943Z",
+        "created_at": "2026-11-02T20:33:07.232Z",
+        "version": 1793651617943,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "RGDBZVN3URCYORBM3RIFMDMM",
+          "name": "Adult",
+          "ordinal": 1,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": true,
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "RGDBZVN3URCYORBM3RIFMDMM",
+        "updated_at": "2026-11-16T01:38:51.294Z",
+        "created_at": "2026-11-02T20:33:07.232Z",
+        "version": 1794793131294,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "La Bola Negra (2026)",
+          "description": "Rating: R\nGenre: Drama, History, Musical\nRuntime: 159 min\n\nThe intertwined lives of three men in three different eras, three lives intimately linked by sexuality and desire, pain, and legacy.\n\nDirector: Javier Ambrossi, Javier Calvo\nCast: Penélope Cruz, Glenn Close, Miguel Bernardeau",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "GMT433OEDIKY5ZSO6ZTZDO4U",
+              "min_selected_modifiers": 1,
+              "max_selected_modifiers": 1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "7IWEQZAAKJFYN6AEP4LKMPNZ",
+              "updated_at": "2026-11-02T20:33:37.943Z",
+              "created_at": "2026-11-02T20:33:07.232Z",
+              "version": 1793651617943,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "RGDBZVN3URCYORBM3RIFMDMM",
+                "name": "Child",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "K2GCSP7GLXHZTCF5NCFIXOTQ",
+              "updated_at": "2026-11-02T20:33:37.943Z",
+              "created_at": "2026-11-02T20:33:07.232Z",
+              "version": 1793651617943,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "RGDBZVN3URCYORBM3RIFMDMM",
+                "name": "Adult",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1250,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "3FWN567RY4OWPIZ3AL5S6I6P",
+              "updated_at": "2026-11-02T20:33:37.943Z",
+              "created_at": "2026-11-02T20:33:07.232Z",
+              "version": 1793651617943,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "RGDBZVN3URCYORBM3RIFMDMM",
+                "name": "Senior",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1100,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "7M72JMNZQMGFRQOZA3EXS3Z6"
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798488285184
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162723319808
+            }
+          ],
+          "description_html": "<p>Rating: R</p><p>Genre: Drama, History, Musical</p><p>Runtime: 159 min</p><p><br></p><p>The intertwined lives of three men in three different eras, three lives intimately linked by sexuality and desire, pain, and legacy.</p><p><br></p><p>Director: Javier Ambrossi, Javier Calvo</p><p>Cast: Penélope Cruz, Glenn Close, Miguel Bernardeau</p>",
+          "description_plaintext": "Rating: R\nGenre: Drama, History, Musical\nRuntime: 159 min\n\nThe intertwined lives of three men in three different eras, three lives intimately linked by sexuality and desire, pain, and legacy.\n\nDirector: Javier Ambrossi, Javier Calvo\nCast: Penélope Cruz, Glenn Close, Miguel Bernardeau",
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+            "ordinal": -2251798488285184
+          }
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "7M72JMNZQMGFRQOZA3EXS3Z6",
+        "updated_at": "2026-11-02T20:37:08.401Z",
+        "created_at": "2026-11-02T20:37:08.435Z",
+        "version": 1793651828401,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "name": "LABOLANEGRA.png",
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/e4dccea8ce3d6ca932400e226baf2b4408c3bb0e/original.png"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "buyer02@example.com",
+      "FirstName": "Given03",
+      "LastName": "Family03",
+      "PhoneNumber": "+15555550012"
+    },
+    "emailRecipient": "buyer02@example.com",
+    "tickets": [
+      {
+        "ProductName": "La Bola Negra (2026)",
+        "ProductDate": "2026-11-19 18:30:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Thu 11-19-2026 6:30 PM (Main Auditorium)",
+        "ProductPrice": 12.5,
+        "ProductID": "K2GCSP7GLXHZTCF5NCFIXOTQ",
+        "EmailAddress": "buyer02@example.com",
+        "FirstName": "Given03",
+        "LastName": "Family03",
+        "PhoneNumber": "+15555550012",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "La Bola Negra (2026)_Adult_ePLeBkGI6QFTmi2aSw7grsD2ifZZY_9aiV8VbT1Jy8P6Tqz08rbB_",
+        "ProductMetadata": {
+          "uid": "9aiV8VbT1Jy8P6Tqz08rbB",
+          "name": "La Bola Negra (2026)",
+          "quantity": "1",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "jsVem03f8p15mHFy8XyLSC",
+              "name": "Thu 11-19-2026 6:30 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1794814732091,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "DKVVCTU2EPAPSGEGRNDTVDXN",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1794814732091,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "catalog_object_id": "K2GCSP7GLXHZTCF5NCFIXOTQ",
+          "gross_sales_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798488285184},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162723319808}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

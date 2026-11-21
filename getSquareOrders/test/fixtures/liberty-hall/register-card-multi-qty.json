@@ -1,0 +1,773 @@
+{
+  "shape": "register-card-multi-qty",
+  "description": "Box office register, card, one line item with quantity 2.",
+  "recorded": "2026-11-20, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "65fda34f-332f-3d3d-a249-eb88ba5dda82",
+    "created_at": "2026-11-20T20:01:29.617Z",
+    "data": {
+      "type": "payment",
+      "id": "uCcP2YISvBUuFybVA0ittm2HcybZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "application_details": {
+            "square_product": "RETAIL"
+          },
+          "approved_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "card_details": {
+            "auth_result_code": "008376",
+            "avs_status": "AVS_NOT_CHECKED",
+            "card": {
+              "bin": "000000",
+              "card_brand": "VISA",
+              "card_type": "DEBIT",
+              "cardholder_name": "redacted-03",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "last_4": "0000",
+              "payment_account_reference": "FIXTUREPAR",
+              "prepaid_type": "NOT_PREPAID"
+            },
+            "card_payment_timeline": {
+              "authorized_at": "2026-11-20T20:01:26.355Z",
+              "captured_at": "2026-11-20T20:01:28.019Z"
+            },
+            "cvv_status": "CVV_NOT_CHECKED",
+            "device_details": {
+              "device_id": "fixture-device-01",
+              "device_installation_id": "fixture-device-02",
+              "device_name": "redacted-01"
+            },
+            "entry_method": "SWIPED",
+            "statement_description": "SQ *LIBERTY HALL",
+            "status": "CAPTURED"
+          },
+          "created_at": "2026-11-20T20:01:26.060Z",
+          "customer_id": "FIXTURECUSTOMER02",
+          "delay_action": "CANCEL",
+          "delay_duration": "PT36H",
+          "delayed_until": "2026-11-22T08:01:26.060Z",
+          "device_details": {
+            "device_id": "fixture-device-01",
+            "device_installation_id": "fixture-device-02",
+            "device_name": "redacted-01"
+          },
+          "employee_id": "FIXTURESTAFF01",
+          "id": "uCcP2YISvBUuFybVA0ittm2HcybZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "WxOYwz6pLZUZHzFUNWqCFRspbmFZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "source_type": "CARD",
+          "status": "COMPLETED",
+          "team_member_id": "FIXTURESTAFF01",
+          "total_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-20T20:01:29.611Z",
+          "version": 4
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "uCcP2YISvBUuFybVA0ittm2HcybZY",
+      "created_at": "2026-11-20T20:01:26.060Z",
+      "updated_at": "2026-11-20T20:01:30.910Z",
+      "amount_money": {
+        "amount": 2200,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "delay_duration": "PT36H",
+      "source_type": "CARD",
+      "card_details": {
+        "status": "CAPTURED",
+        "card": {
+          "card_brand": "VISA",
+          "last_4": "0000",
+          "exp_month": 12,
+          "exp_year": 2030,
+          "cardholder_name": "redacted-03",
+          "fingerprint": "sq-1-fixture-fingerprint",
+          "card_type": "DEBIT",
+          "prepaid_type": "NOT_PREPAID",
+          "bin": "000000",
+          "payment_account_reference": "FIXTUREPAR"
+        },
+        "entry_method": "SWIPED",
+        "cvv_status": "CVV_NOT_CHECKED",
+        "avs_status": "AVS_NOT_CHECKED",
+        "auth_result_code": "008376",
+        "statement_description": "SQ *LIBERTY HALL",
+        "device_details": {
+          "device_id": "fixture-device-01",
+          "device_name": "redacted-01",
+          "device_installation_id": "fixture-device-02"
+        },
+        "card_payment_timeline": {
+          "authorized_at": "2026-11-20T20:01:26.355Z",
+          "captured_at": "2026-11-20T20:01:28.019Z"
+        }
+      },
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "WxOYwz6pLZUZHzFUNWqCFRspbmFZY",
+      "processing_fee": [
+        {
+          "effective_at": "2026-11-20T22:01:29.000Z",
+          "type": "INITIAL",
+          "amount_money": {
+            "amount": 68,
+            "currency": "USD"
+          }
+        }
+      ],
+      "customer_id": "FIXTURECUSTOMER02",
+      "total_money": {
+        "amount": 2200,
+        "currency": "USD"
+      },
+      "approved_money": {
+        "amount": 2200,
+        "currency": "USD"
+      },
+      "employee_id": "FIXTURESTAFF01",
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "delay_action": "CANCEL",
+      "delayed_until": "2026-11-22T08:01:26.060Z",
+      "device_details": {
+        "device_id": "fixture-device-01",
+        "device_name": "redacted-01",
+        "device_installation_id": "fixture-device-02"
+      },
+      "team_member_id": "FIXTURESTAFF01",
+      "application_details": {
+        "square_product": "RETAIL"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": {
+    "customer": {
+      "id": "FIXTURECUSTOMER02",
+      "created_at": "2026-11-20T20:01:28.896Z",
+      "updated_at": "2026-11-20T20:01:28Z",
+      "preferences": {
+        "email_unsubscribed": false
+      },
+      "creation_source": "INSTANT_PROFILE",
+      "version": 0
+    }
+  },
+  "order": {
+    "order": {
+      "id": "WxOYwz6pLZUZHzFUNWqCFRspbmFZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "81330286-e244-4a17-a50c-d6bb8fa91fe0",
+          "catalog_object_id": "UJRYWZ7PL4QUFWDGQI7KHGFK",
+          "catalog_version": 1794939242607,
+          "quantity": "2",
+          "name": "All the President's Men (1976)",
+          "variation_name": "Senior",
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "94d77de2-2022-462b-a945-bd4bc90b2044",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Fri 11-20-2026 2:30 PM (Main Auditorium)",
+              "catalog_object_id": "FIND44C3PSKGDSRUGP23GESY",
+              "catalog_version": 1794939242607,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "created_at": "2026-11-20T20:01:25.700Z",
+      "updated_at": "2026-11-20T20:01:28.538Z",
+      "state": "COMPLETED",
+      "version": 6,
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 2200,
+        "currency": "USD"
+      },
+      "closed_at": "2026-11-20T20:01:27.210Z",
+      "tenders": [
+        {
+          "id": "uCcP2YISvBUuFybVA0ittm2HcybZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "WxOYwz6pLZUZHzFUNWqCFRspbmFZY",
+          "created_at": "2026-11-20T20:01:26Z",
+          "amount_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "type": "CARD",
+          "card_details": {
+            "status": "CAPTURED",
+            "card": {
+              "card_brand": "VISA",
+              "last_4": "0000",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "card_type": "DEBIT",
+              "prepaid_type": "NOT_PREPAID",
+              "bin": "000000"
+            },
+            "entry_method": "SWIPED"
+          },
+          "payment_id": "uCcP2YISvBUuFybVA0ittm2HcybZY"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 2200,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {},
+      "ticket_name": "redacted-04",
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF01"
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "UJRYWZ7PL4QUFWDGQI7KHGFK",
+        "updated_at": "2026-11-14T03:29:53.046Z",
+        "created_at": "2026-11-14T03:28:11.667Z",
+        "version": 1794626993046,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "DA4W2FD3LQAXNQQYOLKEOBYJ",
+          "name": "Senior",
+          "ordinal": 2,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": true,
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "DA4W2FD3LQAXNQQYOLKEOBYJ",
+        "updated_at": "2026-11-17T18:14:02.607Z",
+        "created_at": "2026-11-14T03:28:11.667Z",
+        "version": 1794939242607,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "All the President's Men (1976)",
+          "description": "Rating: PG\nGenre: Drama, History, Thriller\nRuntime: 138 min\n\nIn the run-up to the 1972 elections, Washington Post reporter Bob Woodward covers what seems to be a minor break-in at the Democratic Party National headquarters. He is surprised to find top lawyers already on the defense case, and the discovery of names and addresses of White House fund organizers on the accused further arouses his suspicions. The editor of the Post is prepared to run with the story and assigns Woodward and Carl Bernstein to it. They find the trail leading higher and higher in the White House.\n\nDirector: Alan J. Pakula\nCast: Dustin Hoffman, Robert Redford, Jack Warden",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "UHSBOXCQIPP54KKVGNUPMT4T",
+              "min_selected_modifiers": 1,
+              "max_selected_modifiers": 1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "VI74G2N32XOCEJAOHGI3AJ6N",
+              "updated_at": "2026-11-14T03:29:53.046Z",
+              "created_at": "2026-11-14T03:28:11.667Z",
+              "version": 1794626993046,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "DA4W2FD3LQAXNQQYOLKEOBYJ",
+                "name": "Child",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "QRCHCMG4DJW4XU5IA4RUJCRS",
+              "updated_at": "2026-11-14T03:29:53.046Z",
+              "created_at": "2026-11-14T03:28:11.667Z",
+              "version": 1794626993046,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "DA4W2FD3LQAXNQQYOLKEOBYJ",
+                "name": "Adult",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1250,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "UJRYWZ7PL4QUFWDGQI7KHGFK",
+              "updated_at": "2026-11-14T03:29:53.046Z",
+              "created_at": "2026-11-14T03:28:11.667Z",
+              "version": 1794626993046,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "DA4W2FD3LQAXNQQYOLKEOBYJ",
+                "name": "Senior",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1100,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "JV74DJBLRXAFLRL2GODELNJ5"
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798421176320
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162790428672
+            }
+          ],
+          "description_html": "<p>Rating: PG</p><p>Genre: Drama, History, Thriller</p><p>Runtime: 138 min</p><p><br></p><p>In the run-up to the 1972 elections, Washington Post reporter Bob Woodward covers what seems to be a minor break-in at the Democratic Party National headquarters. He is surprised to find top lawyers already on the defense case, and the discovery of names and addresses of White House fund organizers on the accused further arouses his suspicions. The editor of the Post is prepared to run with the story and assigns Woodward and Carl Bernstein to it. They find the trail leading higher and higher in the White House.</p><p><br></p><p>Director: Alan J. Pakula</p><p>Cast: Dustin Hoffman, Robert Redford, Jack Warden</p>",
+          "description_plaintext": "Rating: PG\nGenre: Drama, History, Thriller\nRuntime: 138 min\n\nIn the run-up to the 1972 elections, Washington Post reporter Bob Woodward covers what seems to be a minor break-in at the Democratic Party National headquarters. He is surprised to find top lawyers already on the defense case, and the discovery of names and addresses of White House fund organizers on the accused further arouses his suspicions. The editor of the Post is prepared to run with the story and assigns Woodward and Carl Bernstein to it. They find the trail leading higher and higher in the White House.\n\nDirector: Alan J. Pakula\nCast: Dustin Hoffman, Robert Redford, Jack Warden",
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+            "ordinal": -2251798421176320
+          }
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "JV74DJBLRXAFLRL2GODELNJ5",
+        "updated_at": "2026-11-14T03:28:11.355Z",
+        "created_at": "2026-11-14T03:28:11.385Z",
+        "version": 1794626891355,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/4a00e4d174b91f2975817fbd63e78688232bc3c0/original.jpeg",
+          "caption": "All the President's Men (1976)"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "WALK-UP",
+      "LastName": "CASH-MASTER",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "All the President's Men (1976)",
+        "ProductDate": "2026-11-20 14:30:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Fri 11-20-2026 2:30 PM (Main Auditorium)",
+        "ProductPrice": 11,
+        "ProductID": "UJRYWZ7PL4QUFWDGQI7KHGFK",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Senior",
+        "Status": "valid",
+        "QRCodePrefix": "All the President's Men (1976)_Senior_WxOYwz6pLZUZHzFUNWqCFRspbmFZY_81330286-e244-4a17-a50c-d6bb8fa91fe0_",
+        "ProductMetadata": {
+          "uid": "81330286-e244-4a17-a50c-d6bb8fa91fe0",
+          "name": "All the President's Men (1976)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "94d77de2-2022-462b-a945-bd4bc90b2044",
+              "name": "Fri 11-20-2026 2:30 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1794939242607,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "FIND44C3PSKGDSRUGP23GESY",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1794939242607,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "catalog_object_id": "UJRYWZ7PL4QUFWDGQI7KHGFK",
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798421176320},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162790428672}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "All the President's Men (1976)",
+        "ProductDate": "2026-11-20 14:30:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Fri 11-20-2026 2:30 PM (Main Auditorium)",
+        "ProductPrice": 11,
+        "ProductID": "UJRYWZ7PL4QUFWDGQI7KHGFK",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Senior",
+        "Status": "valid",
+        "QRCodePrefix": "All the President's Men (1976)_Senior_WxOYwz6pLZUZHzFUNWqCFRspbmFZY_81330286-e244-4a17-a50c-d6bb8fa91fe0_",
+        "ProductMetadata": {
+          "uid": "81330286-e244-4a17-a50c-d6bb8fa91fe0",
+          "name": "All the President's Men (1976)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "94d77de2-2022-462b-a945-bd4bc90b2044",
+              "name": "Fri 11-20-2026 2:30 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1794939242607,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "FIND44C3PSKGDSRUGP23GESY",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1794939242607,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "catalog_object_id": "UJRYWZ7PL4QUFWDGQI7KHGFK",
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798421176320},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162790428672}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

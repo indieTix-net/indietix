@@ -1,0 +1,1042 @@
+{
+  "shape": "online-multi-line",
+  "description": "Square Online, two line items (Adult + Senior) for the same showing.",
+  "recorded": "2026-11-01, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "b7c1f74f-2b32-33de-8c48-d2cb9702647e",
+    "created_at": "2026-11-01T19:31:39.47Z",
+    "data": {
+      "type": "payment",
+      "id": "WUnzTZIm7VE1ZVQKJJlgpEJ3G4CZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 3450,
+            "currency": "USD"
+          },
+          "application_details": {
+            "application_id": "sq0idp-w46nJ_NCNDMSOywaCY0mwA",
+            "square_product": "ECOMMERCE_API"
+          },
+          "approved_money": {
+            "amount": 3450,
+            "currency": "USD"
+          },
+          "billing_address": {
+            "address_line_1": "redacted-18",
+            "administrative_district_level_1": "redacted-07",
+            "country": "US",
+            "first_name": "Given04",
+            "last_name": "Family04",
+            "locality": "redacted-19",
+            "postal_code": "redacted-20"
+          },
+          "buyer_email_address": "buyer03@example.com",
+          "card_details": {
+            "auth_result_code": "311013",
+            "avs_status": "AVS_ACCEPTED",
+            "card": {
+              "bin": "000000",
+              "card_brand": "VISA",
+              "card_type": "CREDIT",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "last_4": "0000",
+              "payment_account_reference": "FIXTUREPAR",
+              "prepaid_type": "NOT_PREPAID"
+            },
+            "card_payment_timeline": {
+              "authorized_at": "2026-11-01T19:31:36.092Z",
+              "captured_at": "2026-11-01T19:31:38.053Z"
+            },
+            "cvv_status": "CVV_ACCEPTED",
+            "entry_method": "KEYED",
+            "statement_description": "SQ *LIBERTY HALL",
+            "status": "CAPTURED"
+          },
+          "created_at": "2026-11-01T19:31:35.696Z",
+          "delay_action": "CANCEL",
+          "delay_duration": "PT168H",
+          "delayed_until": "2026-11-08T19:31:35.696Z",
+          "id": "WUnzTZIm7VE1ZVQKJJlgpEJ3G4CZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "QOGMWAYNh7rkSGZHsTdmsHw8K7UZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "reference_id": "redacted-21",
+          "risk_evaluation": {
+            "created_at": "2026-11-01T19:31:36.267Z",
+            "risk_level": "NORMAL"
+          },
+          "shipping_address": {
+            "address_line_1": "redacted-18",
+            "administrative_district_level_1": "redacted-07",
+            "country": "US",
+            "first_name": "Given04",
+            "last_name": "Family04",
+            "locality": "redacted-19",
+            "postal_code": "redacted-20"
+          },
+          "source_type": "CARD",
+          "status": "COMPLETED",
+          "total_money": {
+            "amount": 3450,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-01T19:31:39.462Z",
+          "version": 3
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "WUnzTZIm7VE1ZVQKJJlgpEJ3G4CZY",
+      "created_at": "2026-11-01T19:31:35.696Z",
+      "updated_at": "2026-11-01T19:31:40.188Z",
+      "amount_money": {
+        "amount": 3450,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "delay_duration": "PT168H",
+      "source_type": "CARD",
+      "card_details": {
+        "status": "CAPTURED",
+        "card": {
+          "card_brand": "VISA",
+          "last_4": "0000",
+          "exp_month": 12,
+          "exp_year": 2030,
+          "fingerprint": "sq-1-fixture-fingerprint",
+          "card_type": "CREDIT",
+          "prepaid_type": "NOT_PREPAID",
+          "bin": "000000",
+          "payment_account_reference": "FIXTUREPAR"
+        },
+        "entry_method": "KEYED",
+        "cvv_status": "CVV_ACCEPTED",
+        "avs_status": "AVS_ACCEPTED",
+        "auth_result_code": "311013",
+        "statement_description": "SQ *LIBERTY HALL",
+        "card_payment_timeline": {
+          "authorized_at": "2026-11-01T19:31:36.092Z",
+          "captured_at": "2026-11-01T19:31:38.053Z"
+        }
+      },
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "QOGMWAYNh7rkSGZHsTdmsHw8K7UZY",
+      "reference_id": "redacted-21",
+      "risk_evaluation": {
+        "created_at": "2026-11-01T19:31:36.267Z",
+        "risk_level": "NORMAL"
+      },
+      "processing_fee": [
+        {
+          "effective_at": "2026-11-01T21:31:39.000Z",
+          "type": "INITIAL",
+          "amount_money": {
+            "amount": 130,
+            "currency": "USD"
+          }
+        }
+      ],
+      "buyer_email_address": "buyer03@example.com",
+      "billing_address": {
+        "address_line_1": "redacted-18",
+        "locality": "redacted-19",
+        "administrative_district_level_1": "redacted-07",
+        "postal_code": "redacted-20",
+        "country": "US",
+        "first_name": "Given04",
+        "last_name": "Family04"
+      },
+      "shipping_address": {
+        "address_line_1": "redacted-18",
+        "locality": "redacted-19",
+        "administrative_district_level_1": "redacted-07",
+        "postal_code": "redacted-20",
+        "country": "US",
+        "first_name": "Given04",
+        "last_name": "Family04"
+      },
+      "customer_id": "FIXTURECUSTOMER05",
+      "total_money": {
+        "amount": 3450,
+        "currency": "USD"
+      },
+      "approved_money": {
+        "amount": 3450,
+        "currency": "USD"
+      },
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "delay_action": "CANCEL",
+      "delayed_until": "2026-11-08T19:31:35.696Z",
+      "application_details": {
+        "square_product": "ECOMMERCE_API",
+        "application_id": "sq0idp-w46nJ_NCNDMSOywaCY0mwA"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": {
+    "customer": {
+      "id": "FIXTURECUSTOMER05",
+      "created_at": "2026-11-01T19:31:39.188Z",
+      "updated_at": "2026-11-01T19:31:39Z",
+      "given_name": "Given04",
+      "family_name": "Family04",
+      "email_address": "buyer03@example.com",
+      "address": {
+        "address_line_1": "redacted-18",
+        "locality": "redacted-19",
+        "administrative_district_level_1": "redacted-07",
+        "postal_code": "redacted-20",
+        "country": "US"
+      },
+      "phone_number": "+15555550013",
+      "preferences": {
+        "email_unsubscribed": false
+      },
+      "creation_source": "INSTANT_PROFILE",
+      "segment_ids": [
+        "M5E5N7KAHZA7Q.REACHABLE",
+        "gv2:BEC52WQAD562Q0WDTGXAF15R6W",
+        "gv2:7TP9XAFKP95R55WR8N48BXBH4M",
+        "gv2:TX7E387DQ570B725WVPV5DCY1R"
+      ],
+      "version": 0
+    }
+  },
+  "order": {
+    "order": {
+      "id": "QOGMWAYNh7rkSGZHsTdmsHw8K7UZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "ud7aCRU0LHJCaudupXymSB",
+          "catalog_object_id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+          "catalog_version": 1793524131861,
+          "quantity": "1",
+          "name": "One Eye Open (2026)",
+          "variation_name": "Adult",
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "2rd3NGcbPoCqYjd9PKPWi",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Sun 11-01-2026 7:30 PM (Little Theater)",
+              "catalog_object_id": "PDJ3DOFT3VKG66G47CCKHBDF",
+              "catalog_version": 1793524131861,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        },
+        {
+          "uid": "cUvpYQ468Mq8v67MzS9d2B",
+          "catalog_object_id": "2WA3M4RDPA66J2J2URC4USL7",
+          "catalog_version": 1793524131861,
+          "quantity": "2",
+          "name": "One Eye Open (2026)",
+          "variation_name": "Senior",
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "wxf9yTQDCslDHyT5b3DB2C",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Sun 11-01-2026 7:30 PM (Little Theater)",
+              "catalog_object_id": "PDJ3DOFT3VKG66G47CCKHBDF",
+              "catalog_version": 1793524131861,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "fulfillments": [
+        {
+          "uid": "034qCJAz8mW4FvEvCHNknt",
+          "type": "SHIPMENT",
+          "state": "PROPOSED",
+          "shipment_details": {
+            "recipient": {
+              "display_name": "redacted-22",
+              "email_address": "buyer03@example.com",
+              "phone_number": "+15555550013",
+              "address": {
+                "address_line_1": "redacted-18",
+                "locality": "redacted-19",
+                "administrative_district_level_1": "redacted-07",
+                "postal_code": "redacted-20",
+                "country": "US",
+                "first_name": "Given04",
+                "last_name": "Family04"
+              }
+            },
+            "shipping_type": "Ticketing Fee",
+            "placed_at": "2026-11-01T19:31:36.487Z"
+          }
+        }
+      ],
+      "created_at": "2026-11-01T19:22:14.280Z",
+      "updated_at": "2026-11-01T19:31:38.818Z",
+      "state": "OPEN",
+      "version": 21,
+      "reference_id": "redacted-23",
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 3450,
+        "currency": "USD"
+      },
+      "tenders": [
+        {
+          "id": "WUnzTZIm7VE1ZVQKJJlgpEJ3G4CZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "QOGMWAYNh7rkSGZHsTdmsHw8K7UZY",
+          "created_at": "2026-11-01T19:31:35Z",
+          "amount_money": {
+            "amount": 3450,
+            "currency": "USD"
+          },
+          "type": "CARD",
+          "card_details": {
+            "status": "CAPTURED",
+            "card": {
+              "card_brand": "VISA",
+              "last_4": "0000",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "card_type": "CREDIT",
+              "prepaid_type": "NOT_PREPAID",
+              "bin": "000000"
+            },
+            "entry_method": "KEYED"
+          },
+          "payment_id": "WUnzTZIm7VE1ZVQKJJlgpEJ3G4CZY"
+        }
+      ],
+      "service_charges": [
+        {
+          "uid": "TPVLu5KSmZFPptUkIHlwV",
+          "name": "Shipping",
+          "amount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "applied_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "calculation_phase": "SUBTOTAL_PHASE",
+          "taxable": true,
+          "total_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "type": "CUSTOM",
+          "treatment_type": "LINE_ITEM_TREATMENT"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 3450,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {
+        "name": "Square Online"
+      },
+      "pricing_options": {
+        "auto_apply_discounts": true,
+        "auto_apply_taxes": true
+      },
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      }
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+        "updated_at": "2026-10-15T18:44:14.723Z",
+        "created_at": "2026-10-15T18:22:18.19Z",
+        "version": 1792089854723,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+          "name": "Adult",
+          "ordinal": 1,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      },
+      {
+        "type": "ITEM_VARIATION",
+        "id": "2WA3M4RDPA66J2J2URC4USL7",
+        "updated_at": "2026-10-15T18:44:14.723Z",
+        "created_at": "2026-10-15T18:22:18.19Z",
+        "version": 1792089854723,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+          "name": "Senior",
+          "ordinal": 2,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+        "updated_at": "2026-11-01T06:38:51.061Z",
+        "created_at": "2026-10-15T18:22:18.19Z",
+        "version": 1793515131061,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "One Eye Open (2026)",
+          "description": "Rating: N/A\nGenre: Crime, Horror, Thriller\nRuntime: 81 min\n\nA recent college graduate house-sitting for her ailing grandfather finds herself caught in a deadly cat-and-mouse game with thieves who become haunted by something supernatural protecting her in the mysterious mansion.\n\nDirector: Michael D. Coffey\nCast: RJ Mitte, Maximiliano Hernández, Chris Bylsma",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "YO57KJA6BIXNL3D27SZTD4W3",
+              "min_selected_modifiers": 1,
+              "max_selected_modifiers": 1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "F76PIYC6RLF7X4MCJPKJQ4XL",
+              "updated_at": "2026-10-15T18:44:14.723Z",
+              "created_at": "2026-10-15T18:22:18.19Z",
+              "version": 1792089854723,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+                "name": "Child",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+              "updated_at": "2026-10-15T18:44:14.723Z",
+              "created_at": "2026-10-15T18:22:18.19Z",
+              "version": 1792089854723,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+                "name": "Adult",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1250,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "2WA3M4RDPA66J2J2URC4USL7",
+              "updated_at": "2026-10-15T18:44:14.723Z",
+              "created_at": "2026-10-15T18:22:18.19Z",
+              "version": 1792089854723,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+                "name": "Senior",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1100,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "NLWCL4IS4NZ5JCBYQBCES6T3"
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798605725696
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162572324864
+            }
+          ],
+          "description_html": "<p>Rating: N/A</p><p>Genre: Crime, Horror, Thriller</p><p>Runtime: 81 min</p><p><br></p><p>A recent college graduate house-sitting for her ailing grandfather finds herself caught in a deadly cat-and-mouse game with thieves who become haunted by something supernatural protecting her in the mysterious mansion.</p><p><br></p><p>Director: Michael D. Coffey</p><p>Cast: RJ Mitte, Maximiliano Hernández, Chris Bylsma</p>",
+          "description_plaintext": "Rating: N/A\nGenre: Crime, Horror, Thriller\nRuntime: 81 min\n\nA recent college graduate house-sitting for her ailing grandfather finds herself caught in a deadly cat-and-mouse game with thieves who become haunted by something supernatural protecting her in the mysterious mansion.\n\nDirector: Michael D. Coffey\nCast: RJ Mitte, Maximiliano Hernández, Chris Bylsma",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+            "ordinal": -2251798605725696
+          }
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "NLWCL4IS4NZ5JCBYQBCES6T3",
+        "updated_at": "2026-10-15T18:28:05.751Z",
+        "created_at": "2026-10-15T18:28:05.807Z",
+        "version": 1792088885751,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "name": "jrK4XVJacUzWN9swZR2S5tYLxSi (1).png",
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/65f447e0c734931aa9c9945934dd220fccbe3201/original.png"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "buyer03@example.com",
+      "FirstName": "Given04",
+      "LastName": "Family04",
+      "PhoneNumber": "+15555550013"
+    },
+    "emailRecipient": "buyer03@example.com",
+    "tickets": [
+      {
+        "ProductName": "One Eye Open (2026)",
+        "ProductDate": "2026-11-01 19:30:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 11-01-2026 7:30 PM (Little Theater)",
+        "ProductPrice": 12.5,
+        "ProductID": "OKWVKHUVGFCF4TKPXRVU6QPM",
+        "EmailAddress": "buyer03@example.com",
+        "FirstName": "Given04",
+        "LastName": "Family04",
+        "PhoneNumber": "+15555550013",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Little Theater",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "One Eye Open (2026)_Adult_QOGMWAYNh7rkSGZHsTdmsHw8K7UZY_ud7aCRU0LHJCaudupXymSB_",
+        "ProductMetadata": {
+          "uid": "ud7aCRU0LHJCaudupXymSB",
+          "name": "One Eye Open (2026)",
+          "quantity": "1",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "2rd3NGcbPoCqYjd9PKPWi",
+              "name": "Sun 11-01-2026 7:30 PM (Little Theater)",
+              "quantity": "1",
+              "catalog_version": 1793524131861,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "PDJ3DOFT3VKG66G47CCKHBDF",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1793524131861,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "catalog_object_id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+          "gross_sales_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798605725696},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162572324864}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "One Eye Open (2026)",
+        "ProductDate": "2026-11-01 19:30:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 11-01-2026 7:30 PM (Little Theater)",
+        "ProductPrice": 11,
+        "ProductID": "2WA3M4RDPA66J2J2URC4USL7",
+        "EmailAddress": "buyer03@example.com",
+        "FirstName": "Given04",
+        "LastName": "Family04",
+        "PhoneNumber": "+15555550013",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Little Theater",
+        "ProductSeatCode": "Senior",
+        "Status": "valid",
+        "QRCodePrefix": "One Eye Open (2026)_Senior_QOGMWAYNh7rkSGZHsTdmsHw8K7UZY_cUvpYQ468Mq8v67MzS9d2B_",
+        "ProductMetadata": {
+          "uid": "cUvpYQ468Mq8v67MzS9d2B",
+          "name": "One Eye Open (2026)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "wxf9yTQDCslDHyT5b3DB2C",
+              "name": "Sun 11-01-2026 7:30 PM (Little Theater)",
+              "quantity": "1",
+              "catalog_version": 1793524131861,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "PDJ3DOFT3VKG66G47CCKHBDF",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1793524131861,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "catalog_object_id": "2WA3M4RDPA66J2J2URC4USL7",
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798605725696},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162572324864}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "One Eye Open (2026)",
+        "ProductDate": "2026-11-01 19:30:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 11-01-2026 7:30 PM (Little Theater)",
+        "ProductPrice": 11,
+        "ProductID": "2WA3M4RDPA66J2J2URC4USL7",
+        "EmailAddress": "buyer03@example.com",
+        "FirstName": "Given04",
+        "LastName": "Family04",
+        "PhoneNumber": "+15555550013",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Little Theater",
+        "ProductSeatCode": "Senior",
+        "Status": "valid",
+        "QRCodePrefix": "One Eye Open (2026)_Senior_QOGMWAYNh7rkSGZHsTdmsHw8K7UZY_cUvpYQ468Mq8v67MzS9d2B_",
+        "ProductMetadata": {
+          "uid": "cUvpYQ468Mq8v67MzS9d2B",
+          "name": "One Eye Open (2026)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "wxf9yTQDCslDHyT5b3DB2C",
+              "name": "Sun 11-01-2026 7:30 PM (Little Theater)",
+              "quantity": "1",
+              "catalog_version": 1793524131861,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "PDJ3DOFT3VKG66G47CCKHBDF",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1793524131861,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "catalog_object_id": "2WA3M4RDPA66J2J2URC4USL7",
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798605725696},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162572324864}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

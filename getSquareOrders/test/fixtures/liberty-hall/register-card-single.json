@@ -1,0 +1,704 @@
+{
+  "shape": "register-card-single",
+  "description": "Box office register, card, one ticket. The most common sale.",
+  "recorded": "2026-11-20, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "7b81db09-afa5-382a-9e7b-3d778924670e",
+    "created_at": "2026-11-20T23:48:46.607Z",
+    "data": {
+      "type": "payment",
+      "id": "8Xb1r4BtmMxGFDgJzRszQIoKZ3HZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "application_details": {
+            "square_product": "RETAIL"
+          },
+          "approved_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "card_details": {
+            "application_cryptogram": "fd362d7fcadef630",
+            "application_identifier": "A0000001523010",
+            "application_name": "Discover",
+            "auth_result_code": "05289R",
+            "avs_status": "AVS_NOT_CHECKED",
+            "card": {
+              "bin": "000000",
+              "card_brand": "DISCOVER",
+              "card_type": "CREDIT",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "last_4": "0000",
+              "payment_account_reference": "FIXTUREPAR",
+              "prepaid_type": "NOT_PREPAID"
+            },
+            "card_payment_timeline": {
+              "authorized_at": "2026-11-20T23:48:43.038Z",
+              "captured_at": "2026-11-20T23:48:45.864Z"
+            },
+            "cvv_status": "CVV_NOT_CHECKED",
+            "device_details": {
+              "device_id": "fixture-device-01",
+              "device_installation_id": "fixture-device-02",
+              "device_name": "redacted-01"
+            },
+            "emv_details": {},
+            "entry_method": "CONTACTLESS",
+            "statement_description": "SQ *LIBERTY HALL",
+            "status": "CAPTURED",
+            "verification_method": "NONE",
+            "verification_results": "UNKNOWN"
+          },
+          "created_at": "2026-11-20T23:48:42.501Z",
+          "delay_action": "CANCEL",
+          "delay_duration": "PT36H",
+          "delayed_until": "2026-11-22T11:48:42.501Z",
+          "device_details": {
+            "device_id": "fixture-device-01",
+            "device_installation_id": "fixture-device-02",
+            "device_name": "redacted-01"
+          },
+          "employee_id": "FIXTURESTAFF01",
+          "id": "8Xb1r4BtmMxGFDgJzRszQIoKZ3HZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "OrfBp7yp7EWhYSMGD2PiWbLHWxAZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "source_type": "CARD",
+          "status": "COMPLETED",
+          "team_member_id": "FIXTURESTAFF01",
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-20T23:48:46.600Z",
+          "version": 3
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "8Xb1r4BtmMxGFDgJzRszQIoKZ3HZY",
+      "created_at": "2026-11-20T23:48:42.501Z",
+      "updated_at": "2026-11-20T23:48:46.600Z",
+      "amount_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "delay_duration": "PT36H",
+      "source_type": "CARD",
+      "card_details": {
+        "status": "CAPTURED",
+        "card": {
+          "card_brand": "DISCOVER",
+          "last_4": "0000",
+          "exp_month": 12,
+          "exp_year": 2030,
+          "fingerprint": "sq-1-fixture-fingerprint",
+          "card_type": "CREDIT",
+          "prepaid_type": "NOT_PREPAID",
+          "bin": "000000",
+          "payment_account_reference": "FIXTUREPAR"
+        },
+        "entry_method": "CONTACTLESS",
+        "cvv_status": "CVV_NOT_CHECKED",
+        "avs_status": "AVS_NOT_CHECKED",
+        "auth_result_code": "05289R",
+        "application_identifier": "A0000001523010",
+        "application_name": "Discover",
+        "application_cryptogram": "fd362d7fcadef630",
+        "verification_method": "NONE",
+        "verification_results": "UNKNOWN",
+        "statement_description": "SQ *LIBERTY HALL",
+        "device_details": {
+          "device_id": "fixture-device-01",
+          "device_name": "redacted-01",
+          "device_installation_id": "fixture-device-02"
+        },
+        "card_payment_timeline": {
+          "authorized_at": "2026-11-20T23:48:43.038Z",
+          "captured_at": "2026-11-20T23:48:45.864Z"
+        },
+        "emv_details": {}
+      },
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "OrfBp7yp7EWhYSMGD2PiWbLHWxAZY",
+      "processing_fee": [
+        {
+          "effective_at": "2026-11-21T01:48:46.000Z",
+          "type": "INITIAL",
+          "amount_money": {
+            "amount": 45,
+            "currency": "USD"
+          }
+        }
+      ],
+      "customer_id": "FIXTURECUSTOMER01",
+      "total_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "approved_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "employee_id": "FIXTURESTAFF01",
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "delay_action": "CANCEL",
+      "delayed_until": "2026-11-22T11:48:42.501Z",
+      "device_details": {
+        "device_id": "fixture-device-01",
+        "device_name": "redacted-01",
+        "device_installation_id": "fixture-device-02"
+      },
+      "team_member_id": "FIXTURESTAFF01",
+      "application_details": {
+        "square_product": "RETAIL"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": {
+    "customer": {
+      "id": "FIXTURECUSTOMER01",
+      "created_at": "2026-08-09T19:37:32.864Z",
+      "updated_at": "2026-09-13T19:33:46Z",
+      "given_name": "Given01",
+      "family_name": "Family01",
+      "preferences": {
+        "email_unsubscribed": false
+      },
+      "creation_source": "INSTANT_PROFILE",
+      "segment_ids": [
+        "M5E5N7KAHZA7Q.REACHABLE",
+        "M5E5N7KAHZA7Q.LOYAL",
+        "gv2:7TP9XAFKP95R55WR8N48BXBH4M",
+        "gv2:BEC52WQAD562Q0WDTGXAF15R6W"
+      ],
+      "version": 1
+    }
+  },
+  "order": {
+    "order": {
+      "id": "OrfBp7yp7EWhYSMGD2PiWbLHWxAZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "988172c5-6228-4a54-9df5-e4d3ce850276",
+          "catalog_object_id": "7AIZ56MM4WQ2DDXLOFOMHJOQ",
+          "catalog_version": 1794945296113,
+          "quantity": "1",
+          "name": "Naza (2026)",
+          "variation_name": "Adult",
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "0672b75a-004c-4e74-bbe7-d8bfb290709d",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Fri 11-20-2026 6:00 PM (Main Auditorium)",
+              "catalog_object_id": "5K36QF5IXIRYNU725DALWAXM",
+              "catalog_version": 1794945296113,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "created_at": "2026-11-20T23:48:42.218Z",
+      "updated_at": "2026-11-20T23:48:47.188Z",
+      "state": "COMPLETED",
+      "version": 6,
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 1250,
+        "currency": "USD"
+      },
+      "closed_at": "2026-11-20T23:48:45.344Z",
+      "tenders": [
+        {
+          "id": "8Xb1r4BtmMxGFDgJzRszQIoKZ3HZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "OrfBp7yp7EWhYSMGD2PiWbLHWxAZY",
+          "created_at": "2026-11-20T23:48:42Z",
+          "amount_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "type": "CARD",
+          "card_details": {
+            "status": "CAPTURED",
+            "card": {
+              "card_brand": "DISCOVER",
+              "last_4": "0000",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "card_type": "CREDIT",
+              "prepaid_type": "NOT_PREPAID",
+              "bin": "000000"
+            },
+            "entry_method": "CONTACTLESS"
+          },
+          "payment_id": "8Xb1r4BtmMxGFDgJzRszQIoKZ3HZY"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 1250,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {},
+      "ticket_name": "redacted-02",
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF01"
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "7AIZ56MM4WQ2DDXLOFOMHJOQ",
+        "updated_at": "2026-11-14T03:24:10.027Z",
+        "created_at": "2026-11-14T03:02:50.907Z",
+        "version": 1794626650027,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "UPXHS462S7FKZBJEE2D4IETN",
+          "name": "Adult",
+          "ordinal": 1,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": true,
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "UPXHS462S7FKZBJEE2D4IETN",
+        "updated_at": "2026-11-17T19:54:56.113Z",
+        "created_at": "2026-11-14T03:02:50.907Z",
+        "version": 1794945296113,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "Naza (2026)",
+          "description": "Rating: N/A\nGenre: Documentary, War\nRuntime: 80 min\n\nFilmed at night from Tel Aviv rooftops, this investigative documentary examines the civilian casualties of Israel's military operations in Gaza and the systems behind targeted killings of Palestinians.\n\nDirector: Yuval Abraham, Rachel Szor\nCast: Yuval Abraham",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "TCGTWJAI5S4ZYIWNZYZ5DUU4",
+              "min_selected_modifiers": 1,
+              "max_selected_modifiers": 1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "HMM5KL7V3AZUFHL2PFHHB3HG",
+              "updated_at": "2026-11-14T03:24:10.027Z",
+              "created_at": "2026-11-14T03:02:50.907Z",
+              "version": 1794626650027,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "UPXHS462S7FKZBJEE2D4IETN",
+                "name": "Child",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "7AIZ56MM4WQ2DDXLOFOMHJOQ",
+              "updated_at": "2026-11-14T03:24:10.027Z",
+              "created_at": "2026-11-14T03:02:50.907Z",
+              "version": 1794626650027,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "UPXHS462S7FKZBJEE2D4IETN",
+                "name": "Adult",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1250,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "F7BEH4NNVE5UB64UBMNVVGOB",
+              "updated_at": "2026-11-14T03:24:10.027Z",
+              "created_at": "2026-11-14T03:02:50.907Z",
+              "version": 1794626650027,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "UPXHS462S7FKZBJEE2D4IETN",
+                "name": "Senior",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1100,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "5EWT75Y5ZVOWCROGWIOKAEJF"
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798437953536
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162773651456
+            }
+          ],
+          "description_html": "<p>Rating: N/A</p><p>Genre: Documentary, War</p><p>Runtime: 80 min</p><p><br></p><p>Filmed at night from Tel Aviv rooftops, this investigative documentary examines the civilian casualties of Israel&#39;s military operations in Gaza and the systems behind targeted killings of Palestinians.</p><p><br></p><p>Director: Yuval Abraham, Rachel Szor</p><p>Cast: Yuval Abraham</p>",
+          "description_plaintext": "Rating: N/A\nGenre: Documentary, War\nRuntime: 80 min\n\nFilmed at night from Tel Aviv rooftops, this investigative documentary examines the civilian casualties of Israel's military operations in Gaza and the systems behind targeted killings of Palestinians.\n\nDirector: Yuval Abraham, Rachel Szor\nCast: Yuval Abraham",
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+            "ordinal": -2251798437953536
+          }
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "5EWT75Y5ZVOWCROGWIOKAEJF",
+        "updated_at": "2026-11-14T03:02:50.529Z",
+        "created_at": "2026-11-14T03:02:50.561Z",
+        "version": 1794625370529,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/2465ef13720578ad2cd2a5a19f3097e9f5946307/original.jpeg",
+          "caption": "Naza (2026)"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "Given01",
+      "LastName": "Family01",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "Naza (2026)",
+        "ProductDate": "2026-11-20 18:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Fri 11-20-2026 6:00 PM (Main Auditorium)",
+        "ProductPrice": 12.5,
+        "ProductID": "7AIZ56MM4WQ2DDXLOFOMHJOQ",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "Given01",
+        "LastName": "Family01",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "Naza (2026)_Adult_OrfBp7yp7EWhYSMGD2PiWbLHWxAZY_988172c5-6228-4a54-9df5-e4d3ce850276_",
+        "ProductMetadata": {
+          "uid": "988172c5-6228-4a54-9df5-e4d3ce850276",
+          "name": "Naza (2026)",
+          "quantity": "1",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "0672b75a-004c-4e74-bbe7-d8bfb290709d",
+              "name": "Fri 11-20-2026 6:00 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1794945296113,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "5K36QF5IXIRYNU725DALWAXM",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1794945296113,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "catalog_object_id": "7AIZ56MM4WQ2DDXLOFOMHJOQ",
+          "gross_sales_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798437953536},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162773651456}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

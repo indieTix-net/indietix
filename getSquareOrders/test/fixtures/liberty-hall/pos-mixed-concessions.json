@@ -1,0 +1,1655 @@
+{
+  "shape": "pos-mixed-concessions",
+  "description": "Point of Sale app: tickets for a live event plus concession items that are not tickets.",
+  "recorded": "2026-11-06, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "a3d86a64-b650-30e8-be85-7b6a084165c5",
+    "created_at": "2026-11-06T02:52:40.295Z",
+    "data": {
+      "type": "payment",
+      "id": "w15RcjDNdEqcnjV2nfYIsFf7nFIZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 3250,
+            "currency": "USD"
+          },
+          "application_details": {
+            "square_product": "RESTAURANTS"
+          },
+          "approved_money": {
+            "amount": 3250,
+            "currency": "USD"
+          },
+          "card_details": {
+            "application_cryptogram": "fd135c218cc53207",
+            "application_identifier": "A0000000980840",
+            "application_name": "US DEBIT",
+            "auth_result_code": "936670",
+            "avs_status": "AVS_NOT_CHECKED",
+            "card": {
+              "bin": "000000",
+              "card_brand": "VISA",
+              "card_type": "DEBIT",
+              "cardholder_name": "redacted-30",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "last_4": "0000",
+              "payment_account_reference": "FIXTUREPAR",
+              "prepaid_type": "NOT_PREPAID"
+            },
+            "card_payment_timeline": {
+              "authorized_at": "2026-11-06T02:52:33.110Z",
+              "captured_at": "2026-11-06T02:52:39.567Z"
+            },
+            "cvv_status": "CVV_NOT_CHECKED",
+            "device_details": {
+              "device_id": "fixture-device-03",
+              "device_installation_id": "fixture-device-04",
+              "device_name": "redacted-31"
+            },
+            "emv_details": {
+              "authorization_response_code": "3030"
+            },
+            "entry_method": "EMV",
+            "statement_description": "SQ *LIBERTY HALL",
+            "status": "CAPTURED",
+            "verification_method": "NONE",
+            "verification_results": "SUCCESS"
+          },
+          "created_at": "2026-11-06T02:52:31.779Z",
+          "delay_action": "CANCEL",
+          "delay_duration": "PT36H",
+          "delayed_until": "2026-11-07T14:52:31.779Z",
+          "device_details": {
+            "device_id": "fixture-device-03",
+            "device_installation_id": "fixture-device-04",
+            "device_name": "redacted-31"
+          },
+          "employee_id": "FIXTURESTAFF01",
+          "id": "w15RcjDNdEqcnjV2nfYIsFf7nFIZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "6vmJ9HrNFkGbtwEYSgho59gV4t8YY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "source_type": "CARD",
+          "status": "COMPLETED",
+          "team_member_id": "FIXTURESTAFF01",
+          "tip_money": {
+            "amount": 650,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 3900,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-06T02:52:40.285Z",
+          "version": 5
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "w15RcjDNdEqcnjV2nfYIsFf7nFIZY",
+      "created_at": "2026-11-06T02:52:31.779Z",
+      "updated_at": "2026-11-06T02:52:40.285Z",
+      "amount_money": {
+        "amount": 3250,
+        "currency": "USD"
+      },
+      "tip_money": {
+        "amount": 650,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "delay_duration": "PT36H",
+      "source_type": "CARD",
+      "card_details": {
+        "status": "CAPTURED",
+        "card": {
+          "card_brand": "VISA",
+          "last_4": "0000",
+          "exp_month": 12,
+          "exp_year": 2030,
+          "cardholder_name": "redacted-30",
+          "fingerprint": "sq-1-fixture-fingerprint",
+          "card_type": "DEBIT",
+          "prepaid_type": "NOT_PREPAID",
+          "bin": "000000",
+          "payment_account_reference": "FIXTUREPAR"
+        },
+        "entry_method": "EMV",
+        "cvv_status": "CVV_NOT_CHECKED",
+        "avs_status": "AVS_NOT_CHECKED",
+        "auth_result_code": "936670",
+        "application_identifier": "A0000000980840",
+        "application_name": "US DEBIT",
+        "application_cryptogram": "fd135c218cc53207",
+        "verification_method": "NONE",
+        "verification_results": "SUCCESS",
+        "statement_description": "SQ *LIBERTY HALL",
+        "device_details": {
+          "device_id": "fixture-device-03",
+          "device_name": "redacted-31",
+          "device_installation_id": "fixture-device-04"
+        },
+        "card_payment_timeline": {
+          "authorized_at": "2026-11-06T02:52:33.110Z",
+          "captured_at": "2026-11-06T02:52:39.567Z"
+        },
+        "emv_details": {
+          "authorization_response_code": "3030"
+        }
+      },
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "6vmJ9HrNFkGbtwEYSgho59gV4t8YY",
+      "customer_id": "FIXTURECUSTOMER06",
+      "total_money": {
+        "amount": 3900,
+        "currency": "USD"
+      },
+      "approved_money": {
+        "amount": 3250,
+        "currency": "USD"
+      },
+      "employee_id": "FIXTURESTAFF01",
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "delay_action": "CANCEL",
+      "delayed_until": "2026-11-07T14:52:31.779Z",
+      "device_details": {
+        "device_id": "fixture-device-03",
+        "device_name": "redacted-31",
+        "device_installation_id": "fixture-device-04"
+      },
+      "team_member_id": "FIXTURESTAFF01",
+      "application_details": {
+        "square_product": "RESTAURANTS"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": {
+    "customer": {
+      "id": "FIXTURECUSTOMER06",
+      "created_at": "2025-03-09T03:31:32.221Z",
+      "updated_at": "2025-03-09T03:31:33Z",
+      "given_name": "Given06",
+      "family_name": "Family06",
+      "preferences": {
+        "email_unsubscribed": false
+      },
+      "creation_source": "INSTANT_PROFILE",
+      "segment_ids": [
+        "gv2:BEC52WQAD562Q0WDTGXAF15R6W"
+      ],
+      "version": 1
+    }
+  },
+  "order": {
+    "order": {
+      "id": "6vmJ9HrNFkGbtwEYSgho59gV4t8YY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "076b9da8-7fe3-4ff5-a470-464611c7a811",
+          "catalog_object_id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+          "catalog_version": 1793890029551,
+          "quantity": "2",
+          "name": "Jazz Sunday in the Spacement",
+          "variation_name": "Regular",
+          "base_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "0d371928-da77-4ce2-9533-b4b78ebb466f",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Thu 11-05-2026 7:00 PM (Spacement)",
+              "catalog_object_id": "B3YVPBAL3V74RO6L74XQ5LAD",
+              "catalog_version": 1793890029551,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 2000,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 2000,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2000,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        },
+        {
+          "uid": "61fd8a45-4fa4-4891-9d48-5b69229c2eea",
+          "catalog_object_id": "JXE3XSHSLK5KKXPOEJ2H3JLR",
+          "catalog_version": 1793305510322,
+          "quantity": "1",
+          "name": "Single Call $8",
+          "variation_name": "Seagrams 7",
+          "base_price_money": {
+            "amount": 800,
+            "currency": "USD"
+          },
+          "gross_sales_money": {
+            "amount": 800,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 800,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 800,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        },
+        {
+          "uid": "e7efae26-f853-409b-86ab-2d704424e675",
+          "catalog_object_id": "NL74J5UIEEHAJKVHB7HBXTPK",
+          "catalog_version": 1792187972127,
+          "quantity": "1",
+          "name": "Value Domestic Cans $4.50",
+          "variation_name": "PBR",
+          "base_price_money": {
+            "amount": 450,
+            "currency": "USD"
+          },
+          "gross_sales_money": {
+            "amount": 450,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 450,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 450,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "fulfillments": [
+        {
+          "uid": "cc862e08-76e3-431f-924d-fefe7b561506",
+          "type": "PICKUP",
+          "state": "COMPLETED",
+          "pickup_details": {
+            "placed_at": "2026-11-06T02:52:38.344Z",
+            "schedule_type": "ASAP",
+            "recipient": {},
+            "picked_up_at": "2026-11-06T02:52:38.344Z"
+          },
+          "line_item_application": "ALL"
+        }
+      ],
+      "created_at": "2026-11-06T02:52:31.399Z",
+      "updated_at": "2026-11-06T02:52:40.670Z",
+      "state": "COMPLETED",
+      "version": 7,
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 650,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 3900,
+        "currency": "USD"
+      },
+      "closed_at": "2026-11-06T02:52:38.344Z",
+      "tenders": [
+        {
+          "id": "w15RcjDNdEqcnjV2nfYIsFf7nFIZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "6vmJ9HrNFkGbtwEYSgho59gV4t8YY",
+          "created_at": "2026-11-06T02:52:31Z",
+          "amount_money": {
+            "amount": 3900,
+            "currency": "USD"
+          },
+          "type": "CARD",
+          "card_details": {
+            "status": "CAPTURED",
+            "card": {
+              "card_brand": "VISA",
+              "last_4": "0000",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "card_type": "DEBIT",
+              "prepaid_type": "NOT_PREPAID",
+              "bin": "000000"
+            },
+            "entry_method": "EMV"
+          },
+          "tip_money": {
+            "amount": 650,
+            "currency": "USD"
+          },
+          "payment_id": "w15RcjDNdEqcnjV2nfYIsFf7nFIZY"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 3900,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 650,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {
+        "name": "Point of Sale"
+      },
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF02"
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+        "updated_at": "2026-10-16T14:52:55.947Z",
+        "created_at": "2026-03-23T01:12:56.574Z",
+        "version": 1792162375947,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "GRLE2GD5BXKSQY762Z4S6L3Q",
+          "name": "Regular",
+          "ordinal": 0,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "NONE",
+          "sellable": true,
+          "stockable": true,
+          "kitchen_name": "",
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_2TvW38z5KzkB2GwSLiVI4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      },
+      {
+        "type": "ITEM_VARIATION",
+        "id": "JXE3XSHSLK5KKXPOEJ2H3JLR",
+        "updated_at": "2026-10-29T20:25:10.322Z",
+        "created_at": "2026-08-12T23:10:57.04Z",
+        "version": 1793305510322,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+          "name": "Seagrams 7",
+          "sku": "S888824",
+          "ordinal": 15,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 800,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": false
+            }
+          ],
+          "track_inventory": true,
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ]
+        }
+      },
+      {
+        "type": "ITEM_VARIATION",
+        "id": "NL74J5UIEEHAJKVHB7HBXTPK",
+        "updated_at": "2026-09-12T23:28:56.061Z",
+        "created_at": "2023-08-04T17:52:55.274Z",
+        "version": 1789255736061,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "7RRDEICEGSWNDU3N2JBMSGNS",
+          "name": "PBR",
+          "sku": "534616B",
+          "ordinal": 2,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 450,
+            "currency": "USD"
+          },
+          "track_inventory": false,
+          "sellable": true,
+          "stockable": true,
+          "image_ids": [
+            "OSXKRKUNP533I7K6FH47WOU2"
+          ],
+          "channels": [
+            "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+        "updated_at": "2026-10-29T20:25:10.322Z",
+        "created_at": "2023-08-04T18:01:15.655Z",
+        "version": 1793305510322,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "Single Call $8",
+          "description": "Single Call",
+          "abbreviation": "8",
+          "label_color": "e5457a",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "4N3T7MGFFTZ7BOBYFITZ5YRW",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Bacardi",
+                "sku": "X946714",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "price_description": "",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "RLL5DQC7RKE345F6O3UXQB35",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Bombay",
+                "sku": "W278283",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "IAXULCPRKYHTFQFWRSSSWHT5",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "absent_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Builders",
+                "sku": "4735892",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "HC2IKT4GESQU6GTQBNGRNIRH",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Camarena Silver",
+                "sku": "1689082",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "U3GOSJGV3ILI22X25LVZBLBB",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Camarena Reposado",
+                "sku": "6943268",
+                "ordinal": 3,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "RFJW7J2TGGAIOGFMYYO55RYX",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Captain Morgan",
+                "sku": "850140E",
+                "ordinal": 4,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "6TFPMRVEKUVR2JMKLSD5ALGF",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Deep Eddy",
+                "sku": "V129571",
+                "ordinal": 5,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "CQJNBDZ7OIGRDUDEOIYMZBYK",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Deep Eddy Grapefruit",
+                "sku": "280171B",
+                "ordinal": 6,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "UN4OJMZ2EPPU5C4QAANBPFUF",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Deep Eddy Lemon",
+                "sku": "7851047",
+                "ordinal": 7,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "OAZTHOBPZXBK5FNYIHDGJIE2",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Deep Eddy Lime",
+                "sku": "3179114",
+                "ordinal": 8,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "SJ6VEJEDFU2DSP7I6TNG6TF5",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Jagermeister",
+                "sku": "508432W",
+                "ordinal": 9,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "STYHEBIRSILYUZL522GNLG5H",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2023-08-04T18:01:15.655Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Jim Beam",
+                "sku": "399378Z",
+                "ordinal": 10,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "track_inventory": false,
+                "price_description": "",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "5G65IJ25MGY2RPCJFPA6SFJN",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Liqueur/Cordial",
+                "sku": "457427D",
+                "ordinal": 11,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "XTVQ4VOJHYKTDJYWBWMC4ZTF",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Malibu",
+                "sku": "M673992",
+                "ordinal": 12,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "YW3IAGRCZUFC66QS76AE3IOU",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Old Overholt",
+                "sku": "2962301",
+                "ordinal": 13,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "CWM4BX5753ZUM3MAKVRBAW2A",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Rumple Minze",
+                "sku": "3724136",
+                "ordinal": 14,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "JXE3XSHSLK5KKXPOEJ2H3JLR",
+              "updated_at": "2026-10-29T20:25:10.322Z",
+              "created_at": "2026-08-12T23:10:57.04Z",
+              "version": 1793305510322,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "I54AQ4QLIOIZSSWJ5PE4FZBF",
+                "name": "Seagrams 7",
+                "sku": "S888824",
+                "ordinal": 15,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 800,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "categories": [
+            {
+              "id": "U3YNJMEF6T6JBH47XJLVWYYX",
+              "ordinal": -2249119754092544
+            },
+            {
+              "id": "6VTB6LFEAGV6C4OWXEIQ55JT",
+              "ordinal": -2250223023816704
+            }
+          ],
+          "description_html": "<p>Single Call</p>",
+          "description_plaintext": "Single Call",
+          "kitchen_name": "Single Call",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "U3YNJMEF6T6JBH47XJLVWYYX",
+            "ordinal": -2249119754092544
+          },
+          "is_alcoholic": true
+        }
+      },
+      {
+        "type": "ITEM",
+        "id": "7RRDEICEGSWNDU3N2JBMSGNS",
+        "updated_at": "2026-10-16T21:59:32.127Z",
+        "created_at": "2023-08-04T17:52:55.274Z",
+        "version": 1792187972127,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "Value Domestic Cans $4.50",
+          "description": "Value Domestic Beer Can",
+          "abbreviation": "4",
+          "label_color": "13b1bf",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "F3PDU6QYRICK7L23LATS3SRM",
+              "updated_at": "2026-09-12T23:30:05.074Z",
+              "created_at": "2026-08-12T03:02:45.573Z",
+              "version": 1789255805074,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "7RRDEICEGSWNDU3N2JBMSGNS",
+                "name": "Miller High Life",
+                "sku": "3439238",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 450,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "NL74J5UIEEHAJKVHB7HBXTPK",
+              "updated_at": "2026-09-12T23:28:56.061Z",
+              "created_at": "2023-08-04T17:52:55.274Z",
+              "version": 1789255736061,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "7RRDEICEGSWNDU3N2JBMSGNS",
+                "name": "PBR",
+                "sku": "534616B",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 450,
+                  "currency": "USD"
+                },
+                "track_inventory": false,
+                "sellable": true,
+                "stockable": true,
+                "image_ids": [
+                  "OSXKRKUNP533I7K6FH47WOU2"
+                ],
+                "channels": [
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "E4AKIOI4OITTBTNMHGIU3HG2",
+              "updated_at": "2026-09-12T23:28:55.237Z",
+              "created_at": "2026-08-20T20:21:55.003Z",
+              "version": 1789255735237,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "7RRDEICEGSWNDU3N2JBMSGNS",
+                "name": "Old Milwaukee",
+                "sku": "281166Q",
+                "ordinal": 3,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 450,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "categories": [
+            {
+              "id": "U3YNJMEF6T6JBH47XJLVWYYX",
+              "ordinal": -2249394631999488
+            },
+            {
+              "id": "ESGCVUFLBRCWMR6BAOD4AS33",
+              "ordinal": 3
+            },
+            {
+              "id": "6VTB6LFEAGV6C4OWXEIQ55JT",
+              "ordinal": -2249978747551744
+            }
+          ],
+          "description_html": "<p>Value Domestic Beer Can</p>",
+          "description_plaintext": "Value Domestic Beer Can",
+          "kitchen_name": "Cheap Domestic Cans",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "U3YNJMEF6T6JBH47XJLVWYYX",
+            "ordinal": -2249394631999488
+          },
+          "is_alcoholic": true
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "OSXKRKUNP533I7K6FH47WOU2",
+        "updated_at": "2023-07-29T18:21:32.596Z",
+        "created_at": "2023-07-29T18:21:32.596Z",
+        "version": 1690654892596,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/a6bef5a8c78ccb222659f8166f81097a5bc120e8/original.png"
+        }
+      },
+      {
+        "type": "ITEM",
+        "id": "GRLE2GD5BXKSQY762Z4S6L3Q",
+        "updated_at": "2026-11-05T14:47:09.551Z",
+        "created_at": "2026-03-23T01:12:56.574Z",
+        "version": 1793890029551,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "SFZPKKHQ4LVY23D3WUWTMTJS"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "LNQ6BVK7BHYSJ77VOOJDA45V"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "Jazz Sunday in the Spacement",
+          "description": "Come down to the Liberty Hall speakeasy lounge, The Spacement, (entrance down the stairs on 7th street below The Plant Shop) and enjoy some fine local Jazz, curated to perfection with a rotating trio or quartet from your very own town!\n\nDoors 6:30, Show from 7-9pm\nLimited capacity so come early!",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "PLLLTZDHUS3M275L2NCMTS4T",
+              "min_selected_modifiers": -1,
+              "max_selected_modifiers": -1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+              "updated_at": "2026-10-16T14:52:55.947Z",
+              "created_at": "2026-03-23T01:12:56.574Z",
+              "version": 1792162375947,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "GRLE2GD5BXKSQY762Z4S6L3Q",
+                "name": "Regular",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "NONE",
+                "sellable": true,
+                "stockable": true,
+                "kitchen_name": "",
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_2TvW38z5KzkB2GwSLiVI4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "Z6I5JQUPT6F4L4QYOS2TRSQX"
+          ],
+          "categories": [
+            {
+              "id": "W375DTBT5VWI4LALZXMD4KWM",
+              "ordinal": 3229865738240
+            },
+            {
+              "id": "YPMWER73XEVFJWEZEXP4B6GS",
+              "ordinal": -2251731060654080
+            }
+          ],
+          "description_html": "<p>Come down to the Liberty Hall speakeasy lounge, The Spacement, (entrance down the stairs on 7th street below The Plant Shop) and enjoy some fine local Jazz, curated to perfection with a rotating trio or quartet from your very own town!</p><p><br></p><p>Doors 6:30, Show from 7-9pm</p><p>Limited capacity so come early!</p>",
+          "description_plaintext": "Come down to the Liberty Hall speakeasy lounge, The Spacement, (entrance down the stairs on 7th street below The Plant Shop) and enjoy some fine local Jazz, curated to perfection with a rotating trio or quartet from your very own town!\n\nDoors 6:30, Show from 7-9pm\nLimited capacity so come early!",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_2TvW38z5KzkB2GwSLiVI4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "W375DTBT5VWI4LALZXMD4KWM",
+            "ordinal": 3229865738240
+          },
+          "is_alcoholic": false,
+          "use_location_fulfillment_methods": true
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "Z6I5JQUPT6F4L4QYOS2TRSQX",
+        "updated_at": "2026-09-28T19:18:27.237Z",
+        "created_at": "2026-09-28T19:18:27.277Z",
+        "version": 1790623107237,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "name": "jazzNoDate.png",
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/32a382c264d22ea08ac791f40ab6eb4d7c7e6e5f/original.png"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "LNQ6BVK7BHYSJ77VOOJDA45V",
+        "name": "Liberty Hall Events"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "SFZPKKHQ4LVY23D3WUWTMTJS",
+        "name": "Live"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "Given06",
+      "LastName": "Family06",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "Jazz Sunday in the Spacement",
+        "ProductDate": "2026-11-05 19:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Live",
+        "ProductDetails": "Thu 11-05-2026 7:00 PM (Spacement)",
+        "ProductPrice": 10,
+        "ProductID": "KCWDUVS6RTPQPSTK6BKP4MBV",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "Given06",
+        "LastName": "Family06",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Events",
+        "ProductVenue": "Spacement",
+        "ProductSeatCode": "Regular",
+        "Status": "valid",
+        "QRCodePrefix": "Jazz Sunday in the Spacement_Regular_6vmJ9HrNFkGbtwEYSgho59gV4t8YY_076b9da8-7fe3-4ff5-a470-464611c7a811_",
+        "ProductMetadata": {
+          "uid": "076b9da8-7fe3-4ff5-a470-464611c7a811",
+          "name": "Jazz Sunday in the Spacement",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "0d371928-da77-4ce2-9533-b4b78ebb466f",
+              "name": "Thu 11-05-2026 7:00 PM (Spacement)",
+              "quantity": "1",
+              "catalog_version": 1793890029551,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "B3YVPBAL3V74RO6L74XQ5LAD",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2000,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "SFZPKKHQ4LVY23D3WUWTMTJS",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Regular",
+          "catalog_version": 1793890029551,
+          "distributorInfo": {
+            "selectionId": "LNQ6BVK7BHYSJ77VOOJDA45V",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "catalog_object_id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+          "gross_sales_money": {
+            "amount": 2000,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"W375DTBT5VWI4LALZXMD4KWM\",\"ordinal\":3229865738240},{\"id\":\"YPMWER73XEVFJWEZEXP4B6GS\",\"ordinal\":-2251731060654080}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2000,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "Jazz Sunday in the Spacement",
+        "ProductDate": "2026-11-05 19:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Live",
+        "ProductDetails": "Thu 11-05-2026 7:00 PM (Spacement)",
+        "ProductPrice": 10,
+        "ProductID": "KCWDUVS6RTPQPSTK6BKP4MBV",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "Given06",
+        "LastName": "Family06",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Events",
+        "ProductVenue": "Spacement",
+        "ProductSeatCode": "Regular",
+        "Status": "valid",
+        "QRCodePrefix": "Jazz Sunday in the Spacement_Regular_6vmJ9HrNFkGbtwEYSgho59gV4t8YY_076b9da8-7fe3-4ff5-a470-464611c7a811_",
+        "ProductMetadata": {
+          "uid": "076b9da8-7fe3-4ff5-a470-464611c7a811",
+          "name": "Jazz Sunday in the Spacement",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "0d371928-da77-4ce2-9533-b4b78ebb466f",
+              "name": "Thu 11-05-2026 7:00 PM (Spacement)",
+              "quantity": "1",
+              "catalog_version": 1793890029551,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "B3YVPBAL3V74RO6L74XQ5LAD",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2000,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "SFZPKKHQ4LVY23D3WUWTMTJS",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Regular",
+          "catalog_version": 1793890029551,
+          "distributorInfo": {
+            "selectionId": "LNQ6BVK7BHYSJ77VOOJDA45V",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "catalog_object_id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+          "gross_sales_money": {
+            "amount": 2000,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"W375DTBT5VWI4LALZXMD4KWM\",\"ordinal\":3229865738240},{\"id\":\"YPMWER73XEVFJWEZEXP4B6GS\",\"ordinal\":-2251731060654080}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2000,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

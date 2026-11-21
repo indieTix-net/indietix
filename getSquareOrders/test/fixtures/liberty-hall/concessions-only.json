@@ -1,0 +1,1150 @@
+{
+  "shape": "concessions-only",
+  "description": "A sale with no ticketed items at all (concessions). No Order row, no email.",
+  "recorded": "2026-11-20, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "c6e5845e-e28f-3908-8dfb-8b47297b1d38",
+    "created_at": "2026-11-20T23:16:11.292Z",
+    "data": {
+      "type": "payment",
+      "id": "Izcwf8HHYyrhlWfwtPzEJCfmntFZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "application_details": {
+            "square_product": "RESTAURANTS"
+          },
+          "approved_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "card_details": {
+            "application_cryptogram": "ae1049fefa0ca543",
+            "application_identifier": "A0000000042203",
+            "application_name": "US Debit",
+            "auth_result_code": "896948",
+            "avs_status": "AVS_NOT_CHECKED",
+            "card": {
+              "bin": "000000",
+              "card_brand": "MASTERCARD",
+              "card_type": "DEBIT",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "last_4": "0000",
+              "payment_account_reference": "FIXTUREPAR",
+              "prepaid_type": "NOT_PREPAID"
+            },
+            "card_payment_timeline": {
+              "authorized_at": "2026-11-20T23:16:05.100Z",
+              "captured_at": "2026-11-20T23:16:09.216Z"
+            },
+            "cvv_status": "CVV_NOT_CHECKED",
+            "device_details": {
+              "device_id": "fixture-device-05",
+              "device_installation_id": "fixture-device-06",
+              "device_name": "redacted-37"
+            },
+            "emv_details": {},
+            "entry_method": "CONTACTLESS",
+            "statement_description": "SQ *LIBERTY HALL",
+            "status": "CAPTURED",
+            "verification_method": "NONE",
+            "verification_results": "SUCCESS"
+          },
+          "created_at": "2026-11-20T23:16:04.456Z",
+          "delay_action": "CANCEL",
+          "delay_duration": "PT36H",
+          "delayed_until": "2026-11-22T11:16:04.456Z",
+          "device_details": {
+            "device_id": "fixture-device-05",
+            "device_installation_id": "fixture-device-06",
+            "device_name": "redacted-37"
+          },
+          "employee_id": "FIXTURESTAFF01",
+          "id": "Izcwf8HHYyrhlWfwtPzEJCfmntFZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "Eoi4SitbcgBBumMpxK90x5VidocZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "source_type": "CARD",
+          "status": "COMPLETED",
+          "team_member_id": "FIXTURESTAFF01",
+          "tip_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-20T23:16:11.280Z",
+          "version": 4
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "Izcwf8HHYyrhlWfwtPzEJCfmntFZY",
+      "created_at": "2026-11-20T23:16:04.456Z",
+      "updated_at": "2026-11-20T23:16:11.280Z",
+      "amount_money": {
+        "amount": 300,
+        "currency": "USD"
+      },
+      "tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "delay_duration": "PT36H",
+      "source_type": "CARD",
+      "card_details": {
+        "status": "CAPTURED",
+        "card": {
+          "card_brand": "MASTERCARD",
+          "last_4": "0000",
+          "exp_month": 12,
+          "exp_year": 2030,
+          "fingerprint": "sq-1-fixture-fingerprint",
+          "card_type": "DEBIT",
+          "prepaid_type": "NOT_PREPAID",
+          "bin": "000000",
+          "payment_account_reference": "FIXTUREPAR"
+        },
+        "entry_method": "CONTACTLESS",
+        "cvv_status": "CVV_NOT_CHECKED",
+        "avs_status": "AVS_NOT_CHECKED",
+        "auth_result_code": "896948",
+        "application_identifier": "A0000000042203",
+        "application_name": "US Debit",
+        "application_cryptogram": "ae1049fefa0ca543",
+        "verification_method": "NONE",
+        "verification_results": "SUCCESS",
+        "statement_description": "SQ *LIBERTY HALL",
+        "device_details": {
+          "device_id": "fixture-device-05",
+          "device_name": "redacted-37",
+          "device_installation_id": "fixture-device-06"
+        },
+        "card_payment_timeline": {
+          "authorized_at": "2026-11-20T23:16:05.100Z",
+          "captured_at": "2026-11-20T23:16:09.216Z"
+        },
+        "emv_details": {}
+      },
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "Eoi4SitbcgBBumMpxK90x5VidocZY",
+      "customer_id": "FIXTURECUSTOMER08",
+      "total_money": {
+        "amount": 300,
+        "currency": "USD"
+      },
+      "approved_money": {
+        "amount": 300,
+        "currency": "USD"
+      },
+      "employee_id": "FIXTURESTAFF01",
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "delay_action": "CANCEL",
+      "delayed_until": "2026-11-22T11:16:04.456Z",
+      "device_details": {
+        "device_id": "fixture-device-05",
+        "device_name": "redacted-37",
+        "device_installation_id": "fixture-device-06"
+      },
+      "team_member_id": "FIXTURESTAFF01",
+      "application_details": {
+        "square_product": "RESTAURANTS"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": {
+    "customer": {
+      "id": "FIXTURECUSTOMER08",
+      "created_at": "2026-10-24T01:57:56.903Z",
+      "updated_at": "2026-10-24T01:57:56Z",
+      "preferences": {
+        "email_unsubscribed": false
+      },
+      "creation_source": "INSTANT_PROFILE",
+      "version": 0
+    }
+  },
+  "order": {
+    "order": {
+      "id": "Eoi4SitbcgBBumMpxK90x5VidocZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "d18d4187-32d9-4946-897e-c91778084a3b",
+          "catalog_object_id": "LJ5PMWUO362TFXDAU53MCR2H",
+          "catalog_version": 1793998552711,
+          "quantity": "1",
+          "name": "Canned Soda $3",
+          "variation_name": "La Croix Lime",
+          "base_price_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "gross_sales_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "fulfillments": [
+        {
+          "uid": "4770492b-68ba-4d83-a3d8-afcf98067b50",
+          "type": "PICKUP",
+          "state": "COMPLETED",
+          "pickup_details": {
+            "placed_at": "2026-11-20T23:16:08.628Z",
+            "schedule_type": "ASAP",
+            "recipient": {},
+            "picked_up_at": "2026-11-20T23:16:08.628Z"
+          },
+          "line_item_application": "ALL"
+        }
+      ],
+      "created_at": "2026-11-20T23:16:04.133Z",
+      "updated_at": "2026-11-20T23:16:10.241Z",
+      "state": "COMPLETED",
+      "version": 7,
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 300,
+        "currency": "USD"
+      },
+      "closed_at": "2026-11-20T23:16:08.628Z",
+      "tenders": [
+        {
+          "id": "Izcwf8HHYyrhlWfwtPzEJCfmntFZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "Eoi4SitbcgBBumMpxK90x5VidocZY",
+          "created_at": "2026-11-20T23:16:04Z",
+          "amount_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "type": "CARD",
+          "card_details": {
+            "status": "CAPTURED",
+            "card": {
+              "card_brand": "MASTERCARD",
+              "last_4": "0000",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "card_type": "DEBIT",
+              "prepaid_type": "NOT_PREPAID",
+              "bin": "000000"
+            },
+            "entry_method": "CONTACTLESS"
+          },
+          "tip_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "payment_id": "Izcwf8HHYyrhlWfwtPzEJCfmntFZY"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 300,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {
+        "name": "Point of Sale"
+      },
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF01"
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "LJ5PMWUO362TFXDAU53MCR2H",
+        "updated_at": "2026-11-06T20:55:43.86Z",
+        "created_at": "2026-08-12T20:38:07.303Z",
+        "version": 1793998543860,
+        "is_deleted": false,
+        "present_at_all_locations": false,
+        "present_at_location_ids": [
+          "S3E2Q1EK0466V"
+        ],
+        "item_variation_data": {
+          "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+          "name": "La Croix Lime",
+          "sku": "B773061",
+          "ordinal": 13,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 300,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": false
+            }
+          ],
+          "track_inventory": true,
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "D34PJZYWXHNPY6QALFFQ6KPV",
+        "updated_at": "2026-11-06T20:55:52.711Z",
+        "created_at": "2023-08-05T03:27:49.642Z",
+        "version": 1793998552711,
+        "is_deleted": false,
+        "present_at_all_locations": false,
+        "present_at_location_ids": [
+          "S3E2Q1EK0466V"
+        ],
+        "item_data": {
+          "name": "Canned Soda $3",
+          "label_color": "13b1bf",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "FL5M3ZMOEMFM5UBH2X6Z5UA5",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Barq's Root Beer",
+                "sku": "1767846",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "price_description": "",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "3UAVGYITG3HYJFTHYKGT6M3R",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Canada Dry Ginger Ale",
+                "sku": "797431Z",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "65LVW6HNNKLMFIT25DQOXBNK",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Cherry Coke",
+                "sku": "S533349",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "A4S2QA4E6ONTHKEW37APKRTS",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Cherry Coke Zero",
+                "sku": "T379381",
+                "ordinal": 3,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "QNB6N5Y4R24ZMQWTRPBQYFX4",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Coke",
+                "sku": "695303Y",
+                "ordinal": 4,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "PHMF5UFG7KPVX3IKCDNOOGMC",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Coke Zero",
+                "sku": "787142G",
+                "ordinal": 5,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "725XH6L4ASLGFX6CRZIT6WHE",
+              "updated_at": "2026-11-06T20:55:52.711Z",
+              "created_at": "2026-11-06T20:55:44.071Z",
+              "version": 1793998552711,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Diet Coke",
+                "sku": "J729033",
+                "ordinal": 6,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "SOI5N2N3VVECEX3KOLCLF5KG",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Dr. Pepper",
+                "sku": "703480M",
+                "ordinal": 7,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "VYAZYUHJK2KDBVNGEPV6LYO6",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2023-08-05T03:27:49.642Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "Diet Dr. Pepper",
+                "sku": "858587Z",
+                "ordinal": 8,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "track_inventory": false,
+                "inventory_alert_type": "NONE",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "HLXWHYQFCNC3KXZGFUJNRSUA",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Beach Plum",
+                "sku": "K483928",
+                "ordinal": 9,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "CU5IRCELS2NKTF5HBROY6VGQ",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Berry",
+                "sku": "V240323",
+                "ordinal": 10,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "P6RFABK7YHF4PAO35VIWSRPR",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Guava Sao Paulo",
+                "sku": "V971466",
+                "ordinal": 11,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "YSDQ4E3O2MBVRDQFAYOJRLB4",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Lemon",
+                "sku": "5364515",
+                "ordinal": 12,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "LJ5PMWUO362TFXDAU53MCR2H",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Lime",
+                "sku": "B773061",
+                "ordinal": 13,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "HFFDDZKDEIX6S3RNSIDH3NFL",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Limoncello",
+                "sku": "J332205",
+                "ordinal": 14,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "MVMSQ2VSC2254TD74LPT7CQB",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Mango",
+                "sku": "792904T",
+                "ordinal": 15,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "7N3KAVWM2TDHS2THM6RWBQQL",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Pampelmousse",
+                "sku": "G108981",
+                "ordinal": 16,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "HAT3YAVMH3YVLAD5JDBN4KRB",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Razz Cran",
+                "sku": "921465E",
+                "ordinal": 17,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "FJGJUC3IQF4HSOZGN6ILD5T2",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Strawberry Peach",
+                "sku": "671304V",
+                "ordinal": 18,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "ZPIDIGLXMATVIT2DNDLTLKB7",
+              "updated_at": "2026-11-06T20:55:43.86Z",
+              "created_at": "2026-08-12T20:38:07.303Z",
+              "version": 1793998543860,
+              "is_deleted": false,
+              "present_at_all_locations": false,
+              "present_at_location_ids": [
+                "S3E2Q1EK0466V"
+              ],
+              "item_variation_data": {
+                "item_id": "D34PJZYWXHNPY6QALFFQ6KPV",
+                "name": "La Croix Tangerine",
+                "sku": "Q628027",
+                "ordinal": 19,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 300,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": false
+                  }
+                ],
+                "track_inventory": true,
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "categories": [
+            {
+              "id": "TWCQSQQCT5DK7YDR4GGCJ3NP",
+              "ordinal": 1236950581248
+            },
+            {
+              "id": "6VTB6LFEAGV6C4OWXEIQ55JT",
+              "ordinal": -2251250057871360
+            }
+          ],
+          "kitchen_name": "Canned Soda",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_Bus8KR9ZLcbK1OgRHGcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "TWCQSQQCT5DK7YDR4GGCJ3NP",
+            "ordinal": 1236950581248
+          },
+          "is_alcoholic": false
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {},
+  "expected": {
+    "order": null,
+    "tickets": [],
+    "emailRecipient": null
+  }
+}
