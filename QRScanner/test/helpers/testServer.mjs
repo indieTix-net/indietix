@@ -161,9 +161,13 @@ function defaultSquareHandlers() {
           json: async () => ({ catalog_object: { ...obj, id: 'MOCK_ITEM_ID', item_data: { ...obj.item_data, variations } } })
         };
       }
+      // A MODIFIER_LIST's modifiers get ids too, as Square assigns them.
+      const listData = obj.modifier_list_data
+        ? { ...obj.modifier_list_data, modifiers: (obj.modifier_list_data.modifiers || []).map((m, i) => ({ ...m, id: `MOCK_MOD_${i}` })) }
+        : undefined;
       return {
         ok: true, status: 200,
-        json: async () => ({ catalog_object: { ...obj, id: 'MOCK_MODIFIER_LIST_ID' } })
+        json: async () => ({ catalog_object: { ...obj, id: 'MOCK_MODIFIER_LIST_ID', ...(listData ? { modifier_list_data: listData } : {}) } })
       };
     },
     batchCreateInventory: async () => ({

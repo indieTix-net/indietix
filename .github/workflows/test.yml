@@ -50,6 +50,8 @@ jobs:
               - 'square-api-lib/**'
               - 'test-db-harness/**'
               - 'clientSetup-Teardown/**'
+              # nativeEvents.test.mjs checks its showtime parser against these
+              - 'getSquareOrders/test/fixtures/**'
             getSquareOrders:
               - '.github/workflows/test.yml'
               - 'getSquareOrders/**'

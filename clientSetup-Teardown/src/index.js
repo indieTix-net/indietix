@@ -838,6 +838,72 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
     await pgClient.query(createNoTicketOrderTable);
     console.log('NoTicketOrder table created');
 
+    // 18. NATIVE EVENTS -- IndieTix's own record of events, ticket types,
+    // showings and capacity, and which POS objects (Square items,
+    // showtime modifiers, ticket variations) each one is published as.
+    // QRScanner's Add Movie/Event writes these; sales still happen in the
+    // POS. See NATIVE_EVENTS_PLAN.md. No FKs, per convention. StartsAt is
+    // Chicago wall-clock time, like QRCodeProduct.ProductDate.
+    // QRCodeProduct.ShowingID is which showing a ticket is for (filled by
+    // getSquareOrders from native-events step 3 on; NULL before that).
+    await pgClient.query(`CREATE TABLE IF NOT EXISTS public."Event" (
+  "ID" SERIAL PRIMARY KEY,
+  "Kind" VARCHAR(20) NOT NULL CHECK ("Kind" IN ('movie', 'event')),
+  "Title" VARCHAR(255) NOT NULL,
+  "EventType" VARCHAR(50),
+  "Distributor" VARCHAR(255),
+  "ImdbID" VARCHAR(20),
+  "Description" TEXT,
+  "PosterUrl" TEXT,
+  "Status" VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK ("Status" IN ('draft', 'active', 'archived')),
+  "CreatedBy" VARCHAR(100),
+  "CreatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "UpdatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS public."TicketType" (
+  "ID" SERIAL PRIMARY KEY,
+  "EventID" INTEGER NOT NULL,
+  "Name" VARCHAR(100) NOT NULL,
+  "PriceCents" INTEGER NOT NULL CHECK ("PriceCents" >= 0),
+  "SortOrder" INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS "TicketType_EventID_idx" ON public."TicketType" ("EventID");
+
+CREATE TABLE IF NOT EXISTS public."Showing" (
+  "ID" SERIAL PRIMARY KEY,
+  "EventID" INTEGER NOT NULL,
+  "StartsAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  "Venue" VARCHAR(255) NOT NULL,
+  "Descriptors" VARCHAR(255) NOT NULL DEFAULT '',
+  "Label" VARCHAR(255) NOT NULL,
+  "Capacity" INTEGER CHECK ("Capacity" IS NULL OR "Capacity" >= 0),
+  "HeldSeats" INTEGER NOT NULL DEFAULT 0 CHECK ("HeldSeats" >= 0),
+  "Status" VARCHAR(20) NOT NULL DEFAULT 'on_sale' CHECK ("Status" IN ('on_sale', 'sold_out', 'cancelled', 'expired')),
+  "SoldOutAt" TIMESTAMP WITHOUT TIME ZONE,
+  "CreatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "Showing_EventID_idx" ON public."Showing" ("EventID");
+CREATE INDEX IF NOT EXISTS "Showing_StartsAt_idx" ON public."Showing" ("StartsAt");
+
+CREATE TABLE IF NOT EXISTS public."ExternalCatalogLink" (
+  "ID" SERIAL PRIMARY KEY,
+  "EntityType" VARCHAR(20) NOT NULL CHECK ("EntityType" IN ('event', 'showing', 'ticket_type')),
+  "EntityID" INTEGER NOT NULL,
+  "Provider" VARCHAR(30) NOT NULL,
+  "ExternalType" VARCHAR(30) NOT NULL,
+  "ExternalID" VARCHAR(64) NOT NULL,
+  "CreatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "DeletedAt" TIMESTAMP WITHOUT TIME ZONE,
+  "DeletedReason" VARCHAR(20),
+  CONSTRAINT "ExternalCatalogLink_Provider_ExternalID_key" UNIQUE ("Provider", "ExternalID")
+);
+CREATE INDEX IF NOT EXISTS "ExternalCatalogLink_Entity_idx" ON public."ExternalCatalogLink" ("EntityType", "EntityID");
+
+ALTER TABLE public."QRCodeProduct" ADD COLUMN IF NOT EXISTS "ShowingID" INTEGER;
+CREATE INDEX IF NOT EXISTS "QRCodeProduct_ShowingID_idx" ON public."QRCodeProduct" ("ShowingID");`);
+    console.log('Native event tables created');
+
     // ===========================================================
     // FUNCTIONS
     // ===========================================================

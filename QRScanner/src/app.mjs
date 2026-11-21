@@ -27,6 +27,7 @@ import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, even
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
 import { buildZip } from './utils/zip.mjs';
+import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent } from './utils/native-events.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -5330,6 +5331,23 @@ async function createTicketAttribute(accessToken, name, spec) {
  */
 app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit'), async (req, res) => {
   let clientPool;
+  // NATIVE EVENTS: IndieTix's own copy, saved as a draft before Square is touched
+  let nativePool = null;
+  let nativeDraft = null;
+  let nativePublished = false;
+  // A draft whose Square item was never made is removed BEFORE the response
+  // goes out (every early `return res...json()` below passes through here),
+  // so nobody sees a half-made event.
+  let nativeCleanup = null;
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    if (nativeDraft && !nativePublished && !nativeCleanup) {
+      nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+      nativeCleanup.finally(() => sendJson(body));
+      return res;
+    }
+    return sendJson(body);
+  };
   
   try {
     const { movieData } = req.body;
@@ -5358,6 +5376,16 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       return res.status(400).json({ 
         error: 'At least one showtime is required',
         details: 'Please add showtimes before creating the item'
+      });
+    }
+
+    // ---- NATIVE EVENTS: every showtime must be readable ----
+    const parsedShowings = movieData.showtimes.map(parseShowtimeLabel);
+    const unreadableShowtimes = movieData.showtimes.filter((label, i) => !parsedShowings[i]);
+    if (unreadableShowtimes.length > 0) {
+      return res.status(400).json({
+        error: 'A showtime could not be read',
+        details: `Expected the form "Sun 01-18-2026 7:00 PM (Main Theater)": ${unreadableShowtimes.join('; ')}`
       });
     }
     
@@ -5399,6 +5427,23 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     const eventTypeMovieSelectionUid = ticketAttributes.eventTypeSelectionUid;
     const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
     
+    // ---- NATIVE EVENTS: save the draft (IndieTix first, then Square) ----
+    nativePool = await createClientDbConnection(req.user.dbName);
+    nativeDraft = await createDraftEvent(nativePool, {
+      kind: 'movie',
+      title: movieData.title,
+      // What the tickets will record: left off when Square has no such choice.
+      eventType: eventTypeMovieSelectionUid ? ticketSettings.eventTypeChoice : null,
+      distributor: distributorSelectionUid ? ticketSettings.distributorChoice : null,
+      imdbID: movieData.imdbID,
+      description: movieData.description,
+      posterUrl: movieData.posterUrl,
+      createdBy: req.user.username,
+      ticketTypes: ticketSettings.ticketTypes,
+      showings: parsedShowings
+    });
+    // ---- END NATIVE EVENTS draft ----
+
     // 4. Create modifier list with all showtimes
     // Each showtime becomes a modifier option in the list
     const modifiers = movieData.showtimes.map((showtime, index) => ({
@@ -5595,6 +5640,25 @@ const createItemResponse = await squareApi.squareFetch(accessToken, '/v2/catalog
     }
     
     const createItemData = await createItemResponse.json();
+
+    // ---- NATIVE EVENTS: link the draft to what Square created ----
+    let nativeNote = '';
+    if (nativeDraft) {
+      try {
+        await publishEventLinks(nativePool, nativeDraft, {
+          itemId: createItemData.catalog_object.id,
+          modifierListId,
+          imageId,
+          modifiers: modifierData.catalog_object.modifier_list_data?.modifiers,
+          variations: createItemData.catalog_object.item_data?.variations
+        });
+        nativePublished = true;
+      } catch (nativeError) {
+        console.error(`NATIVE_EVENT_LINK_FAILED: "${movieData.title}" was created in Square (${createItemData.catalog_object.id}) but IndieTix could not save its copy:`, nativeError.message);
+        nativeNote = ' IndieTix could not save its own copy of this item (it still sells and makes tickets).';
+      }
+    }
+    // ---- END NATIVE EVENTS link ----
     console.log('=== SQUARE RESPONSE ===');
 console.log(JSON.stringify(createItemData, null, 2));
 console.log('=== END RESPONSE ===');
@@ -5756,7 +5820,8 @@ if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALE
 res.json({
   success: true,
   itemId: createItemData.catalog_object.id,
-  message: `Successfully created "${movieData.title}" in Square with ${movieData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}`,
+  eventId: nativePublished ? nativeDraft.eventId : null,
+  message: `Successfully created "${movieData.title}" in Square with ${movieData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}${nativeNote}`,
   squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
 });
     
@@ -5764,12 +5829,34 @@ res.json({
     console.error('Error:', error);
     if (clientPool) await clientPool.end();
     res.status(500).json({ error: 'Failed to create item', details: error.message });
+  } finally {
+    // ---- NATIVE EVENTS: a draft whose Square item was never made is removed ----
+    if (nativeDraft && !nativePublished && !nativeCleanup) nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+    if (nativeCleanup) await nativeCleanup;
+    if (nativePool) await nativePool.end().catch(() => {});
   }
 });
 
 // Create Event Item in Square (matches movie endpoint pattern exactly)
 app.post('/api/square/create-event-item', requireAuth, requirePermission('edit'), async (req, res) => {
   let clientPool;
+  // NATIVE EVENTS: IndieTix's own copy, saved as a draft before Square is touched
+  let nativePool = null;
+  let nativeDraft = null;
+  let nativePublished = false;
+  // A draft whose Square item was never made is removed BEFORE the response
+  // goes out (every early `return res...json()` below passes through here),
+  // so nobody sees a half-made event.
+  let nativeCleanup = null;
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    if (nativeDraft && !nativePublished && !nativeCleanup) {
+      nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+      nativeCleanup.finally(() => sendJson(body));
+      return res;
+    }
+    return sendJson(body);
+  };
   
   try {
     const { eventData } = req.body;
@@ -5798,6 +5885,16 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       return res.status(400).json({ 
         error: 'At least one showtime is required',
         details: 'Please add showtimes before creating the item'
+      });
+    }
+
+    // ---- NATIVE EVENTS: every showtime must be readable ----
+    const parsedShowings = eventData.showtimes.map(parseShowtimeLabel);
+    const unreadableShowtimes = eventData.showtimes.filter((label, i) => !parsedShowings[i]);
+    if (unreadableShowtimes.length > 0) {
+      return res.status(400).json({
+        error: 'A showtime could not be read',
+        details: `Expected the form "Sun 01-18-2026 7:00 PM (Main Theater)": ${unreadableShowtimes.join('; ')}`
       });
     }
     
@@ -5839,6 +5936,23 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     const eventTypeEventSelectionUid = ticketAttributes.eventTypeSelectionUid;
     const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
     
+    // ---- NATIVE EVENTS: save the draft (IndieTix first, then Square) ----
+    nativePool = await createClientDbConnection(req.user.dbName);
+    nativeDraft = await createDraftEvent(nativePool, {
+      kind: 'event',
+      title: eventData.title,
+      // What the tickets will record: left off when Square has no such choice.
+      eventType: eventTypeEventSelectionUid ? ticketSettings.eventTypeChoice : null,
+      distributor: distributorSelectionUid ? ticketSettings.distributorChoice : null,
+      imdbID: eventData.imdbID,
+      description: eventData.description,
+      posterUrl: eventData.posterUrl,
+      createdBy: req.user.username,
+      ticketTypes: ticketSettings.ticketTypes,
+      showings: parsedShowings
+    });
+    // ---- END NATIVE EVENTS draft ----
+
     // 4. Create modifier list with all showtimes (SAME AS MOVIE)
     const modifiers = eventData.showtimes.map((showtime, index) => {
       // Extract just the time for abbreviation (Kitchen Name in Square)
@@ -6037,6 +6151,25 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     }
     
     const createItemData = await createItemResponse.json();
+
+    // ---- NATIVE EVENTS: link the draft to what Square created ----
+    let nativeNote = '';
+    if (nativeDraft) {
+      try {
+        await publishEventLinks(nativePool, nativeDraft, {
+          itemId: createItemData.catalog_object.id,
+          modifierListId,
+          imageId,
+          modifiers: modifierData.catalog_object.modifier_list_data?.modifiers,
+          variations: createItemData.catalog_object.item_data?.variations
+        });
+        nativePublished = true;
+      } catch (nativeError) {
+        console.error(`NATIVE_EVENT_LINK_FAILED: "${eventData.title}" was created in Square (${createItemData.catalog_object.id}) but IndieTix could not save its copy:`, nativeError.message);
+        nativeNote = ' IndieTix could not save its own copy of this item (it still sells and makes tickets).';
+      }
+    }
+    // ---- END NATIVE EVENTS link ----
     console.log('=== EVENT SQUARE RESPONSE ===');
     console.log('Item ID:', createItemData.catalog_object.id);
     console.log('Modifier lists in response:', createItemData.catalog_object.item_data?.modifier_list_info?.length || 0);
@@ -6215,7 +6348,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     res.json({
       success: true,
       itemId: createItemData.catalog_object.id,
-      message: `Successfully created "${eventData.title}" in Square with ${eventData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}`,
+      eventId: nativePublished ? nativeDraft.eventId : null,
+      message: `Successfully created "${eventData.title}" in Square with ${eventData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}${nativeNote}`,
       squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
     });
     
@@ -6223,6 +6357,11 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     console.error('Error:', error);
     if (clientPool) await clientPool.end();
     res.status(500).json({ error: 'Failed to create event item', details: error.message });
+  } finally {
+    // ---- NATIVE EVENTS: a draft whose Square item was never made is removed ----
+    if (nativeDraft && !nativePublished && !nativeCleanup) nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+    if (nativeCleanup) await nativeCleanup;
+    if (nativePool) await nativePool.end().catch(() => {});
   }
 });
 
