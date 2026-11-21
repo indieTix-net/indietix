@@ -638,8 +638,11 @@ publish_layer_sandbox() {
 # TICKET_SMS_FILENAME, same as production's venue-specific templates
 # always worked). Echoes the bucket name.
 seed_ticket_templates_bucket() {
+  # Only the bucket name may reach stdout: the caller captures it. (aws-cli
+  # 2.x head-bucket prints JSON; captured, it made TICKET_TEMPLATES_BUCKET
+  # "{" in indietix-boottest, so onboarding never copied the templates.)
   local bucket="${ENV_PREFIX}-ticket-templates"
-  if ! aws s3api head-bucket --bucket "$bucket" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null; then
+  if ! aws s3api head-bucket --bucket "$bucket" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
     echo "Creating ticket-templates bucket: $bucket" >&2
     if [ "$AWS_REGION" = "us-east-1" ]; then
       aws s3api create-bucket --bucket "$bucket" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >&2
@@ -1126,7 +1129,7 @@ print_summary() {
 empty_bucket() {
   local b="$1"
   case "$b" in "${ENV_PREFIX}"-*) ;; *) echo "  refusing to empty $b (not ${ENV_PREFIX}-*)" >&2; return 1 ;; esac
-  if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null; then
+  if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
     echo "Emptying s3://$b"
     aws s3 rm "s3://$b" --recursive --only-show-errors "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
   fi
@@ -1376,7 +1379,7 @@ cmd_down() {
     leftover_buckets="$leftover_buckets ${ENV_PREFIX}-${client_lower} ${ENV_PREFIX}-${client_lower}-bdor"
   done
   for b in $leftover_buckets; do
-    if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null; then
+    if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
       empty_bucket "$b" && \
         aws s3api delete-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" && \
         echo "Deleted bucket $b"
