@@ -27,7 +27,7 @@ import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, even
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
 import { buildZip } from './utils/zip.mjs';
-import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing } from './utils/native-events.mjs';
+import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare } from './utils/native-events.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -6436,6 +6436,13 @@ app.post('/api/events/:eventId/showings/:showingId/cancel', requireAuth, require
     const cancelled = await cancelShowing(pool, requireSquareToken(config), eventId, showingId);
     return { success: true, ...cancelled, event: await getEventWithShowings(pool, eventId) };
   }));
+// Bring the venue's existing Square ticket items into IndieTix (native
+// events step 4). { dryRun: true } (the default) only reports.
+app.post('/api/events/import-from-square', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => ({
+    success: true,
+    ...(await importFromSquare(pool, requireSquareToken(config), config, { dryRun: req.body?.dryRun !== false }))
+  })));
 // ---- END SHOWTIME MANAGEMENT ROUTES ----
 
 // app_mjs_insights_endpoint.js

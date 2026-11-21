@@ -299,7 +299,51 @@
         }
     }
 
+    // ---- Bring in existing Square items (native events step 4) ----
+    function importSummary(report) {
+        const lines = [];
+        const showtimes = report.imported.reduce((n, i) => n + i.showtimes, 0);
+        lines.push(`${report.imported.length} item${report.imported.length === 1 ? '' : 's'} with ${showtimes} showtime${showtimes === 1 ? '' : 's'}${report.dryRun ? ' would be added' : ' added'}.`);
+        if (!report.dryRun) {
+            const linked = report.imported.reduce((n, i) => n + (i.ticketsLinked || 0), 0);
+            lines.push(`${linked} ticket${linked === 1 ? '' : 's'} already sold now show${linked === 1 ? 's' : ''} which showtime ${linked === 1 ? 'it is' : 'they are'} for.`);
+        }
+        if (report.skipped.length) lines.push(`${report.skipped.length} skipped (${[...new Set(report.skipped.map((s) => s.reason))].join('; ')}).`);
+        return lines.join(' ');
+    }
+    function importDetails(report) {
+        const parts = report.imported.map((i) => `${i.title}: ${i.showtimes} showtimes`);
+        report.problems.forEach((p) => parts.push(`${p.title}: ${p.problem}`));
+        return parts.slice(0, 40).join(' \u2022 ') + (parts.length > 40 ? ` \u2022 ...and ${parts.length - 40} more` : '');
+    }
+    async function runImport() {
+        const button = $('import-btn');
+        button.disabled = true;
+        try {
+            const preview = await api('POST', '/api/events/import-from-square', { dryRun: true });
+            if (preview.imported.length === 0) {
+                await UIDialogs.showMessage({ type: 'info', title: 'Nothing new to bring in', message: importSummary(preview), details: importDetails(preview) });
+                return;
+            }
+            const go = await UIDialogs.showConfirm({
+                title: 'Bring these into IndieTix?',
+                message: `${importSummary(preview)}${preview.problems.length ? ` ${preview.problems.length} need${preview.problems.length === 1 ? 's' : ''} a look (listed below). ` : ' '}Nothing changes in Square.`,
+                details: importDetails(preview),
+                confirmText: 'Bring them in'
+            });
+            if (!go) return;
+            const result = await api('POST', '/api/events/import-from-square', { dryRun: false });
+            await UIDialogs.showMessage({ type: result.problems.length ? 'warning' : 'success', title: 'Brought in', message: importSummary(result), details: importDetails(result) });
+            await loadEvents($('event-select').value);
+        } catch (error) {
+            await UIDialogs.showMessage({ type: 'error', title: 'Could not bring items in', message: error.message, details: error.details });
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
+        $('import-btn').addEventListener('click', runImport);
         $('event-select').addEventListener('change', (e) => showEvent(e.target.value));
         $('show-archived').addEventListener('change', () => loadEvents($('event-select').value));
         $('showtime-form').addEventListener('submit', submitForm);

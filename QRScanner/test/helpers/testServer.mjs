@@ -170,6 +170,7 @@ function defaultSquareHandlers() {
         json: async () => ({ catalog_object: { ...obj, id: 'MOCK_MODIFIER_LIST_ID', ...(listData ? { modifier_list_data: listData } : {}) } })
       };
     },
+    listCatalogItems: async () => ({ ok: true, status: 200, json: async () => ({ objects: [] }) }),
     // GET / DELETE /v2/catalog/object/{id}: nothing there unless a test says so.
     getCatalogObject: async () => ({ ok: false, status: 404, json: async () => ({ errors: [{ code: 'NOT_FOUND' }] }), text: async () => 'NOT_FOUND' }),
     deleteCatalogObject: async (objectId) => ({ ok: true, status: 200, json: async () => ({ deleted_object_ids: [objectId] }), text: async () => '{}' }),
@@ -222,6 +223,7 @@ function patchFetch() {
       const types = new URL(urlStr).searchParams.get('types');
       if (types === 'CATEGORY') return squareHandlers.listCatalogCategories();
       if (types === 'CUSTOM_ATTRIBUTE_DEFINITION') return squareHandlers.listCatalogCustomAttributes();
+      if (types === 'ITEM') return squareHandlers.listCatalogItems(new URL(urlStr).searchParams.get('cursor'));
       return { ok: true, status: 200, json: async () => ({ objects: [] }) };
     }
     if (urlStr === 'https://connect.squareup.com/v2/catalog/object' && opts.method === 'POST') {

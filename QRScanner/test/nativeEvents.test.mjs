@@ -53,9 +53,21 @@ test('parseShowtimeLabel: reads the Add Movie/Event format into Chicago wall-clo
   assert.equal(parseShowtimeLabel('  Sun  01-18-2026 7:00 PM (Spacement) ').label, 'Sun 01-18-2026 7:00 PM (Spacement)');
 });
 
+test('parseShowtimeLabel: also reads what staff typed into Square by hand (real Liberty Hall labels)', () => {
+  const read = (label) => { const p = parseShowtimeLabel(label); return p && [p.startsAt, p.venue, p.descriptors.join('|')]; };
+  assert.deepEqual(read('Sat 10-10-2026 9:30PM (Little Theater)'), ['2026-10-10 21:30:00', 'Little Theater', '']);
+  assert.deepEqual(read('Fri 10-9-2026 7:00 PM (Main Auditorium)'), ['2026-10-09 19:00:00', 'Main Auditorium', '']);
+  assert.deepEqual(read('Sun 02-1-2026 7:00 PM (The Spacement)'), ['2026-02-01 19:00:00', 'The Spacement', '']);
+  assert.deepEqual(read('Wed 05-27-2026 9:00 PM (Spacement) - All Ages'), ['2026-05-27 21:00:00', 'Spacement', 'All Ages']);
+  assert.deepEqual(read('Wed 10-14-2026 8:30 PM (Main Auditorium) - 21+'), ['2026-10-14 20:30:00', 'Main Auditorium', '21+']);
+  assert.deepEqual(read('05-02-2025 2:30 PM'), ['2025-05-02 14:30:00', 'Main', '']);
+  assert.deepEqual(read('sun 01-18-2026 7:00 pm (Main)'), ['2026-01-18 19:00:00', 'Main', '']);
+});
+
 test('parseShowtimeLabel: anything else is refused, not guessed', () => {
   for (const bad of ['', 'tomorrow at 7', 'Xyz 01-18-2026 7:00 PM (Main)', 'Sun 02-30-2026 7:00 PM (Main)',
-    'Sun 13-01-2026 7:00 PM (Main)', 'Sun 01-18-2026 13:00 PM (Main)', 'Sun 01-18-2026 7:00 (Main)', 'Sun 2026-01-18 7:00 PM', null, 42]) {
+    'Sun 13-01-2026 7:00 PM (Main)', 'Sun 01-18-2026 13:00 PM (Main)', 'Sun 01-18-2026 7:00 (Main)', 'Sun 2026-01-18 7:00 PM',
+    'Sat 09-05-2026 8:30 (Main Auditorium)', null, 42]) {
     assert.equal(parseShowtimeLabel(bad), null, `${JSON.stringify(bad)} should not parse`);
   }
 });

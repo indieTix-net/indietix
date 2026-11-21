@@ -12,14 +12,19 @@ import * as squareApi from 'square-api-lib';
 // migration. Add Movie/Event then works exactly as before (Square only).
 const UNDEFINED_TABLE = '42P01';
 
-const DAYS = new Set(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+const DAYS = new Set(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
 // "Sun 01-18-2026 7:00 PM (Spacement, 21+)" -- what getMovieInfo.js /
 // getEventInfo.js formatShowtime() produce and Square shows as the modifier.
-const LABEL_PATTERN = /^([A-Za-z]{3}) (\d{2})-(\d{2})-(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)(?: \(([^()]*)\))?$/;
+// Also reads what staff have typed straight into Square (checked against all
+// 591 showtime labels on Liberty Hall's tickets, 2026-11-20): "9:30PM", a
+// one-digit day or month ("10-9-2026"), no weekday, and extras after the
+// parentheses ("(Spacement) - All Ages"). A time with no AM/PM is refused,
+// not guessed (getSquareOrders read "8:30" as 8:30 in the morning).
+const LABEL_PATTERN = /^(?:([A-Za-z]{3}) )?(\d{1,2})-(\d{1,2})-(\d{4}) (\d{1,2}):(\d{2}) ?(AM|PM)(?: ?\(([^()]*)\))?(?: ?- ?(.+))?$/i;
 
 /**
- * Parse a showtime label into the Showing's fields, or null if it isn't in
- * the format the Add Movie/Event pages produce.
+ * Parse a showtime label into the Showing's fields, or null if it can't be
+ * read without guessing.
  * @returns {{ startsAt: string, venue: string, descriptors: string[], label: string } | null}
  *   startsAt is Chicago wall-clock 'YYYY-MM-DD HH:MM:00', the same value
  *   getSquareOrders stores as QRCodeProduct.ProductDate for this label.
@@ -29,8 +34,9 @@ export function parseShowtimeLabel(label) {
   const text = label.trim().replace(/\s+/g, ' ');
   const m = LABEL_PATTERN.exec(text);
   if (!m) return null;
-  const [, day, mm, dd, yyyy, h, min, ampm, inParens] = m;
-  if (!DAYS.has(day)) return null;
+  const [, day, mm, dd, yyyy, h, min, ampmRaw, inParens, after] = m;
+  if (day !== undefined && !DAYS.has(day.toLowerCase())) return null;
+  const ampm = ampmRaw.toUpperCase();
   const month = Number(mm); const date = Number(dd); const year = Number(yyyy);
   let hour = Number(h); const minute = Number(min);
   if (month < 1 || month > 12 || hour < 1 || hour > 12 || minute > 59) return null;
@@ -39,12 +45,13 @@ export function parseShowtimeLabel(label) {
   if (ampm === 'PM' && hour !== 12) hour += 12;
   if (ampm === 'AM' && hour === 12) hour = 0;
   const parts = (inParens ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const extras = (after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const pad = (n) => String(n).padStart(2, '0');
   return {
-    startsAt: `${yyyy}-${mm}-${dd} ${pad(hour)}:${pad(minute)}:00`,
+    startsAt: `${yyyy}-${pad(month)}-${pad(date)} ${pad(hour)}:${pad(minute)}:00`,
     // Same default getSquareOrders' parseItemModifierValues uses.
     venue: parts[0] || 'Main',
-    descriptors: parts.slice(1),
+    descriptors: [...parts.slice(1), ...extras],
     label: text
   };
 }
@@ -478,5 +485,172 @@ export async function cancelShowing(pool, accessToken, eventId, showingId) {
   return { soldTickets: outcome.sold, archived, archiveError };
 }
 // ---- END SHOWTIME MANAGEMENT ----
+
+// ---- SQUARE IMPORT ----
+// One-time (re-runnable) import of a venue's existing Square ticket items
+// into its own native event tables (NATIVE_EVENTS_PLAN.md step 4), from the
+// Showtimes page. Uses only this venue's Square token and database.
+// A ticket item = not archived, with the venue's USE_QR_CODE attribute true
+// on the item or a variation (getSquareOrders' own test). Items already
+// linked are skipped, so running it again only brings in new ones.
+
+async function squareJson(accessToken, path, init) {
+  const response = await squareApi.squareFetch(accessToken, path, init);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`Square ${init?.method || 'GET'} ${path.split('?')[0]}: ${response.status}`);
+  return body;
+}
+
+async function listAll(accessToken, types) {
+  const objects = [];
+  let cursor;
+  do {
+    const page = await squareJson(accessToken, `/v2/catalog/list?types=${types}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { method: 'GET' });
+    objects.push(...(page.objects || []));
+    cursor = page.cursor;
+  } while (cursor);
+  return objects;
+}
+
+async function batchRetrieve(accessToken, ids) {
+  const objects = [];
+  for (let i = 0; i < ids.length; i += 500) {
+    const page = await squareJson(accessToken, '/v2/catalog/batch-retrieve', { method: 'POST', body: JSON.stringify({ object_ids: ids.slice(i, i + 500) }) });
+    objects.push(...(page.objects || []));
+  }
+  return objects;
+}
+
+// The value of a named custom attribute on the item, else on its first
+// variation that has it (same order getSquareOrders reads them).
+function attributeOf(item, name) {
+  const all = [item.custom_attribute_values, ...(item.item_data?.variations || []).map((v) => v.custom_attribute_values)];
+  for (const values of all) {
+    for (const attr of Object.values(values || {})) if (attr?.name === name) return attr;
+  }
+  return null;
+}
+
+function isTicketItem(item, useQrName) {
+  if (item.type !== 'ITEM' || item.is_deleted || item.item_data?.is_archived) return false;
+  const all = [item.custom_attribute_values, ...(item.item_data?.variations || []).map((v) => v.custom_attribute_values)];
+  return all.some((values) => Object.values(values || {}).some((a) => a?.name === useQrName && a.boolean_value === true));
+}
+
+/**
+ * @param {object} config the venue's configuration (USE_QR_CODE, EVENT_TYPE,
+ *   DISTRIBUTOR_NAME, MODIFIER_NAME_FILTER, ROOM_CAPACITY)
+ * @param {{ dryRun: boolean }} options dryRun = report only, write nothing
+ * @returns {Promise<{ dryRun, imported: [...], skipped: [...], problems: [...] }>}
+ */
+export async function importFromSquare(pool, accessToken, config, { dryRun = true } = {}) {
+  const useQrName = config.USE_QR_CODE || 'UseQRCode';
+  const eventTypeName = config.EVENT_TYPE || 'EventType';
+  const distributorName = config.DISTRIBUTOR_NAME || 'Distributor';
+  const listFilter = String(config.MODIFIER_NAME_FILTER || 'Show Time').toLowerCase();
+
+  let linkedItems;
+  try {
+    linkedItems = new Set((await pool.query(
+      `SELECT "ExternalID" FROM "ExternalCatalogLink" WHERE "Provider" = 'square' AND "EntityType" = 'event' AND "ExternalType" = 'ITEM' AND "DeletedAt" IS NULL`)).rows.map((r) => r.ExternalID));
+  } catch (error) { throw wrapMissingTables(error); }
+
+  const items = (await listAll(accessToken, 'ITEM')).filter((item) => isTicketItem(item, useQrName));
+  const definitions = await listAll(accessToken, 'CUSTOM_ATTRIBUTE_DEFINITION');
+  const selectionName = (attr) => {
+    const uid = attr?.selection_uid_values?.[0];
+    if (!uid) return null;
+    const def = definitions.find((d) => d.id === attr.custom_attribute_definition_id);
+    return def?.custom_attribute_definition_data?.selection_config?.allowed_selections?.find((s) => s.uid === uid)?.name || null;
+  };
+  const listIds = [...new Set(items.flatMap((i) => (i.item_data?.modifier_list_info || []).map((m) => m.modifier_list_id)))];
+  const lists = new Map((listIds.length ? await batchRetrieve(accessToken, listIds) : []).map((o) => [o.id, o]));
+
+  const report = { dryRun, imported: [], skipped: [], problems: [] };
+  for (const item of items) {
+    const title = item.item_data?.name || item.id;
+    if (linkedItems.has(item.id)) { report.skipped.push({ title, reason: 'already in IndieTix' }); continue; }
+    const itemLists = (item.item_data?.modifier_list_info || []).map((m) => lists.get(m.modifier_list_id)).filter(Boolean);
+    const showtimeList = itemLists.find((l) => String(l.modifier_list_data?.name || '').toLowerCase().includes(listFilter))
+      || (itemLists.length === 1 ? itemLists[0] : null);
+    if (!showtimeList) { report.skipped.push({ title, reason: 'no showtime list found on the item' }); continue; }
+
+    const showings = [];
+    const unreadable = [];
+    for (const modifier of showtimeList.modifier_list_data?.modifiers || []) {
+      const parsed = parseShowtimeLabel(modifier.modifier_data?.name);
+      if (parsed) showings.push({ ...parsed, modifierId: modifier.id, ordinal: modifier.modifier_data?.ordinal ?? 0 });
+      else unreadable.push(modifier.modifier_data?.name || modifier.id);
+    }
+    showings.sort((a, b) => a.ordinal - b.ordinal);
+    if (unreadable.length) report.problems.push({ title, problem: `showtime text not understood, left out (its sales are still ticketed, but flagged): ${unreadable.join('; ')}` });
+
+    const eventType = selectionName(attributeOf(item, eventTypeName));
+    const variations = (item.item_data?.variations || []).filter((v) => !v.is_deleted);
+    const plan = {
+      title,
+      kind: eventType && eventType.toLowerCase() === 'movie' ? 'movie' : 'event',
+      eventType,
+      distributor: selectionName(attributeOf(item, distributorName)),
+      description: item.item_data?.description_plaintext || null,
+      ticketTypes: variations.map((v) => ({ name: v.item_variation_data?.name || 'Ticket', price: (v.item_variation_data?.price_money?.amount ?? 0) / 100, variationId: v.id })),
+      showings,
+      itemId: item.id,
+      modifierListId: showtimeList.id
+    };
+    if (dryRun) {
+      report.imported.push({ title, kind: plan.kind, showtimes: showings.length, ticketTypes: plan.ticketTypes.map((t) => t.name) });
+      continue;
+    }
+    try {
+      const result = await saveImportedEvent(pool, plan, config.ROOM_CAPACITY);
+      report.imported.push({ title, kind: plan.kind, showtimes: showings.length, ticketTypes: plan.ticketTypes.map((t) => t.name), eventId: result.eventId, ticketsLinked: result.ticketsLinked });
+    } catch (error) {
+      report.problems.push({ title, problem: `not imported: ${error.message}` });
+    }
+  }
+  return report;
+}
+
+async function saveImportedEvent(pool, plan, roomCapacities) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const eventId = (await client.query(
+      `INSERT INTO "Event" ("Kind", "Title", "EventType", "Distributor", "Description", "Status", "CreatedBy") VALUES ($1, $2, $3, $4, $5, 'active', 'square-import') RETURNING "ID"`,
+      [plan.kind, plan.title, plan.eventType, plan.distributor, plan.description])).rows[0].ID;
+    const link = (type, id, extType, extId) => client.query(
+      `INSERT INTO "ExternalCatalogLink" ("EntityType", "EntityID", "Provider", "ExternalType", "ExternalID") VALUES ($1, $2, 'square', $3, $4)`, [type, id, extType, extId]);
+    await link('event', eventId, 'ITEM', plan.itemId);
+    await link('event', eventId, 'MODIFIER_LIST', plan.modifierListId);
+    for (const [i, t] of plan.ticketTypes.entries()) {
+      const id = (await client.query(`INSERT INTO "TicketType" ("EventID", "Name", "PriceCents", "SortOrder") VALUES ($1, $2, $3, $4) RETURNING "ID"`,
+        [eventId, t.name, Math.round(t.price * 100), i])).rows[0].ID;
+      await link('ticket_type', id, 'ITEM_VARIATION', t.variationId);
+    }
+    let ticketsLinked = 0;
+    for (const s of plan.showings) {
+      const id = (await client.query(
+        `INSERT INTO "Showing" ("EventID", "StartsAt", "Venue", "Descriptors", "Label", "Capacity") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "ID"`,
+        [eventId, s.startsAt, s.venue, s.descriptors.join(', '), s.label, roomCapacity(roomCapacities, s.venue)])).rows[0].ID;
+      await link('showing', id, 'MODIFIER', s.modifierId);
+      // Tickets already sold for this showtime get their ShowingID.
+      const updated = await client.query(
+        `UPDATE "QRCodeProduct" SET "ShowingID" = $1
+         WHERE "ShowingID" IS NULL AND "ProductMetadata" @> jsonb_build_object('modifiers', jsonb_build_array(jsonb_build_object('catalog_object_id', $2::text)))`,
+        [id, s.modifierId]);
+      ticketsLinked += updated.rowCount;
+    }
+    await client.query('COMMIT');
+    return { eventId, ticketsLinked };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error.code === '23505') throw new Error('one of its Square objects is already linked to another IndieTix event');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+// ---- END SQUARE IMPORT ----
 
 // ---- END NATIVE EVENTS ----
