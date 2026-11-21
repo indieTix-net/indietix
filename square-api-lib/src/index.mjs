@@ -158,13 +158,14 @@ export async function archiveItem(accessToken, itemId) {
       throw new Error(`Could not retrieve item ${itemId} for archiving`);
     }
 
-    // Use snake_case for REST API
+    // The WHOLE object goes back (2026-11-20): it used to send only type, id,
+    // version and item_data, which risks Square dropping the item's custom
+    // attributes (UseQRCode) and locations, so an item later unarchived
+    // could sell without making tickets.
     const updatePayload = {
       idempotency_key: `archive-${itemId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       object: {
-        type: 'ITEM',
-        id: itemId,
-        version: currentItem.object.version,
+        ...currentItem.object,
         item_data: {
           ...currentItem.object.item_data,
           is_archived: true
@@ -189,6 +190,27 @@ export async function archiveItem(accessToken, itemId) {
     console.error(`Error archiving item ${itemId}:`, error);
     throw error;
   }
+}
+
+/**
+ * Undo archiveItem: re-read the item, then save the WHOLE object back (custom
+ * attributes such as UseQRCode, locations, modifier lists) with
+ * is_archived: false. Used when a showtime is added to an archived event.
+ * @returns {Promise<object>} Square's response body from the update
+ */
+export async function unarchiveItem(accessToken, itemId) {
+  const currentItem = await retrieveCatalogObject(accessToken, itemId);
+  if (!currentItem.object) throw new Error(`Could not retrieve item ${itemId} for unarchiving`);
+  const response = await squareFetch(accessToken, '/v2/catalog/object', {
+    method: 'POST',
+    body: JSON.stringify({
+      idempotency_key: `unarchive-${itemId}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      object: { ...currentItem.object, item_data: { ...currentItem.object.item_data, is_archived: false } }
+    })
+  });
+  if (!response.ok) throw new Error(`Failed to unarchive item ${itemId}: ${response.status} ${await response.text()}`);
+  console.log(`Unarchived item: ${itemId}`);
+  return response.json();
 }
 
 /**

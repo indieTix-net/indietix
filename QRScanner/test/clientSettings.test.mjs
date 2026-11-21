@@ -226,7 +226,7 @@ test('PUT /api/client: every USER_DEFINABLE key from clientSetup-Teardown is acc
   assert.ok(keys.length > 50, 'should have found the onboarding list');
   // Keys the save route validates get a well-formed value; the rest just 'x'.
   const ticketTypes = JSON.stringify([{ name: 'Adult', price: '12.50' }]);
-  const wellFormed = { SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2' }, MOVIE_TICKET_TYPES: ticketTypes, EVENT_TICKET_TYPES: ticketTypes };
+  const wellFormed = { SALES_TAX_RATE: '9.3', SCREEN_NUMBERS: { little: '2' }, ROOM_CAPACITY: { 'Main Auditorium': 300 }, MOVIE_TICKET_TYPES: ticketTypes, EVENT_TICKET_TYPES: ticketTypes };
   const configuration = Object.fromEntries(keys.map((key) => [key, wellFormed[key] ?? 'x']));
   const { status, json } = await ctx.request('PUT', '/api/client', {
     token: ctx.clientToken,
@@ -234,6 +234,23 @@ test('PUT /api/client: every USER_DEFINABLE key from clientSetup-Teardown is acc
   });
   assert.equal(status, 200);
   assert.equal(json.ignoredKeys, undefined, `not accepted: ${json.ignoredKeys}`);
+});
+
+// ---- ROOM_CAPACITY: seats per room for new showings ----
+
+test('PUT /api/client: ROOM_CAPACITY saves whole seat counts per room, and rejects anything else', async () => {
+  const save = (ROOM_CAPACITY) => ctx.request('PUT', '/api/client', {
+    token: ctx.clientToken,
+    body: { contactName: 'Test Contact', clientEmail: 'contact@example.com', configuration: { ROOM_CAPACITY } }
+  });
+  assert.equal((await save({ 'Main Auditorium': 300, 'Little Theater': '90' })).status, 200);
+  const stored = await ctx.pgClient.query(`SELECT "configuration"->'ROOM_CAPACITY' AS rc FROM "Client"`);
+  assert.deepEqual(stored.rows[0].rc, { 'Main Auditorium': 300, 'Little Theater': '90' });
+  for (const bad of [['not', 'an object'], { 'Main Auditorium': 'lots' }, { 'Main Auditorium': -5 }, { 'Main Auditorium': 12.5 }, { ' ': 10 }]) {
+    const { status, json } = await save(bad);
+    assert.equal(status, 400, JSON.stringify(bad));
+    assert.match(json.message, /seat|Room/i);
+  }
 });
 
 // ---- box-office report settings: SALES_TAX_RATE and SCREEN_NUMBERS ----

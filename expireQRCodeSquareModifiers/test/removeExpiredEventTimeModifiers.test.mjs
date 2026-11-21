@@ -112,7 +112,7 @@ test('removeExpiredEventTimeModifiers (via processClientModifiers): ALL modifier
   // archiveItem's own retrieveCatalogObject(itemId) call.
   route(
     (url, method) => method === 'GET' && url.includes('item-2'),
-    { object: { id: 'item-2', version: 1, item_data: { name: 'Old Movie', is_archived: false } } }
+    { object: { type: 'ITEM', id: 'item-2', version: 1, item_data: { name: 'Old Movie', is_archived: false } } }
   );
   // archiveItem's POST to update the item.
   route(

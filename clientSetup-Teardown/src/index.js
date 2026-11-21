@@ -1168,6 +1168,7 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       "EVENT_TYPE": "EventType",
       "EVENT_LOCATIONS": ["Main Auditorium"],
       "SALES_TAX_RATE": "",                                   // optional: percent included in ticket prices, split out of Gross in box-office reports (blank = no tax)
+      "ROOM_CAPACITY": {},                                    // optional: {"room name": seats}; each new showing starts with its room's seats (blank/missing = no limit). Rooms are EVENT_LOCATIONS
       "SCREEN_NUMBERS": {},                                   // optional: {"text in a ticket's venue": "screen number"} for box-office reports; no match = screen 1
       "MOVIE_TICKET_TYPES": "",                               // optional: JSON [{"name":"Adult","price":"12.50"}] for Add Movie's ticket types (blank = Child 10.00, Adult 12.50, Senior 11.00)
       "EVENT_TICKET_TYPES": "",                               // optional: same for Add Event (blank = Regular 0.00)
@@ -1319,6 +1320,7 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
         "EVENT_LOCATIONS",
         "SALES_TAX_RATE",
         "SCREEN_NUMBERS",
+        "ROOM_CAPACITY",
         "MOVIE_TICKET_TYPES",
         "EVENT_TICKET_TYPES",
         "MOVIE_DISTRIBUTOR",

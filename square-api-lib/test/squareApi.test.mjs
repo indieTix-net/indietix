@@ -7,6 +7,7 @@ import {
   deleteCatalogObject,
   upsertCatalogObject,
   archiveItem,
+  unarchiveItem,
   squareFetch,
   uploadCatalogImage
 } from '../src/index.mjs';
@@ -107,9 +108,9 @@ test('upsertCatalogObject: POSTs the request body as given', async () => {
   assert.deepEqual(calls[0].body, request);
 });
 
-test('archiveItem: re-reads the item, then saves it back at that version with is_archived true', async () => {
+test('archiveItem: re-reads the item, then saves the whole object back at that version with is_archived true', async () => {
   responder = (call) => call.method === 'GET'
-    ? jsonResponse({ object: { id: 'ITEM1', version: 42, item_data: { name: 'The Glass Orchard', is_archived: false } } })
+    ? jsonResponse({ object: { type: 'ITEM', id: 'ITEM1', version: 42, present_at_location_ids: ['LOC1'], custom_attribute_values: { indietix_use_qr: { boolean_value: true } }, item_data: { name: 'The Glass Orchard', is_archived: false } } })
     : jsonResponse({ catalog_object: { id: 'ITEM1' } });
 
   await archiveItem('tok', 'ITEM1');
@@ -124,6 +125,8 @@ test('archiveItem: re-reads the item, then saves it back at that version with is
     type: 'ITEM',
     id: 'ITEM1',
     version: 42,
+    present_at_location_ids: ['LOC1'],
+    custom_attribute_values: { indietix_use_qr: { boolean_value: true } },
     item_data: { name: 'The Glass Orchard', is_archived: true }
   });
 });
@@ -203,4 +206,26 @@ test('squareFetch: uses an injected fetch instead of the global one', async () =
   assert.equal(injected.length, 1);
   assert.equal(injected[0].url, 'https://connect.squareup.com/oauth2/token');
   assert.equal(calls.length, 0, 'global fetch not used');
+});
+
+test('unarchiveItem: re-reads the item and saves the whole object back with is_archived false', async () => {
+  const item = {
+    type: 'ITEM', id: 'ITEM1', version: 43, present_at_location_ids: ['LOC1'],
+    custom_attribute_values: { indietix_use_qr: { boolean_value: true } },
+    item_data: { name: 'The Glass Orchard', is_archived: true, modifier_list_info: [{ modifier_list_id: 'ML1' }] }
+  };
+  responder = (call) => call.method === 'GET' ? jsonResponse({ object: item }) : jsonResponse({ catalog_object: { id: 'ITEM1' } });
+
+  await unarchiveItem('tok', 'ITEM1');
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].body.idempotency_key, /^unarchive-ITEM1-/);
+  assert.deepEqual(calls[1].body.object, { ...item, item_data: { ...item.item_data, is_archived: false } });
+});
+
+test('unarchiveItem: a Square failure throws', async () => {
+  responder = (call) => call.method === 'GET'
+    ? jsonResponse({ object: { type: 'ITEM', id: 'ITEM1', version: 1, item_data: {} } })
+    : jsonResponse({ errors: [] }, { ok: false, status: 400 });
+  await assert.rejects(unarchiveItem('tok', 'ITEM1'), /Failed to unarchive item ITEM1: 400/);
 });

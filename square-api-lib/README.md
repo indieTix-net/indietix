@@ -13,7 +13,7 @@ Every Lambda that talked to Square built its own URLs and auth headers: about 50
 - `squareFetch(accessToken, path, init, { fetch })`: the base for every call. Builds the URL from `SQUARE_API_BASE` + `path` (query string included), adds `Authorization: Bearer <token>`, adds `Content-Type: application/json` when there's a string body, and returns Square's **raw Response**. Callers keep their own `response.ok` handling, which legitimately differs by call site (throw, return `"Unknown"`, send a 400/500 to the browser).
   - Pass `null` as the token for the OAuth token endpoint (`/oauth2/token`), which authenticates with the app's client secret in the body.
   - The optional 4th argument injects a fetch implementation (squareTokenRefresher's tests do).
-- Catalog helpers: `retrieveCatalogObject`, `deleteCatalogObject`, `upsertCatalogObject`, `archiveItem` (all throw on non-OK), and `uploadCatalogImage` (multipart `POST /v2/catalog/images`, "file" then "request" part; returns the raw Response).
+- Catalog helpers: `retrieveCatalogObject`, `deleteCatalogObject`, `upsertCatalogObject`, `archiveItem`, `unarchiveItem` (sends the whole item back; all throw on non-OK), and `uploadCatalogImage` (multipart `POST /v2/catalog/images`, "file" then "request" part; returns the raw Response).
 - `squareApiBase()`: `SQUARE_API_BASE` (sandbox) or Square's production address, read on every call.
 - `isSquareSandbox()`: whether that base is Square's sandbox (QRScanner uses it for dashboard links and the OAuth page).
 
@@ -37,6 +37,7 @@ Not in it, on purpose: `infrastructure/lib/square-webhook.py` (a Python deploy-t
 
 - **Poster upload transport.** QRScanner used `form-data`'s `.submit()` over raw `https`; this uses `fetch` with a native `FormData`. Same parts, same order, same auth. It also made the upload testable for the first time (QRScanner's `squareItemCreation` tests). **Verify a poster upload against the Square sandbox before the first production deploy.**
 - **`Content-Type` on bodyless GETs.** Some call sites sent `Content-Type: application/json` on GETs with no body; `squareFetch` sends it only with a body. Square ignores it either way.
+- **`archiveItem` sends the whole item back (2026-11-20).** It used to send only `type`, `id`, `version` and `item_data`. Checked against the Square sandbox that day: Square then **drops the item's custom attributes (UseQRCode, Distributor, EventType) and its location list**. So every item the nightly expiry job archived in production lost its ticket flag; unarchived in Square's dashboard and sold again, it would make no tickets. `unarchiveItem` (new) sends the whole item too; both keep everything (sandbox-verified).
 - **A null/undefined token** leaves the `Authorization` header off instead of sending `Bearer undefined`. Square answers 401 to both.
 
 ## Tests

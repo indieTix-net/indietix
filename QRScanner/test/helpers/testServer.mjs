@@ -170,6 +170,9 @@ function defaultSquareHandlers() {
         json: async () => ({ catalog_object: { ...obj, id: 'MOCK_MODIFIER_LIST_ID', ...(listData ? { modifier_list_data: listData } : {}) } })
       };
     },
+    // GET / DELETE /v2/catalog/object/{id}: nothing there unless a test says so.
+    getCatalogObject: async () => ({ ok: false, status: 404, json: async () => ({ errors: [{ code: 'NOT_FOUND' }] }), text: async () => 'NOT_FOUND' }),
+    deleteCatalogObject: async (objectId) => ({ ok: true, status: 200, json: async () => ({ deleted_object_ids: [objectId] }), text: async () => '{}' }),
     batchCreateInventory: async () => ({
       ok: true,
       status: 200,
@@ -224,6 +227,11 @@ function patchFetch() {
     if (urlStr === 'https://connect.squareup.com/v2/catalog/object' && opts.method === 'POST') {
       return squareHandlers.createCatalogObject(JSON.parse(opts.body));
     }
+    if (urlStr.startsWith('https://connect.squareup.com/v2/catalog/object/')) {
+      const objectId = new URL(urlStr).pathname.split('/').pop();
+      if (opts.method === 'DELETE') return squareHandlers.deleteCatalogObject(objectId);
+      if (!opts.method || opts.method === 'GET') return squareHandlers.getCatalogObject(objectId);
+    }
     if (urlStr === 'https://connect.squareup.com/v2/catalog/images' && opts.method === 'POST') {
       return squareHandlers.uploadCatalogImage(opts.body, opts.headers);
     }
@@ -238,6 +246,10 @@ function patchFetch() {
     if (urlStr.startsWith('https://www.omdbapi.com/') || urlStr.startsWith('https://img.omdbapi.com/')) {
       omdbCalls.push(urlStr);
       return omdbHandler(new URL(urlStr));
+    }
+    // Never let a test reach the real Square.
+    if (urlStr.startsWith('https://connect.squareup.com/')) {
+      throw new Error(`Unmocked Square call in a test: ${opts.method || 'GET'} ${urlStr}`);
     }
     return realFetch(url, opts);
   };

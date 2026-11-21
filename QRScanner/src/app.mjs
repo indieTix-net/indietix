@@ -27,7 +27,7 @@ import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, even
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
 import { buildZip } from './utils/zip.mjs';
-import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent } from './utils/native-events.mjs';
+import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing } from './utils/native-events.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -2442,7 +2442,7 @@ const CLIENT_SETTINGS_KEYS = [
   'TICKET_FILENAME', 'SENDER_EMAIL', 'OWNER_BCC_EMAIL', 'WALKUP_PHONE', 'ONE_PER_EMAIL_ITEMS',
   'LEGAL_NAME', 'LEGAL_SHORT_NAME', 'LEGAL_ADDRESS', 'LEGAL_PHONE', 'LEGAL_EMAIL',
   'LEGAL_STATE', 'LEGAL_COURT_COUNTY', 'SALES_TAX_RATE', 'SCREEN_NUMBERS',
-  'MOVIE_TICKET_TYPES', 'EVENT_TICKET_TYPES', 'MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR',
+  'MOVIE_TICKET_TYPES', 'EVENT_TICKET_TYPES', 'MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR', 'ROOM_CAPACITY',
   'META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID', 'META_IG_BUSINESS_ID', 'TIKTOK_ACCESS_TOKEN',
   'TIKTOK_REFRESH_TOKEN', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_PRIVACY_LEVEL'
 ];
@@ -2497,6 +2497,9 @@ function validateReportSettings(configuration) {
       return `${label} ticket types need a name and a price like 12.50 on each row (up to 20, no repeated names)`;
     }
   }
+  // Seats per room for new showings (ROOM CAPACITY in utils/native-events.mjs)
+  const roomCapacityError = validateRoomCapacity(configuration.ROOM_CAPACITY);
+  if (roomCapacityError) return roomCapacityError;
   for (const key of ['MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR']) {
     if (configuration[key] !== undefined && configuration[key] !== null && String(configuration[key]).length > 255) {
       return 'A distributor name can be up to 255 characters';
@@ -3610,7 +3613,7 @@ app.get('/api/public/status', async (req, res) => {
 // GET /api/client (client.configuration) so callers only change the URL.
 // (GET /api/client itself is client-login-only: Client Settings is the
 // master account's page.)
-const UI_CONFIG_KEYS = ['EVENT_LOCATIONS', 'EVENT_DESCRIPTORS', 'SHOWTIME_BUFFER_MINUTES', 'USERS_NAMES'];
+const UI_CONFIG_KEYS = ['EVENT_LOCATIONS', 'EVENT_DESCRIPTORS', 'SHOWTIME_BUFFER_MINUTES', 'USERS_NAMES', 'ROOM_CAPACITY'];
 
 app.get('/api/client/ui-config', requireAuth, requirePermission(...PERMS_DOOR), async (req, res) => {
   try {
@@ -5440,7 +5443,8 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       posterUrl: movieData.posterUrl,
       createdBy: req.user.username,
       ticketTypes: ticketSettings.ticketTypes,
-      showings: parsedShowings
+      showings: parsedShowings,
+      roomCapacities: globalConfig.ROOM_CAPACITY
     });
     // ---- END NATIVE EVENTS draft ----
 
@@ -5949,7 +5953,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       posterUrl: eventData.posterUrl,
       createdBy: req.user.username,
       ticketTypes: ticketSettings.ticketTypes,
-      showings: parsedShowings
+      showings: parsedShowings,
+      roomCapacities: globalConfig.ROOM_CAPACITY
     });
     // ---- END NATIVE EVENTS draft ----
 
@@ -6364,6 +6369,74 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     if (nativePool) await nativePool.end().catch(() => {});
   }
 });
+
+// ---- SHOWTIME MANAGEMENT ROUTES ----
+// The Showtimes page (showtimes.html). Logic and rules live in
+// utils/native-events.mjs (SHOWTIME MANAGEMENT); these only open the venue's
+// database, load its settings and map errors. Same permission as Add Movie.
+async function withShowtimePool(req, res, work) {
+  let pool;
+  try {
+    pool = await createClientDbConnection(req.user.dbName);
+    await getClientConfiguration(pool, req.user.dbName);
+    const result = await work(pool, globalConfig);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ShowtimeError) return res.status(error.status).json({ error: error.message });
+    console.error('Showtime management error:', error);
+    res.status(500).json({ error: 'Could not update the showtime', details: error.message });
+  } finally {
+    if (pool) await pool.end().catch(() => {});
+  }
+}
+function showtimeIds(req) {
+  const eventId = Number(req.params.eventId);
+  const showingId = req.params.showingId === undefined ? undefined : Number(req.params.showingId);
+  if (!Number.isInteger(eventId) || eventId < 1 || (showingId !== undefined && (!Number.isInteger(showingId) || showingId < 1))) {
+    throw new ShowtimeError(404, 'Not found');
+  }
+  return { eventId, showingId };
+}
+function requireSquareToken(config) {
+  if (!config.SQUARE_ACCESS_TOKEN) throw new ShowtimeError(500, 'Square API not configured');
+  return config.SQUARE_ACCESS_TOKEN;
+}
+
+app.get('/api/events', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool) => ({ events: await listEvents(pool, { includeArchived: req.query.archived === '1' }) })));
+
+app.get('/api/events/:eventId', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool) => ({ event: await getEventWithShowings(pool, showtimeIds(req).eventId) })));
+
+app.post('/api/events/:eventId/showings', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId } = showtimeIds(req);
+    const { label, capacity, heldSeats } = req.body || {};
+    const added = await addShowing(pool, requireSquareToken(config), eventId, { label, capacity, heldSeats }, { roomCapacities: config.ROOM_CAPACITY });
+    return { success: true, ...added, event: await getEventWithShowings(pool, eventId) };
+  }));
+
+app.put('/api/events/:eventId/showings/:showingId', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId, showingId } = showtimeIds(req);
+    const edited = await editShowing(pool, requireSquareToken(config), eventId, showingId, { label: req.body?.label });
+    return { success: true, ...edited, event: await getEventWithShowings(pool, eventId) };
+  }));
+
+app.put('/api/events/:eventId/showings/:showingId/seats', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool) => {
+    const { eventId, showingId } = showtimeIds(req);
+    const seats = await setShowingSeats(pool, eventId, showingId, { capacity: req.body?.capacity, heldSeats: req.body?.heldSeats });
+    return { success: true, ...seats, event: await getEventWithShowings(pool, eventId) };
+  }));
+
+app.post('/api/events/:eventId/showings/:showingId/cancel', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId, showingId } = showtimeIds(req);
+    const cancelled = await cancelShowing(pool, requireSquareToken(config), eventId, showingId);
+    return { success: true, ...cancelled, event: await getEventWithShowings(pool, eventId) };
+  }));
+// ---- END SHOWTIME MANAGEMENT ROUTES ----
 
 // app_mjs_insights_endpoint.js
 // Add this endpoint to your app.mjs file
