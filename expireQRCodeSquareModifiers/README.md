@@ -1,6 +1,6 @@
 # expireQRCodeSquareModifiers
 
-**Last Edited:** 2026-10-28
+**Last Edited:** 2026-11-21
 
 Scheduled Lambda that keeps a venue's Square catalog clean: removes showtime modifiers for showtimes that have already happened, and archives Square items whose entire run has completed. Node 22, ESM.
 
@@ -17,6 +17,8 @@ Runs on a schedule (an EventBridge rule — check your deployment's actual cron 
 ## Why archiving, not deleting
 
 Square's Catalog Search API still returns archived items by default (`item_data.is_archived === true` on the object) — archiving isn't the same as hiding from every query. `filterItemsByCustomAttribute()` explicitly skips already-archived items when picking candidates for further processing, so a venue's catalog doesn't accumulate repeat-processing of the same already-done items. (The exact same class of bug — forgetting to filter out archived items — has shown up independently in QRScanner's own marketing item search; if you're touching either, worth checking the other.)
+
+**Archiving keeps the item whole (fixed 2026-11-20 in `square-api-lib`).** The old archive call sent only part of the item, and Square dropped what was left out, including the `UseQRCode` custom attribute and the item's locations. `archiveItem` now sends the whole item with `is_archived: true`, and `unarchiveItem` reverses it (used by QRScanner's Showtimes page). Items this job archived in production before the fix have lost those attributes.
 
 ## Config fields this Lambda reads
 

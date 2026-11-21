@@ -67,7 +67,7 @@ Deletes, in order: the Secrets Manager secret (and the venue's Connect Square re
 ## Key files
 
 - `src/index.js` — everything. `createDatabaseObjects` is the canonical schema definition; `insertClientRecord`'s `configuration` object is the canonical default config for a new client — if you're ever unsure what either should look like, this file is the answer, not a running database.
-- `src/migrations.sql` — idempotent, append-only migration batches that bring *existing* clients up to whatever `createDatabaseObjects` already does for new ones. Must stay in sync by hand; nothing enforces that automatically.
+- `src/migrations.sql` — idempotent, append-only migration batches that bring *existing* clients up to whatever `createDatabaseObjects` already does for new ones. Must stay in sync by hand; nothing enforces that automatically. The 2026-11-20 blocks add `NoTicketOrder` and the native event tables (`Event`, `TicketType`, `Showing`, `ExternalCatalogLink`, `QRCodeProduct.ShowingID`); a new client gets them from `createDatabaseObjects`.
 - `nodejs/` — the Lambda layer (`node_modules`) for this function.
 
 ## Conventions worth knowing before changing this file
