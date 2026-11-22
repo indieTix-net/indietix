@@ -6,8 +6,6 @@
 (function () {
     const API_URL = window.INDIETIX_API_URL;
     let rooms = [];
-    let descriptors = [];
-    let roomCapacity = {};
     let currentEvent = null;
     let editingShowingId = null;
 
@@ -36,58 +34,15 @@
         return node;
     }
 
-    // Same text Add Movie / Add Event make: "Sun 01-18-2026 7:00 PM (Room, extra)"
-    function formatShowtime(dateString, timeString, location, extras) {
-        const date = new Date(`${dateString}T${timeString}`);
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        let hours = date.getHours();
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        const place = extras.length ? `${location}, ${extras.join(', ')}` : location;
-        return `${days[date.getDay()]} ${month}-${day}-${date.getFullYear()} ${hours}:${minutes} ${ampm} (${place})`;
-    }
-
     // "2026-11-21 21:30:00" -> { date: "2026-11-21", time: "21:30" }
     function splitStartsAt(startsAt) {
         return { date: startsAt.slice(0, 10), time: startsAt.slice(11, 16) };
     }
 
-    function seatsForRoom(room) {
-        const key = Object.keys(roomCapacity).find((r) => r.trim().toLowerCase() === String(room).trim().toLowerCase());
-        const seats = key === undefined ? '' : roomCapacity[key];
-        return seats === null || seats === undefined ? '' : String(seats);
-    }
-
+    // Rooms, extras and room seats come from the shared showtime form
+    // (showtime-form.js), the same one Add Movie and Add Event use.
     async function loadSettings() {
-        try {
-            const data = await api('GET', '/api/client/ui-config');
-            const config = data.client?.configuration || {};
-            rooms = Array.isArray(config.EVENT_LOCATIONS) && config.EVENT_LOCATIONS.length ? config.EVENT_LOCATIONS : ['Main Auditorium'];
-            descriptors = Array.isArray(config.EVENT_DESCRIPTORS) ? config.EVENT_DESCRIPTORS : [];
-            roomCapacity = config.ROOM_CAPACITY && typeof config.ROOM_CAPACITY === 'object' ? config.ROOM_CAPACITY : {};
-        } catch (error) {
-            rooms = ['Main Auditorium'];
-        }
-        const select = $('showtime-location');
-        select.replaceChildren(el('option', null, 'Choose a room...'));
-        select.firstChild.value = '';
-        rooms.forEach((room) => { const o = el('option', null, room); o.value = room; select.appendChild(o); });
-        const box = $('descriptors-checkboxes');
-        box.replaceChildren();
-        descriptors.forEach((d, i) => {
-            const wrap = el('span', 'descriptor-checkbox');
-            const input = el('input');
-            input.type = 'checkbox'; input.id = `descriptor-${i}`; input.value = d;
-            input.addEventListener('change', updatePreview);
-            const label = el('label', null, d);
-            label.htmlFor = input.id;
-            wrap.append(input, label);
-            box.appendChild(wrap);
-        });
-        $('descriptors-row').style.display = descriptors.length ? 'block' : 'none';
+        rooms = (await ShowtimeForm.load({ onChange: updatePreview })).rooms;
     }
 
     async function loadEvents(selectId) {
@@ -209,13 +164,9 @@
         cap.focus();
     }
 
-    function selectedExtras() {
-        return Array.from(document.querySelectorAll('#descriptors-checkboxes input:checked')).map((i) => i.value);
-    }
-
+    // The item's own style: extras inside the brackets for movies, after a dash for events.
     function currentLabel() {
-        const date = $('showtime-date').value; const time = $('showtime-time').value; const room = $('showtime-location').value;
-        return date && time && room ? formatShowtime(date, time, room, selectedExtras()) : '';
+        return ShowtimeForm.currentLabel(currentEvent?.kind);
     }
 
     function updatePreview() {
@@ -256,10 +207,9 @@
     async function submitForm(event) {
         event.preventDefault();
         if (!currentEvent) return;
-        if (!$('showtime-date').value) return UIDialogs.fieldError($('showtime-date'), 'Choose a date.');
-        if (!$('showtime-time').value) return UIDialogs.fieldError($('showtime-time'), 'Choose a time.');
-        if (!$('showtime-location').value) return UIDialogs.fieldError($('showtime-location'), 'Choose a room.');
-        const label = currentLabel();
+        const form = ShowtimeForm.read(currentEvent.kind);
+        if (!form) return;
+        const label = form.label;
         const button = $('form-submit');
         button.disabled = true;
         try {
@@ -267,7 +217,7 @@
             if (editingShowingId) {
                 data = await api('PUT', `/api/events/${currentEvent.id}/showings/${editingShowingId}`, { label });
             } else {
-                data = await api('POST', `/api/events/${currentEvent.id}/showings`, { label, capacity: $('showtime-capacity').value.trim(), heldSeats: $('showtime-held').value.trim() });
+                data = await api('POST', `/api/events/${currentEvent.id}/showings`, { label, capacity: form.capacity === null ? '' : String(form.capacity), heldSeats: String(form.heldSeats) });
             }
             stopEditing();
             renderEvent(data.event);
@@ -367,10 +317,7 @@
         $('showtime-form').addEventListener('submit', submitForm);
         $('form-cancel-edit').addEventListener('click', stopEditing);
         ['showtime-date', 'showtime-time'].forEach((id) => $(id).addEventListener('input', updatePreview));
-        $('showtime-location').addEventListener('change', () => {
-            if (!editingShowingId) $('showtime-capacity').value = seatsForRoom($('showtime-location').value);
-            updatePreview();
-        });
+        $('showtime-location').addEventListener('change', updatePreview); // seats follow the room in showtime-form.js
         await loadSettings();
         await loadEvents(new URLSearchParams(location.search).get('event'));
     });

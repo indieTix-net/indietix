@@ -27,7 +27,7 @@ import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, even
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
 import { buildZip } from './utils/zip.mjs';
-import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare, showingsForTickets, syncShowingSales } from './utils/native-events.mjs';
+import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare, showingsForTickets, syncShowingSales, readShowtimeSeats } from './utils/native-events.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -1435,6 +1435,9 @@ app.get('/api/orders', requireAuth, requirePermission(...PERMS_ORDERS), async (r
   try {
     const { search, startDate, endDate } = req.query;
     console.log('GET /api/orders — search:', search, 'dates:', { startDate, endDate });
+    // ---- ORDER <-> TICKET LINKS: ?order=<Order.ID> lists just that order ----
+    const onlyOrderId = orderIdParam(req.query.order);
+    if (onlyOrderId === false) return res.status(400).json({ error: 'order must be an order number from this list' });
 
     userPool = await createDbConnection(req.user.dbName);
 
@@ -1471,6 +1474,11 @@ app.get('/api/orders', requireAuth, requirePermission(...PERMS_ORDERS), async (r
       end.setHours(23, 59, 59, 999);
       dateClause = ` AND o."CreatedDate" <= $${queryParams.length + 1}`;
       queryParams.push(end);
+    }
+
+    if (onlyOrderId) {
+      dateClause += ` AND o."ID" = $${queryParams.length + 1}`;
+      queryParams.push(onlyOrderId);
     }
 
     // --- data-filter JOIN + WHERE (sub-users only, conditional) ---
@@ -1584,6 +1592,9 @@ app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (r
   try {
     const { search, startDate, endDate } = req.query;
     console.log('Search query:', search);
+    // ---- ORDER <-> TICKET LINKS: ?order=<Order.ID> lists that order's tickets ----
+    const onlyOrderId = orderIdParam(req.query.order);
+    if (onlyOrderId === false) return res.status(400).json({ error: 'order must be an order number from this list' });
     console.log('Date range:', { startDate, endDate });
     
     // Add debug logging here
@@ -1616,6 +1627,11 @@ app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (r
       });
     }
     
+    if (onlyOrderId) {
+      // onlyOrderId is a validated positive integer, so inlining it is safe.
+      andConditions.push({ id: { [Sequelize.Op.in]: Sequelize.literal(`(SELECT "QRCodeProductID" FROM "QRCodeProductToOrder" WHERE "OrderID" = ${onlyOrderId})`) } });
+    }
+
     // Add date range filtering if provided
     if (startDate || endDate) {
       let dateCondition = {};
@@ -1738,9 +1754,11 @@ app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (r
     // Attach who refunded each ticket an order refund invalidated (ORDER REFUND ATTRIBUTION)
     const refundedIds = products.filter(p => p.status === 'refunded').map(p => Number(p.id));
     const orderRefunds = await getOrderRefundsForTickets(QRCodeProduct.sequelize, refundedIds);
+    const ticketOrders = await getOrdersForTickets(QRCodeProduct.sequelize, products.map(p => Number(p.id)));
     const tickets = products.map(p => {
       const orderRefund = orderRefunds.get(Number(p.id));
-      return orderRefund ? { ...p, orderRefund } : p;
+      const order = ticketOrders.get(Number(p.id)) || null;
+      return orderRefund ? { ...p, order, orderRefund } : { ...p, order };
     });
     res.json(paging ? { tickets, total, page: paging.page, pageSize: paging.pageSize } : tickets);
   } catch (error) {
@@ -3774,6 +3792,32 @@ app.post('/api/checkout', requireAuth, requirePermission(...PERMS_DOOR), async (
 // Those tickets show who refunded them and why, and can't be marked valid
 // again. Tickets marked invalid by hand ("Mark as Invalid") aren't listed,
 // so they can still be toggled back.
+// ---- ORDER <-> TICKET LINKS ----
+// The Tickets and Orders pages link to each other: a ticket row's order
+// number opens order.html?order=<Order.ID>; an order's number opens
+// products.html?order=<Order.ID> (all of its tickets). Both list routes take
+// ?order= and still apply the caller's data filter, so a link never shows a
+// sub-user anything their filter hides.
+/** undefined = not asked; a positive integer; false = a bad value. */
+function orderIdParam(value) {
+  if (value === undefined || value === '') return undefined;
+  return /^[1-9][0-9]{0,9}$/.test(String(value)) ? Number(value) : false;
+}
+/** Map of ticket ID -> { id: Order.ID, number: Order.OrderID (Square's order id) }. */
+async function getOrdersForTickets(sequelizeInstance, ticketIds) {
+  const orders = new Map();
+  if (!ticketIds.length) return orders;
+  const rows = await sequelizeInstance.query(
+    `SELECT pto."QRCodeProductID" AS "ticketId", o."ID" AS "id", o."OrderID" AS "number"
+     FROM "QRCodeProductToOrder" pto JOIN "Order" o ON o."ID" = pto."OrderID"
+     WHERE pto."QRCodeProductID" IN (:ticketIds)`,
+    { replacements: { ticketIds }, type: Sequelize.QueryTypes.SELECT }
+  );
+  for (const row of rows) orders.set(Number(row.ticketId), { id: row.id, number: row.number });
+  return orders;
+}
+// ---- END ORDER <-> TICKET LINKS ----
+
 async function getOrderRefundsForTickets(sequelizeInstance, ticketIds) {
   const refunds = new Map();
   if (!ticketIds.length) return refunds;
@@ -5417,6 +5461,14 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
         details: `Expected the form "Sun 01-18-2026 7:00 PM (Main Theater)": ${unreadableShowtimes.join('; ')}`
       });
     }
+    // Seats typed per showtime on the shared showtime form (optional).
+    let showtimeSeats;
+    try {
+      showtimeSeats = readShowtimeSeats(movieData.showtimeSeats, movieData.showtimes);
+    } catch (error) {
+      if (error instanceof ShowtimeError) return res.status(400).json({ error: 'Seats not understood', details: error.message });
+      throw error;
+    }
     
     // 1. Check if item already exists
     const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
@@ -5470,6 +5522,7 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       createdBy: req.user.username,
       ticketTypes: ticketSettings.ticketTypes,
       showings: parsedShowings,
+      seats: showtimeSeats,
       roomCapacities: globalConfig.ROOM_CAPACITY
     });
     // ---- END NATIVE EVENTS draft ----
@@ -5927,6 +5980,14 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
         details: `Expected the form "Sun 01-18-2026 7:00 PM (Main Theater)": ${unreadableShowtimes.join('; ')}`
       });
     }
+    // Seats typed per showtime on the shared showtime form (optional).
+    let showtimeSeats;
+    try {
+      showtimeSeats = readShowtimeSeats(eventData.showtimeSeats, eventData.showtimes);
+    } catch (error) {
+      if (error instanceof ShowtimeError) return res.status(400).json({ error: 'Seats not understood', details: error.message });
+      throw error;
+    }
     
     // 1. Check if item already exists
     const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
@@ -5980,6 +6041,7 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       createdBy: req.user.username,
       ticketTypes: ticketSettings.ticketTypes,
       showings: parsedShowings,
+      seats: showtimeSeats,
       roomCapacities: globalConfig.ROOM_CAPACITY
     });
     // ---- END NATIVE EVENTS draft ----

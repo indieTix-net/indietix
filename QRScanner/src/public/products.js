@@ -23,6 +23,23 @@ document.addEventListener('DOMContentLoaded', function() {
     let listArgs = ['', '', ''];
     const listPager = window.createListPager({ pageSize: 100, onChange: () => loadEvents(...listArgs) });
 
+    // ---- ORDER <-> TICKET LINKS ----
+    // products.html?order=<Order.ID> (from an order's number on the Orders
+    // page) shows all of that order's tickets, whatever the dates. Each ticket's
+    // order number links back to order.html?order=<Order.ID>.
+    const orderParam = new URLSearchParams(window.location.search).get('order');
+    const orderFilter = /^[1-9][0-9]*$/.test(orderParam || '') ? orderParam : null;
+    function escapeLinkText(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function orderCell(order) {
+        if (!order) return '<span class="text-muted">None</span>';
+        const number = escapeLinkText(order.number || order.id);
+        const canOpen = !window.HeaderLoader?.canAccessPage || window.HeaderLoader.canAccessPage('/order.html');
+        return canOpen ? `<a href="order.html?order=${encodeURIComponent(order.id)}" title="Open this order">${number}</a>` : number;
+    }
+    // ---- END ORDER <-> TICKET LINKS ----
+
     // Date filter elements
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
@@ -489,6 +506,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize date filters and load events when page loads
     initializeDateFilters();
+    // An order's tickets can be for any date: start without a date range.
+    if (orderFilter) { startDateInput.value = ''; endDateInput.value = ''; }
     initializeColumnVisibility();
     console.log('About to call loadEvents for initial load with todays date');
     loadEvents(searchInput.value, startDateInput.value, endDateInput.value);
@@ -543,7 +562,8 @@ document.addEventListener('DOMContentLoaded', function() {
         listArgs = [searchTerm, startDate, endDate];
         params.append('page', listPager.page);
         params.append('pageSize', listPager.pageSize);
-        
+        if (orderFilter) params.append('order', orderFilter);
+
         if (searchTerm) {
             params.append('search', searchTerm);
         }
@@ -584,9 +604,16 @@ document.addEventListener('DOMContentLoaded', function() {
             
             loadingIndicator.style.display = 'none';
             console.log("Products received:", products);
-            
+
             if (!products.length && products.count !== undefined) {
                 products = products.qrcodes || [];
+            }
+            if (orderFilter) {
+                const number = products.find(p => p.order)?.order?.number;
+                document.getElementById('order-filter-text').textContent = products.length
+                    ? `Showing the ${products.length} ticket${products.length === 1 ? '' : 's'} on order ${number || orderFilter}.`
+                    : 'No tickets found for this order.';
+                document.getElementById('order-filter-banner').hidden = false;
             }
             
             if (products.length === 0) {
@@ -596,7 +623,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                 productsTableBody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="text-center">${noResultsMessage}</td>
+                        <td colspan="10" class="text-center">${noResultsMessage}</td>
                     </tr>
                 `;
                 mobileCardsContainer.innerHTML = `
@@ -653,6 +680,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td data-column="phone">${customerPhoneNumber}</td>
                     <td data-column="price">${eventPrice}</td>
                     <td data-column="expiration">${expirationDate}</td>
+                    <td data-column="order-number">${orderCell(product.order)}</td>
                     <td class="action-cell">
                         ${refundNote || `<div class="dropdown">
                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle action-dropdown-btn"
@@ -742,6 +770,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             <dt data-column="expiration">Expires</dt>
                             <dd data-column="expiration">${expirationDate}</dd>
+
+                            <dt data-column="order-number">Order</dt>
+                            <dd data-column="order-number">${orderCell(product.order)}</dd>
                         </dl>
                     </div>
                     
@@ -880,7 +911,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadingIndicator.style.display = 'none';
             productsTableBody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="text-center text-danger">
+                    <td colspan="10" class="text-center text-danger">
                         Error loading events: ${error.message}. Please try again.
                     </td>
                 </tr>

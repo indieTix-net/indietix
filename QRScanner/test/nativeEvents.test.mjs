@@ -218,6 +218,35 @@ test('Add Event: an unreadable showtime is refused before anything is created', 
   assert.equal(await count('Event'), 0);
 });
 
+// ---- seats typed on the shared showtime form ----
+
+test('Add Movie: seats typed per showtime are saved (blank capacity = no limit); without them each showing gets its room\'s seats', async () => {
+  const { status, json } = await createMovie(movieBody({ showtimeSeats: [{ capacity: 120, heldSeats: 4 }, { capacity: null, heldSeats: 0 }] }));
+  assert.equal(status, 200, JSON.stringify(json));
+  assert.deepEqual(await rows(`SELECT "Label", "Capacity", "HeldSeats" FROM "Showing" ORDER BY "StartsAt"`), [
+    { Label: SHOWTIMES[0], Capacity: 120, HeldSeats: 4 },
+    { Label: SHOWTIMES[1], Capacity: null, HeldSeats: 0 }
+  ]);
+});
+
+test('Add Event: seats that break the rules, or don\'t match the showtimes, are refused before anything is created', async () => {
+  const creates = countSquareCreates();
+  for (const showtimeSeats of [[{ capacity: 10, heldSeats: 11 }], [{ capacity: 'lots', heldSeats: 0 }], [{ capacity: 10, heldSeats: 0 }, { capacity: 10, heldSeats: 0 }], 'all of them']) {
+    const { status, json } = await createEvent(eventBody({ showtimeSeats }));
+    assert.equal(status, 400, JSON.stringify(showtimeSeats));
+    assert.equal(json.error, 'Seats not understood');
+  }
+  assert.deepEqual(creates, []);
+  assert.equal(await count('Event'), 0);
+});
+
+test('Add Event: the dash style the shared form uses for events ("(Room) - extra") is saved with its room and extras', async () => {
+  squareHandlers.listCatalogCategories = async () => ({ ok: true, status: 200, json: async () => ({ objects: [{ id: 'MOCK_CAT_EVENTS', category_data: { name: 'Events' } }] }) });
+  const { status, json } = await createEvent(eventBody({ showtimes: ['Sun 11-22-2026 7:00 PM (Spacement) - All Ages - 21+'] }));
+  assert.equal(status, 200, JSON.stringify(json));
+  assert.deepEqual(await rows(`SELECT "Venue", "Descriptors" FROM "Showing"`), [{ Venue: 'Spacement', Descriptors: 'All Ages, 21+' }]);
+});
+
 // Last: drops the tables.
 test('a venue database without the native event tables still creates Square items exactly as before', async () => {
   for (const table of ['ExternalCatalogLink', 'Showing', 'TicketType', 'Event']) await ctx.pgClient.query(`DROP TABLE "${table}"`);

@@ -37,7 +37,9 @@ test('GET /api/products: rows match the model exactly (dates formatted the same 
   const { status, json } = await ctx.request('GET', '/api/products', { token: ctx.clientToken });
   assert.equal(status, 200);
   const expected = (await QRCodeProduct.findAll({ order: [['id', 'DESC']] })).map(p => p.toJSON());
-  assert.deepEqual(json, JSON.parse(JSON.stringify(expected)));
+  // Plus each ticket's order (ORDER <-> TICKET LINKS; these have none).
+  assert.deepEqual(json.map(t => t.order), [null, null, null]);
+  assert.deepEqual(json.map(({ order, ...rest }) => rest), JSON.parse(JSON.stringify(expected)));
   assert.match(json[0].productDate, /^March 1[45], 2026 at /); // the getter's text (exact time depends on the machine's time zone)
 });
 

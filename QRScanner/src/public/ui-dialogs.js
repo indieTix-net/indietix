@@ -75,10 +75,11 @@
                 group.append(inputEl, inputError);
                 body.appendChild(group);
             }
-            // Optional link (e.g. "View in Square"); http(s) only
-            if (link && /^https?:\/\//i.test(link.href || '')) {
-                const linkEl = el('a', '', link.text || link.href);
-                linkEl.href = link.href;
+            // Optional link, or a list of them (e.g. "View in Square"); http(s) only
+            for (const one of (Array.isArray(link) ? link : (link ? [link] : []))) {
+                if (!/^https?:\/\//i.test(one.href || '')) continue;
+                const linkEl = el('a', '', one.text || one.href);
+                linkEl.href = one.href;
                 linkEl.target = '_blank';
                 linkEl.rel = 'noopener';
                 const linkP = el('p', 'mt-3 mb-0');

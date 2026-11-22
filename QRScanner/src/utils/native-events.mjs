@@ -45,7 +45,8 @@ export function parseShowtimeLabel(label) {
   if (ampm === 'PM' && hour !== 12) hour += 12;
   if (ampm === 'AM' && hour === 12) hour = 0;
   const parts = (inParens ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const extras = (after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  // Add Event joins several extras with " - " ("(Spacement) - All Ages - 21+").
+  const extras = (after ?? '').split(/,| - /).map((s) => s.trim()).filter(Boolean);
   const pad = (n) => String(n).padStart(2, '0');
   return {
     startsAt: `${yyyy}-${pad(month)}-${pad(date)} ${pad(hour)}:${pad(minute)}:00`,
@@ -91,10 +92,12 @@ export async function createDraftEvent(pool, e) {
       ticketTypeIds.push(row.rows[0].ID);
     }
     const showingIds = [];
-    for (const s of e.showings) {
+    for (const [i, s] of e.showings.entries()) {
+      // Seats typed on Add Movie/Event (already checked by readShowtimeSeats), else the room's.
+      const seats = e.seats?.[i] || { capacity: roomCapacity(e.roomCapacities, s.venue), heldSeats: 0 };
       const row = await client.query(
-        `INSERT INTO "Showing" ("EventID", "StartsAt", "Venue", "Descriptors", "Label", "Capacity") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "ID"`,
-        [eventId, s.startsAt, s.venue, s.descriptors.join(', '), s.label, roomCapacity(e.roomCapacities, s.venue)]
+        `INSERT INTO "Showing" ("EventID", "StartsAt", "Venue", "Descriptors", "Label", "Capacity", "HeldSeats") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING "ID"`,
+        [eventId, s.startsAt, s.venue, s.descriptors.join(', '), s.label, seats.capacity, seats.heldSeats]
       );
       showingIds.push(row.rows[0].ID);
     }
@@ -276,6 +279,24 @@ export async function getEventWithShowings(pool, eventId) {
       }))
     };
   } catch (error) { throw wrapMissingTables(error); }
+}
+
+/**
+ * Add Movie / Add Event's optional seats, one entry per showtime (the shared
+ * showtime form sends them). Missing = the room's seats. Same rules as the
+ * Showtimes page. Throws ShowtimeError(400) naming the showtime.
+ */
+export function readShowtimeSeats(seats, labels) {
+  if (seats === undefined || seats === null) return undefined;
+  if (!Array.isArray(seats) || seats.length !== labels.length) throw new ShowtimeError(400, 'Seats must be given for every showtime, or for none');
+  return seats.map((s, i) => {
+    if (s === null || s === undefined) return undefined;
+    try {
+      return readSeats(s);
+    } catch (error) {
+      throw new ShowtimeError(400, `${labels[i]}: ${error.message}`);
+    }
+  });
 }
 
 // Capacity / held seats as typed: '' or null capacity = no limit.

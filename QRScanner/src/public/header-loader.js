@@ -817,7 +817,9 @@
         getUserType,
         isClientUser,
         getPermissions,
-        getLandingPage
+        getLandingPage,
+        // Whether this user may open a page (e.g. before linking to it).
+        canAccessPage: (path) => canAccessRule(getPageRule(path))
     };
     
     console.log('Header loader initialized with persistent caching and role-based menus');

@@ -22,6 +22,19 @@ document.addEventListener('DOMContentLoaded', function() {
     let listArgs = ['', '', ''];
     const listPager = window.createListPager({ pageSize: 100, onChange: () => loadOrders(...listArgs) });
 
+    // ---- ORDER <-> TICKET LINKS ----
+    // order.html?order=<Order.ID> (from a ticket's order number on the Tickets
+    // page) shows just that order, whatever the dates. Each order's number
+    // links to products.html?order=<Order.ID>: all of its tickets.
+    const orderParam = new URLSearchParams(window.location.search).get('order');
+    const orderFilter = /^[1-9][0-9]*$/.test(orderParam || '') ? orderParam : null;
+    function orderNumberLink(id, orderID) {
+        const number = String(orderID ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const canOpen = !window.HeaderLoader?.canAccessPage || window.HeaderLoader.canAccessPage('/products.html');
+        return canOpen && id ? `<a href="products.html?order=${encodeURIComponent(id)}" title="See this order's tickets">${number}</a>` : number;
+    }
+    // ---- END ORDER <-> TICKET LINKS ----
+
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
     const applyDateFilterButton = document.getElementById('apply-date-filter');
@@ -755,6 +768,8 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
     // Initialize column visibility and date filters, then load orders
     initializeColumnVisibility();
     initializeDateFilters();
+    // One order, whenever it was placed: start without a date range.
+    if (orderFilter) { startDateInput.value = ''; endDateInput.value = ''; }
     loadClientConfiguration(); // Load user names for refund dropdown
     console.log('About to call loadOrders for initial load with todays date');
     loadOrders(searchInput.value, startDateInput.value, endDateInput.value);
@@ -809,7 +824,8 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
         listArgs = [searchTerm, startDate, endDate];
         params.append('page', listPager.page);
         params.append('pageSize', listPager.pageSize);
-        
+        if (orderFilter) params.append('order', orderFilter);
+
         if (searchTerm) {
             params.append('search', searchTerm);
         }
@@ -854,6 +870,12 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
                 resultLimit = orders.limit;
                 if (orders.total !== undefined) listPager.update(orders.total, orders.page, orders.pageSize);
                 orders = orders.orders || [];
+            }
+            if (orderFilter) {
+                document.getElementById('order-filter-text').textContent = orders.length
+                    ? `Showing order ${orders[0].OrderID || orders[0].orderID || orderFilter}.`
+                    : 'This order wasn’t found.';
+                document.getElementById('order-filter-banner').hidden = false;
             }
 
             if (orders.length === 0) {
@@ -911,7 +933,7 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
                 const row = document.createElement('tr');
                 
                	row.innerHTML = `
-    <td class="column-cell" data-column="order-id">${orderID}</td>
+    <td class="column-cell" data-column="order-id">${orderNumberLink(id, orderID)}</td>
     <td class="column-cell" data-column="created-date">${formatDate(createdDate)}</td>
     <td class="column-cell" data-column="customer-name">${customerName}</td>
     <td class="column-cell" data-column="email">${emailAddress}</td>
@@ -1014,7 +1036,7 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
     <div class="card-details">
         <dl>
             <dt data-column="order-id">Order ID</dt>
-            <dd data-column="order-id">${orderID}</dd>
+            <dd data-column="order-id">${orderNumberLink(id, orderID)}</dd>
             
             <dt data-column="email">Email Address</dt>
             <dd data-column="email">${emailAddress}</dd>

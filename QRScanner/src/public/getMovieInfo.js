@@ -17,157 +17,42 @@ let bufferMinutes = 15;  // Default, will be loaded from config
 
 // Load event locations and descriptors from client configuration
 async function loadEventLocations() {
-    try {
-        const response = await fetch(`${API_URL}/api/client/ui-config`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Failed to load client configuration');
-        }
-        
-        const data = await response.json();
-        const config = data.client?.configuration || {};
-        
-        // Get EVENT_LOCATIONS array, default to these locations if not set
-        eventLocations = config.EVENT_LOCATIONS || ['Main Auditorium', 'Little Theater', 'Spacement'];
-        
-        // Populate location dropdown
-        const locationSelect = document.getElementById('showtime-location');
-        locationSelect.innerHTML = '<option value="">Select location...</option>';
-        
-        eventLocations.forEach(location => {
-            const option = document.createElement('option');
-            option.value = location;
-            option.textContent = location;
-            locationSelect.appendChild(option);
-        });
-        
-        console.log('Event locations loaded:', eventLocations);
-        
-        // Get EVENT_DESCRIPTORS array, default to empty if not set
-        eventDescriptors = config.EVENT_DESCRIPTORS || [];
-        
-        // Populate descriptor checkboxes
-        const descriptorsCheckboxes = document.getElementById('descriptors-checkboxes');
-        const descriptorsRow = document.getElementById('descriptors-row');
-        
-        if (eventDescriptors.length > 0) {
-            descriptorsCheckboxes.innerHTML = eventDescriptors.map((descriptor, index) => `
-                <div class="descriptor-checkbox">
-                    <input type="checkbox" id="descriptor-${index}" value="${descriptor}">
-                    <label for="descriptor-${index}">${descriptor}</label>
-                </div>
-            `).join('');
-            descriptorsRow.style.display = 'block';
-        } else {
-            descriptorsRow.style.display = 'none';
-        }
-        
-        console.log('Event descriptors loaded:', eventDescriptors);
-        
-    } catch (error) {
-        console.error('Error loading event locations:', error);
-        // Use default locations as fallback
-        eventLocations = ['Main Auditorium', 'Little Theater', 'Spacement'];
-        eventDescriptors = [];
-        
-        const locationSelect = document.getElementById('showtime-location');
-        locationSelect.innerHTML = '<option value="">Select location...</option>';
-        eventLocations.forEach(location => {
-            const option = document.createElement('option');
-            option.value = location;
-            option.textContent = location;
-            locationSelect.appendChild(option);
-        });
-    }
+    // Rooms, extras and room seats from Client Settings, through the shared
+    // showtime form (showtime-form.js) the Showtimes page uses too.
+    const settings = await ShowtimeForm.load();
+    eventLocations = settings.rooms;
+    eventDescriptors = settings.descriptors;
 }
 
-// Format a date/time/location/descriptors combo into Square modifier format
-// Format: "DayOfWeek MM-DD-YYYY HH:MM AM/PM (Location, descriptor1, descriptor2)"
-// Example: "Sun 01-18-2026 7:00 PM (Spacement, All ages, Closed Captioned)"
-// Or without descriptors: "Sun 01-18-2026 7:00 PM (Spacement)"
+// The showtime as Square shows it; see showtime-form.js (movies put extras
+// inside the brackets, as Add Movie always has).
 function formatShowtime(dateString, timeString, location, descriptors = []) {
-    const date = new Date(`${dateString}T${timeString}`);
-    
-    // Get day of week (short form)
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayOfWeek = days[date.getDay()];
-    
-    // Format date as MM-DD-YYYY
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const year = date.getFullYear();
-    const formattedDate = `${month}-${day}-${year}`;
-    
-    // Format time as HH:MM AM/PM
-    let hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12; // Convert to 12-hour format
-    const formattedTime = `${hours}:${minutes} ${ampm}`;
-    
-    // Build location/descriptor part
-    let locationPart = location;
-    if (descriptors && descriptors.length > 0) {
-        locationPart += ', ' + descriptors.join(', ');
-    }
-    
-    // Combine into final format
-    return `${dayOfWeek} ${formattedDate} ${formattedTime} (${locationPart})`;
+    return ShowtimeForm.formatShowtime(dateString, timeString, location, descriptors, 'movie');
 }
 
 // Add a showtime to the list
 function addShowtime() {
-    const dateInput = document.getElementById('showtime-date');
-    const timeInput = document.getElementById('showtime-time');
-    const locationSelect = document.getElementById('showtime-location');
-    
-    const date = dateInput.value;
-    const time = timeInput.value;
-    const location = locationSelect.value;
-    
-    // Validate inputs
-    if (!date) return UIDialogs.fieldError(dateInput, 'Choose a date.');
-    if (!time) return UIDialogs.fieldError(timeInput, 'Choose a time.');
-    if (!location) return UIDialogs.fieldError(locationSelect, 'Choose a location.');
-    
-    // Get selected descriptors (optional)
-    const descriptorCheckboxes = document.querySelectorAll('#descriptors-checkboxes input[type="checkbox"]:checked');
-    const descriptors = Array.from(descriptorCheckboxes).map(cb => cb.value);
-    
-    // Format the showtime with descriptors
-    const formatted = formatShowtime(date, time, location, descriptors);
-    
-    // Add to showtimes array
-    const showtimeObj = {
-        date,
-        time,
-        location,
-        descriptors,
-        formatted
-    };
-    
-    showtimes.push(showtimeObj);
-    
-    // Clear time input only (keep date and location for next showtime)
-    timeInput.value = '';
-    
-    // Uncheck all descriptor checkboxes
-    descriptorCheckboxes.forEach(cb => cb.checked = false);
-    
-    // Re-render showtimes list
+    // Read and check date, time, room, extras and seats (shared showtime form).
+    const form = ShowtimeForm.read('movie');
+    if (!form) return;
+    if (showtimes.some(st => st.formatted === form.label)) {
+        UIDialogs.fieldError(document.getElementById('showtime-date'), 'That showtime is already in the list.');
+        return;
+    }
+    showtimes.push({
+        date: form.date,
+        time: form.time,
+        location: form.room,
+        descriptors: form.extras,
+        formatted: form.label,
+        capacity: form.capacity,
+        heldSeats: form.heldSeats
+    });
+    // Keep date and room for the next one; seats back to the room's.
+    ShowtimeForm.clearForNext();
     renderShowtimesList();
-    
-    // Update timeline to show newly added showtime
     renderTimeline();
     checkConflicts();
-    
-    // Hide warning if showtimes exist
     updateSquareButtonWarning();
 }
 
@@ -193,6 +78,7 @@ function renderShowtimesList() {
         <div class="showtime-item">
             <div class="showtime-item-info">
                 ${showtime.formatted}
+                <small class="text-muted">(${ShowtimeForm.describeSeats(showtime.capacity, showtime.heldSeats)})</small>
             </div>
             <div class="showtime-item-actions">
                 <button class="btn btn-sm btn-danger" onclick="removeShowtime(${index})">
@@ -831,7 +717,8 @@ async function createSquareItem() {
             production: production,
             plot: plot,
             posterUrl: posterUrl,
-            showtimes: showtimes.map(st => st.formatted)
+            showtimes: showtimes.map(st => st.formatted),
+            showtimeSeats: showtimes.map(st => ({ capacity: st.capacity, heldSeats: st.heldSeats }))
         };
         
         console.log('Creating Square item with data:', movieData);
@@ -873,7 +760,10 @@ async function createSquareItem() {
             type: 'success',
             title: 'Movie created in Square',
             message: `${data.message || 'The movie item was created.'}\n\nOne more step: in Square, set this item's fulfillment to Pickup only (turn off Shipping and Delivery).`,
-            link: data.squareUrl ? { href: data.squareUrl, text: 'View in Square' } : undefined
+            link: [
+                ...(data.squareUrl ? [{ href: data.squareUrl, text: 'View in Square' }] : []),
+                ...(data.eventId ? [{ href: new URL(`showtimes.html?event=${data.eventId}`, window.location.href).href, text: 'Manage its showtimes' }] : [])
+            ]
         });
         
         // Clear showtimes after successful creation
