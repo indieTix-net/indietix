@@ -613,7 +613,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('order-filter-text').textContent = products.length
                     ? `Showing the ${products.length} ticket${products.length === 1 ? '' : 's'} on order ${number || orderFilter}.`
                     : 'No tickets found for this order.';
-                document.getElementById('order-filter-banner').hidden = false;
+                document.getElementById('order-filter-banner').style.display = 'flex'; // not [hidden]: Bootstrap's d-flex would override it
             }
             
             if (products.length === 0) {

@@ -875,7 +875,7 @@ async function handlePrintOrderTicketsClick(orderId, orderID) {
                 document.getElementById('order-filter-text').textContent = orders.length
                     ? `Showing order ${orders[0].OrderID || orders[0].orderID || orderFilter}.`
                     : 'This order wasn’t found.';
-                document.getElementById('order-filter-banner').hidden = false;
+                document.getElementById('order-filter-banner').style.display = 'flex'; // not [hidden]: Bootstrap's d-flex would override it
             }
 
             if (orders.length === 0) {
