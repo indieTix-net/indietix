@@ -8,7 +8,7 @@ Scheduled Lambda that keeps a venue's Square catalog clean: removes showtime mod
 
 Runs on a schedule (an EventBridge rule — check your deployment's actual cron expression rather than assuming one here). On each run:
 
-1. Connects to the shared Aurora cluster's `postgres` maintenance database (a system catalog every cluster has, not any one client's own database) to discover every client database that exists — this is how it finds "every venue," without a separate routing table.
+1. Connects (with the cluster's master login: `DB_ADMIN_SECRET_ARN`/`DB_HOST` in a bootstrap environment, the `indieTix/rds/clients/indietix/credentials` secret in production) to the shared Aurora cluster's `postgres` maintenance database (a system catalog every cluster has, not any one client's own database) to discover every client database that exists — this is how it finds "every venue," without a separate routing table.
 2. For each client, reads its `Client.configuration` from Secrets Manager / its own database and skips it entirely if `SQUARE_ACCESS_TOKEN` is missing.
 3. Fetches Square catalog items in that venue's configured categories (`TARGET_CATEGORIES`, comma-separated, default `Cinema,Events`) with the ticketed-item attribute set (`USE_QR_CODE` attribute name, default `UseQRCode`; `USE_QR_CODE_VALUE`, default `"true"`).
 4. For each item, inspects its showtime modifiers (filtered by name via `MODIFIER_NAME_FILTER`, default `"Show Times"`) and parses the date/time embedded in each modifier's name (`MM-DD-YYYY H:MM AM/PM`, assumed Chicago time — the same format IndieTix's own Add Movie/Add Event flow generates). A modifier is considered expired once its showtime is more than **5 hours** in the past, not the instant it passes — a deliberate grace window.
