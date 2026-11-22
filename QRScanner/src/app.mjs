@@ -5381,28 +5381,24 @@ async function createTicketAttribute(accessToken, name, spec) {
 }
 // ---- END SQUARE TICKET ITEM SETUP ----
 
-// UPDATED ENDPOINT for app.mjs
-// This replaces the existing app.post('/api/square/create-movie-item', ...) endpoint
+// ---- CREATE TICKET ITEM (Movie Info Lookup / Event Info Entry) ----
+// One handler for both pages (they were two ~500-line copies until
+// 2026-11-22; the movie one was taken as the reference). What differs by kind
+// is in TICKET_ITEM_KINDS; everything else is the same for movies and events.
+//
+// POST /api/square/create-movie-item  { movieData, createCalendarEvents, userTimezone }
+// POST /api/square/create-event-item  { eventData, createCalendarEvents, userTimezone }
+//   data: { title, description, posterUrl?, imdbID? (movies), runtime? (movies),
+//           showtimes: ["Sun 01-18-2026 7:00 PM (Spacement)", ...],
+//           showtimeSeats?: [{ capacity, heldSeats }, ...] }
+const TICKET_ITEM_KINDS = {
+  movie: { bodyKey: 'movieData', category: 'Cinema', calendarConfigKey: 'CINEMA_CALENDAR_ID', kitchenNames: false },
+  // Events' showtimes carry Square's "Kitchen Name" (the time), as Add Event always set.
+  event: { bodyKey: 'eventData', category: 'Events', calendarConfigKey: 'EVENT_CALENDAR_ID', kitchenNames: true }
+};
 
-// UPDATED ENDPOINT for app.mjs
-// This replaces the existing app.post('/api/square/create-movie-item', ...) endpoint
-
-/**
- * Create a movie item in Square catalog with showtimes as modifiers
- * POST /api/square/create-movie-item
- * 
- * Request body:
- * {
- *   movieData: {
- *     title: string,
- *     description: string,
- *     imdbID: string,
- *     posterUrl: string (optional),
- *     showtimes: string[] // Array of formatted showtimes like "Sun 01-18-2026 7:00 PM (Spacement)"
- *   }
- * }
- */
-app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit'), async (req, res) => {
+async function createTicketItem(req, res, kind) {
+  const spec = TICKET_ITEM_KINDS[kind];
   let clientPool;
   // NATIVE EVENTS: IndieTix's own copy, saved as a draft before Square is touched
   let nativePool = null;
@@ -5423,10 +5419,13 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
   };
   
   try {
-    const { movieData } = req.body;
+    const data = req.body[spec.bodyKey];
+    if (!data || typeof data !== 'object') return res.status(400).json({ error: `${spec.bodyKey} is required` });
+    // Square idempotency keys / temporary ids: the IMDb id for a movie, else the title.
+    const idempotencyBase = data.imdbID || String(data.title || kind).replace(/[^A-Za-z0-9]+/g, '-').slice(0, 60);
     
-    console.log(`Creating Square item for movie: ${movieData.title}`);
-    console.log(`Showtimes: ${movieData.showtimes?.length || 0}`);
+    console.log(`Creating Square item for ${kind}: ${data.title}`);
+    console.log(`Showtimes: ${data.showtimes?.length || 0}`);
     
     // Get client configuration
     clientPool = await createClientDbConnection(req.user.dbName);
@@ -5445,7 +5444,7 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     }
     
     // Validate showtimes
-    if (!movieData.showtimes || movieData.showtimes.length === 0) {
+    if (!data.showtimes || data.showtimes.length === 0) {
       return res.status(400).json({ 
         error: 'At least one showtime is required',
         details: 'Please add showtimes before creating the item'
@@ -5453,8 +5452,8 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     }
 
     // ---- NATIVE EVENTS: every showtime must be readable ----
-    const parsedShowings = movieData.showtimes.map(parseShowtimeLabel);
-    const unreadableShowtimes = movieData.showtimes.filter((label, i) => !parsedShowings[i]);
+    const parsedShowings = data.showtimes.map(parseShowtimeLabel);
+    const unreadableShowtimes = data.showtimes.filter((label, i) => !parsedShowings[i]);
     if (unreadableShowtimes.length > 0) {
       return res.status(400).json({
         error: 'A showtime could not be read',
@@ -5464,7 +5463,7 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     // Seats typed per showtime on the shared showtime form (optional).
     let showtimeSeats;
     try {
-      showtimeSeats = readShowtimeSeats(movieData.showtimeSeats, movieData.showtimes);
+      showtimeSeats = readShowtimeSeats(data.showtimeSeats, data.showtimes);
     } catch (error) {
       if (error instanceof ShowtimeError) return res.status(400).json({ error: 'Seats not understood', details: error.message });
       throw error;
@@ -5478,7 +5477,7 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
         query: {
           exact_query: {
             attribute_name: 'name',
-            attribute_value: movieData.title
+            attribute_value: data.title
           }
         }
       })
@@ -5492,33 +5491,33 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       });
     }
     
-    // 2. Find (or create) the Cinema category
-    const cinemaCategoryId = await findOrCreateSquareCategory(accessToken, 'Cinema');
-    if (!cinemaCategoryId) {
-      return res.status(500).json({ error: 'Could not find or create the Cinema category in Square' });
+    // 2. Find (or create) the kind's category (Cinema / Events)
+    const categoryId = await findOrCreateSquareCategory(accessToken, spec.category);
+    if (!categoryId) {
+      return res.status(500).json({ error: `Could not find or create the ${spec.category} category in Square` });
     }
    
     // 3. Find (or create) the ticket custom attributes -- see SQUARE TICKET ITEM SETUP
-    const ticketSettings = ticketItemSettings(globalConfig, 'movie');
+    const ticketSettings = ticketItemSettings(globalConfig, kind);
     const ticketAttributes = await ensureTicketAttributes(accessToken, ticketSettings);
     if (ticketAttributes.error) {
       return res.status(500).json({ error: ticketAttributes.error });
     }
     const { useQRCodeKey, onlineDisplayNameKey, eventTypeKey, distributorKey, distributorSelectionUid } = ticketAttributes;
-    const eventTypeMovieSelectionUid = ticketAttributes.eventTypeSelectionUid;
+    const eventTypeSelectionUid = ticketAttributes.eventTypeSelectionUid;
     const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
     
     // ---- NATIVE EVENTS: save the draft (IndieTix first, then Square) ----
     nativePool = await createClientDbConnection(req.user.dbName);
     nativeDraft = await createDraftEvent(nativePool, {
-      kind: 'movie',
-      title: movieData.title,
+      kind,
+      title: data.title,
       // What the tickets will record: left off when Square has no such choice.
-      eventType: eventTypeMovieSelectionUid ? ticketSettings.eventTypeChoice : null,
+      eventType: eventTypeSelectionUid ? ticketSettings.eventTypeChoice : null,
       distributor: distributorSelectionUid ? ticketSettings.distributorChoice : null,
-      imdbID: movieData.imdbID,
-      description: movieData.description,
-      posterUrl: movieData.posterUrl,
+      imdbID: data.imdbID,
+      description: data.description,
+      posterUrl: data.posterUrl,
       createdBy: req.user.username,
       ticketTypes: ticketSettings.ticketTypes,
       showings: parsedShowings,
@@ -5529,21 +5528,29 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
 
     // 4. Create modifier list with all showtimes
     // Each showtime becomes a modifier option in the list
-    const modifiers = movieData.showtimes.map((showtime, index) => ({
-      type: 'MODIFIER',
-      id: `#showtime_${index}`,
-      modifier_data: {
-        name: showtime, // "Sun 01-18-2026 7:00 PM (Spacement)"
-        price_money: { amount: 0, currency: 'USD' },
-        ordinal: index + 1
+    const modifiers = data.showtimes.map((showtime, index) => {
+      const modifier = {
+        type: 'MODIFIER',
+        id: `#showtime_${index}`,
+        modifier_data: {
+          name: showtime, // "Sun 01-18-2026 7:00 PM (Spacement)"
+          price_money: { amount: 0, currency: 'USD' },
+          ordinal: index + 1
+        }
+      };
+      if (spec.kitchenNames) {
+        // Square's "Kitchen Name": the time alone (same as the Showtimes page's abbreviationFor)
+        const timeMatch = showtime.match(/(\d{1,2}:\d{2}\s+(?:AM|PM))/);
+        modifier.modifier_data.abbreviation = timeMatch ? timeMatch[1] : `T${index + 1}`;
       }
-    }));
+      return modifier;
+    });
     
     const modifierListObject = {
       type: 'MODIFIER_LIST',
-      id: '#movie_times_modifier',
+      id: `#${kind}_times_modifier`,
       modifier_list_data: {
-        internal_name: `Show Time (${movieData.title})`,
+        internal_name: `Show Time (${data.title})`,
         name: globalConfig.MODIFIER_NAME_FILTER || 'Show Time', // Display name
         ordinal: 0,
         selection_type: 'SINGLE',
@@ -5555,7 +5562,7 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     const createModifierResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
       body: JSON.stringify({
-        idempotency_key: `${movieData.imdbID}-modifier-${Date.now()}`,
+        idempotency_key: `${idempotencyBase}-modifier-${Date.now()}`,
         object: modifierListObject
       })
     });
@@ -5572,10 +5579,10 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     
     // 5. Upload image (optional, don't fail if it doesn't work)
     let imageId = null;
-    const tempImageId = `#image_${movieData.imdbID}_${Date.now()}`;
-    if (movieData.posterUrl || movieData.imdbID) {
+    const tempImageId = `#image_${idempotencyBase}_${Date.now()}`;
+    if (data.posterUrl || data.imdbID) {
       try {
-        const posterUrl = movieData.posterUrl || omdbPosterUrl(movieData.imdbID);
+        const posterUrl = data.posterUrl || omdbPosterUrl(data.imdbID);
         if (!posterUrl) throw new Error('No poster URL: set OMDB_API_KEY in Client Settings');
 
         // Normalize to a real square JPEG regardless of the source's actual
@@ -5595,7 +5602,7 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
 
         if (posterFetchOk && posterBuffer) {
           // Create safer filename
-          const safeFilename = movieData.title
+          const safeFilename = data.title
             .replace(/[^a-z0-9]/gi, '_')
             .replace(/_+/g, '_')
             .toLowerCase()
@@ -5604,12 +5611,12 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
           console.log(`Safe filename: ${safeFilename}_poster.jpg`);
 
           const requestMetadata = {
-            idempotency_key: `${movieData.imdbID}-image-${Date.now()}`,
+            idempotency_key: `${idempotencyBase}-image-${Date.now()}`,
             image: {
               id: tempImageId,
               type: 'IMAGE',
               image_data: {
-                caption: movieData.title
+                caption: data.title
               }
             }
           };
@@ -5645,16 +5652,16 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     // 6. Create the item with modifier list
     const itemObject = {
       type: 'ITEM',
-      id: '#movie_item',
+      id: `#${kind}_item`,
       item_data: {        
-        name: movieData.title,
-        description: buildItemDescription(movieData),
+        name: data.title,
+        description: buildItemDescription(data),
         product_type: 'REGULAR',
         skip_modifier_screen: false,
         available_online: true,
         available_for_pickup: false,
         available_electronically: false,
-        reporting_category: { id: cinemaCategoryId },
+        reporting_category: { id: categoryId },
         is_taxable: false,
         //tax_ids: [],
         modifier_list_info: [{
@@ -5663,7 +5670,7 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
           max_selected_modifiers: 1,
           enabled: true
         }],
-        variations: ticketVariations('#movie_item', ticketSettings.ticketTypes, locationId)
+        variations: ticketVariations(`#${kind}_item`, ticketSettings.ticketTypes, locationId)
       },
       present_at_location_ids: [locationId]
     };
@@ -5684,13 +5691,13 @@ if (useQRCodeKey) {
 
 if (onlineDisplayNameKey) {
   itemObject.custom_attribute_values[onlineDisplayNameKey] = {
-    string_value: movieData.title
+    string_value: data.title
   };
 }
 
-if (eventTypeKey && eventTypeMovieSelectionUid) {
+if (eventTypeKey && eventTypeSelectionUid) {
   itemObject.custom_attribute_values[eventTypeKey] = {
-    selection_uid_values: [eventTypeMovieSelectionUid]
+    selection_uid_values: [eventTypeSelectionUid]
   };
 }
 
@@ -5708,7 +5715,7 @@ console.log('=== END CUSTOM ATTRIBUTES ===');
 const createItemResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
   method: 'POST',
   body: JSON.stringify({
-    idempotency_key: `${movieData.imdbID}-${Date.now()}`,
+    idempotency_key: `${idempotencyBase}-${Date.now()}`,
     object: itemObject
   })
 });
@@ -5737,7 +5744,7 @@ const createItemResponse = await squareApi.squareFetch(accessToken, '/v2/catalog
         });
         nativePublished = true;
       } catch (nativeError) {
-        console.error(`NATIVE_EVENT_LINK_FAILED: "${movieData.title}" was created in Square (${createItemData.catalog_object.id}) but IndieTix could not save its copy:`, nativeError.message);
+        console.error(`NATIVE_EVENT_LINK_FAILED: "${data.title}" was created in Square (${createItemData.catalog_object.id}) but IndieTix could not save its copy:`, nativeError.message);
         nativeNote = ' IndieTix could not save its own copy of this item (it still sells and makes tickets).';
       }
     }
@@ -5765,7 +5772,7 @@ console.log('=== END RESPONSE ===');
     await squareApi.squareFetch(accessToken, '/v2/inventory/changes/batch-create', {
       method: 'POST',
       body: JSON.stringify({
-        idempotency_key: `inventory-${movieData.imdbID}-${Date.now()}`,
+        idempotency_key: `inventory-${idempotencyBase}-${Date.now()}`,
         changes: inventoryChanges
       })
     });
@@ -5776,7 +5783,7 @@ const shouldCreateCalendarEvents = req.body.createCalendarEvents !== false; // D
 // it used to say "Calendar events created." whenever the box was checked.
 let calendarNote = '';
 
-if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALENDAR_ID)) {
+if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig[spec.calendarConfigKey])) {
   calendarNote = ' Calendar events were not created: Google Calendar is not set up in Client Settings.';
   console.log('Skipping calendar event creation (Google Calendar not configured)');
 } else if (shouldCreateCalendarEvents) {
@@ -5790,17 +5797,17 @@ if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALE
       
       if (itemDetailsResponse.ok) {
         const itemDetails = await itemDetailsResponse.json();
-        squareItemUrl = globalConfig.ECOMMERCE_SITE_URL+`/product/${movieData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/${itemId}`;
+        squareItemUrl = globalConfig.ECOMMERCE_SITE_URL+`/product/${data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/${itemId}`;
         console.log(`Square item URL: ${squareItemUrl}`);
       }
     } catch (urlError) {
       console.warn('Could not fetch Square item URL:', urlError);
     }
     
-    // Extract runtime from movieData
+    // Runtime (movies; Event Info Entry sends none, so 2 hours)
     let runtimeMinutes = 120;
-    if (movieData.runtime && movieData.runtime !== '--') {
-      const runtimeMatch = movieData.runtime.match(/(\d+)/);
+    if (data.runtime && data.runtime !== '--') {
+      const runtimeMatch = data.runtime.match(/(\d+)/);
       if (runtimeMatch) {
         runtimeMinutes = parseInt(runtimeMatch[1]);
         console.log(`Using movie runtime: ${runtimeMinutes} minutes`);
@@ -5869,16 +5876,16 @@ if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALE
       };
     };
     
-    const parsedShowtimes = movieData.showtimes.map(showtimeStr => 
+    const parsedShowtimes = data.showtimes.map(showtimeStr => 
       parseShowtimeString(showtimeStr)
     );
     
     console.log(`Parsed ${parsedShowtimes.length} showtimes for calendar`);
     
     const calendarResponse = await createCalendarEvents(
-      movieData,
+      data,
       parsedShowtimes,
-      globalConfig.CINEMA_CALENDAR_ID,
+      globalConfig[spec.calendarConfigKey],
       squareItemUrl,
       req.user.username,
       req.body.userTimezone
@@ -5904,7 +5911,7 @@ res.json({
   success: true,
   itemId: createItemData.catalog_object.id,
   eventId: nativePublished ? nativeDraft.eventId : null,
-  message: `Successfully created "${movieData.title}" in Square with ${movieData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}${nativeNote}`,
+  message: `Successfully created "${data.title}" in Square with ${data.showtimes.length} showtimes.${calendarNote}${ticketWarnings}${nativeNote}`,
   squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
 });
     
@@ -5918,545 +5925,11 @@ res.json({
     if (nativeCleanup) await nativeCleanup;
     if (nativePool) await nativePool.end().catch(() => {});
   }
-});
+}
 
-// Create Event Item in Square (matches movie endpoint pattern exactly)
-app.post('/api/square/create-event-item', requireAuth, requirePermission('edit'), async (req, res) => {
-  let clientPool;
-  // NATIVE EVENTS: IndieTix's own copy, saved as a draft before Square is touched
-  let nativePool = null;
-  let nativeDraft = null;
-  let nativePublished = false;
-  // A draft whose Square item was never made is removed BEFORE the response
-  // goes out (every early `return res...json()` below passes through here),
-  // so nobody sees a half-made event.
-  let nativeCleanup = null;
-  const sendJson = res.json.bind(res);
-  res.json = (body) => {
-    if (nativeDraft && !nativePublished && !nativeCleanup) {
-      nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
-      nativeCleanup.finally(() => sendJson(body));
-      return res;
-    }
-    return sendJson(body);
-  };
-  
-  try {
-    const { eventData } = req.body;
-    
-    console.log(`Creating Square item for event: ${eventData.title}`);
-    console.log(`Showtimes: ${eventData.showtimes?.length || 0}`);
-    
-    // Get client configuration
-    clientPool = await createClientDbConnection(req.user.dbName);
-    await getClientConfiguration(clientPool, req.user.dbName);
-    await clientPool.end();
-    
-    const accessToken = globalConfig.SQUARE_ACCESS_TOKEN;
-    const locationId = globalConfig.SQUARE_LOCATION_ID;
-    
-    if (!accessToken) {
-      return res.status(500).json({ error: 'Square API not configured' });
-    }
-    
-    if (!locationId) {
-      return res.status(500).json({ error: 'Square Location ID not configured' });
-    }
-    
-    // Validate showtimes
-    if (!eventData.showtimes || eventData.showtimes.length === 0) {
-      return res.status(400).json({ 
-        error: 'At least one showtime is required',
-        details: 'Please add showtimes before creating the item'
-      });
-    }
-
-    // ---- NATIVE EVENTS: every showtime must be readable ----
-    const parsedShowings = eventData.showtimes.map(parseShowtimeLabel);
-    const unreadableShowtimes = eventData.showtimes.filter((label, i) => !parsedShowings[i]);
-    if (unreadableShowtimes.length > 0) {
-      return res.status(400).json({
-        error: 'A showtime could not be read',
-        details: `Expected the form "Sun 01-18-2026 7:00 PM (Main Theater)": ${unreadableShowtimes.join('; ')}`
-      });
-    }
-    // Seats typed per showtime on the shared showtime form (optional).
-    let showtimeSeats;
-    try {
-      showtimeSeats = readShowtimeSeats(eventData.showtimeSeats, eventData.showtimes);
-    } catch (error) {
-      if (error instanceof ShowtimeError) return res.status(400).json({ error: 'Seats not understood', details: error.message });
-      throw error;
-    }
-    
-    // 1. Check if item already exists
-    const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
-      method: 'POST',
-      body: JSON.stringify({
-        object_types: ['ITEM'],
-        query: {
-          exact_query: {
-            attribute_name: 'name',
-            attribute_value: eventData.title
-          }
-        }
-      })
-    });
-    
-    const searchData = await searchResponse.json();
-    
-    if (searchData.objects && searchData.objects.length > 0) {
-      return res.status(409).json({ 
-        error: 'An item with this name already exists in Square.'
-      });
-    }
-    
-    // 2. Find (or create) the Events category
-    const eventsCategoryId = await findOrCreateSquareCategory(accessToken, 'Events');
-    if (!eventsCategoryId) {
-      return res.status(500).json({ error: 'Could not find or create the Events category in Square' });
-    }
-   
-    // 3. Find (or create) the ticket custom attributes -- see SQUARE TICKET ITEM SETUP
-    const ticketSettings = ticketItemSettings(globalConfig, 'event');
-    const ticketAttributes = await ensureTicketAttributes(accessToken, ticketSettings);
-    if (ticketAttributes.error) {
-      return res.status(500).json({ error: ticketAttributes.error });
-    }
-    const { useQRCodeKey, onlineDisplayNameKey, eventTypeKey, distributorKey, distributorSelectionUid } = ticketAttributes;
-    const eventTypeEventSelectionUid = ticketAttributes.eventTypeSelectionUid;
-    const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
-    
-    // ---- NATIVE EVENTS: save the draft (IndieTix first, then Square) ----
-    nativePool = await createClientDbConnection(req.user.dbName);
-    nativeDraft = await createDraftEvent(nativePool, {
-      kind: 'event',
-      title: eventData.title,
-      // What the tickets will record: left off when Square has no such choice.
-      eventType: eventTypeEventSelectionUid ? ticketSettings.eventTypeChoice : null,
-      distributor: distributorSelectionUid ? ticketSettings.distributorChoice : null,
-      imdbID: eventData.imdbID,
-      description: eventData.description,
-      posterUrl: eventData.posterUrl,
-      createdBy: req.user.username,
-      ticketTypes: ticketSettings.ticketTypes,
-      showings: parsedShowings,
-      seats: showtimeSeats,
-      roomCapacities: globalConfig.ROOM_CAPACITY
-    });
-    // ---- END NATIVE EVENTS draft ----
-
-    // 4. Create modifier list with all showtimes (SAME AS MOVIE)
-    const modifiers = eventData.showtimes.map((showtime, index) => {
-      // Extract just the time for abbreviation (Kitchen Name in Square)
-      // e.g. "Sun 01-18-2026 7:00 PM (Spacement)" -> "7:00 PM"
-      const timeMatch = showtime.match(/(\d{1,2}:\d{2}\s+(?:AM|PM))/);
-      const abbreviation = timeMatch ? timeMatch[1] : `T${index + 1}`;
-      
-      return {
-        type: 'MODIFIER',
-        id: `#showtime_${index}`,
-        modifier_data: {
-          name: showtime,
-          abbreviation: abbreviation, // This sets "Kitchen Name" in Square
-          price_money: { amount: 0, currency: 'USD' },
-          ordinal: index + 1
-        }
-      };
-    });
-    
-    const modifierListObject = {
-      type: 'MODIFIER_LIST',
-      id: '#event_times_modifier',
-      modifier_list_data: {
-        internal_name: `Show Time (${eventData.title})`,
-        name: globalConfig.MODIFIER_NAME_FILTER || 'Show Time',
-        ordinal: 0,
-        selection_type: 'SINGLE',
-        modifiers: modifiers
-      },
-      present_at_location_ids: [locationId]
-    };
-    
-    const createModifierResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
-      method: 'POST',
-      body: JSON.stringify({
-        idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-modifier-${Date.now()}`,
-        object: modifierListObject
-      })
-    });
-    
-    if (!createModifierResponse.ok) {
-      const errorText = await createModifierResponse.text();
-      return res.status(500).json({ error: 'Failed to create modifier list', details: errorText });
-    }
-    
-    const modifierData = await createModifierResponse.json();
-    const modifierListId = modifierData.catalog_object.id;
-    
-    console.log(`✅ EVENT: Created modifier list: ${modifierListId}`);
-    console.log(`   - Number of modifiers: ${modifiers.length}`);
-    console.log(`   - Modifiers:`, modifiers.map(m => m.modifier_data.abbreviation).join(', '));
-    
-    // 5. Upload image (SAME AS MOVIE)
-    let imageId = null;
-    const tempImageId = `#image_${eventData.title.replace(/\s+/g, '_')}_${Date.now()}`;
-    
-    if (eventData.posterUrl) {
-      try {
-        // Normalize to a real square JPEG regardless of the source's actual
-        // format (webp, png, ...) -- see normalizePosterImage().
-        const normalized = await normalizePosterImage(
-          eventData.posterUrl.startsWith('data:image/')
-            ? { dataUrl: eventData.posterUrl }
-            : { url: eventData.posterUrl },
-          { square: true }
-        );
-        const posterBuffer = normalized.buffer;
-
-        // Upload to Square
-        const safeFilename = eventData.title
-          .replace(/[^a-z0-9]/gi, '_')
-          .replace(/_+/g, '_')
-          .toLowerCase()
-          .substring(0, 100);
-        
-        console.log(`Safe filename: ${safeFilename}_poster.jpg`);
-
-        const requestMetadata = {
-          idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-image-${Date.now()}`,
-          image: {
-            id: tempImageId,
-            type: 'IMAGE',
-            image_data: {
-              caption: eventData.title
-            }
-          }
-        };
-        
-        console.log('Uploading image to Square...');
-
-        // Multipart upload via the shared square-api-lib.
-        const imageResponse = await squareApi.uploadCatalogImage(accessToken, {
-          imageBuffer: posterBuffer,
-          filename: `${safeFilename}_poster.jpg`,
-          contentType: 'image/jpeg',
-          request: requestMetadata
-        });
-        
-        const imageResponseText = await imageResponse.text();
-        console.log('Image upload response status:', imageResponse.status);
-        
-        if (imageResponse.ok) {
-          const imageData = JSON.parse(imageResponseText);
-          imageId = imageData.image?.id;
-          console.log(`✅ Image uploaded successfully: ${imageId}`);
-        } else {
-          console.error('❌ Image upload failed:', imageResponseText);
-        }
-      } catch (err) {
-        console.error('❌ Image upload exception:', err.message);
-      }
-    }
-    
-    // 6. Create the item with modifier list (SAME STRUCTURE AS MOVIE)
-    const itemObject = {
-      type: 'ITEM',
-      id: '#event_item',
-      item_data: {
-        name: eventData.title,
-        description: buildItemDescription(eventData),
-        product_type: 'REGULAR',
-        skip_modifier_screen: false,
-        available_online: true,
-        available_for_pickup: false,
-        available_electronically: false,
-        reporting_category: { id: eventsCategoryId },
-        is_taxable: false,
-        modifier_list_info: [{
-          modifier_list_id: modifierListId,
-          min_selected_modifiers: 1,
-          max_selected_modifiers: 1,
-          enabled: true
-        }],
-        variations: ticketVariations('#event_item', ticketSettings.ticketTypes, locationId)
-      },
-      present_at_location_ids: [locationId]
-    };
-    
-    if (imageId) {
-      itemObject.item_data.image_ids = [imageId];
-    }
-    
-    console.log(`✅ EVENT: About to create item with modifier list ID: ${modifierListId}`);
-    
-    // Build custom attributes (SAME AS MOVIE)
-    itemObject.custom_attribute_values = {};
-
-    if (useQRCodeKey) {
-      itemObject.custom_attribute_values[useQRCodeKey] = {
-        boolean_value: true
-      };
-    }
-
-    if (onlineDisplayNameKey) {
-      itemObject.custom_attribute_values[onlineDisplayNameKey] = {
-        string_value: eventData.title
-      };
-    }
-
-    if (eventTypeKey && eventTypeEventSelectionUid) {
-      itemObject.custom_attribute_values[eventTypeKey] = {
-        selection_uid_values: [eventTypeEventSelectionUid]
-      };
-    }
-
-    if (distributorKey && distributorSelectionUid) {
-      itemObject.custom_attribute_values[distributorKey] = {
-        selection_uid_values: [distributorSelectionUid]
-      };
-    }
-
-    console.log('Creating item...');
-    console.log('=== EVENT CUSTOM ATTRIBUTES BEING SENT ===');
-    console.log(JSON.stringify(itemObject.custom_attribute_values, null, 2));
-    console.log(`   - UseQRCode key: ${useQRCodeKey || 'NOT SET'}`);
-    console.log(`   - OnlineDisplayName key: ${onlineDisplayNameKey || 'NOT SET'}`);
-    console.log(`   - EventType key: ${eventTypeKey || 'NOT SET'} (UID: ${eventTypeEventSelectionUid || 'NOT SET'})`);
-    console.log(`   - Distributor key: ${distributorKey || 'NOT SET'} (UID: ${distributorSelectionUid || 'NOT SET'})`);
-    console.log('=== END CUSTOM ATTRIBUTES ===');
-
-    const createItemResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
-      method: 'POST',
-      body: JSON.stringify({
-        idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-item-${Date.now()}`,
-        object: itemObject
-      })
-    });
-    
-    if (!createItemResponse.ok) {
-      const errorText = await createItemResponse.text();
-      console.error('CREATE FAILED:', errorText);
-      return res.status(500).json({ 
-        error: 'Failed to create item in Square',
-        details: errorText
-      });
-    }
-    
-    const createItemData = await createItemResponse.json();
-
-    // ---- NATIVE EVENTS: link the draft to what Square created ----
-    let nativeNote = '';
-    if (nativeDraft) {
-      try {
-        await publishEventLinks(nativePool, nativeDraft, {
-          itemId: createItemData.catalog_object.id,
-          modifierListId,
-          imageId,
-          modifiers: modifierData.catalog_object.modifier_list_data?.modifiers,
-          variations: createItemData.catalog_object.item_data?.variations
-        });
-        nativePublished = true;
-      } catch (nativeError) {
-        console.error(`NATIVE_EVENT_LINK_FAILED: "${eventData.title}" was created in Square (${createItemData.catalog_object.id}) but IndieTix could not save its copy:`, nativeError.message);
-        nativeNote = ' IndieTix could not save its own copy of this item (it still sells and makes tickets).';
-      }
-    }
-    // ---- END NATIVE EVENTS link ----
-    console.log('=== EVENT SQUARE RESPONSE ===');
-    console.log('Item ID:', createItemData.catalog_object.id);
-    console.log('Modifier lists in response:', createItemData.catalog_object.item_data?.modifier_list_info?.length || 0);
-    if (createItemData.catalog_object.custom_attribute_values) {
-      console.log('Custom attributes in response:', Object.keys(createItemData.catalog_object.custom_attribute_values).length);
-      console.log('Custom attribute keys:', Object.keys(createItemData.catalog_object.custom_attribute_values));
-    }
-    console.log('=== END RESPONSE ===');
-    console.log(`✅ Item created: ${createItemData.catalog_object.id}`);
-    
-    // 7. Set inventory (THIS WAS MISSING!)
-    const variationIds = createItemData.catalog_object.item_data.variations.map(v => v.id);
-    
-    const inventoryChanges = variationIds.map(varId => ({
-      type: 'ADJUSTMENT',
-      adjustment: {
-        catalog_object_id: varId,
-        from_state: 'NONE',
-        to_state: 'IN_STOCK',
-        location_id: locationId,
-        quantity: '500',
-        occurred_at: new Date().toISOString()
-      }
-    }));
-    
-    await squareApi.squareFetch(accessToken, '/v2/inventory/changes/batch-create', {
-      method: 'POST',
-      body: JSON.stringify({
-        idempotency_key: `inventory-${eventData.title.replace(/\s+/g, '-')}-${Date.now()}`,
-        changes: inventoryChanges
-      })
-    });
-    
-    // After successful Square creation, conditionally create calendar events  
-    const shouldCreateCalendarEvents = req.body.createCalendarEvents !== false;
-    // What actually happened with the calendar, for the response message.
-    let calendarNote = '';
-
-    if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.EVENT_CALENDAR_ID)) {
-      calendarNote = ' Calendar events were not created: Google Calendar is not set up in Client Settings.';
-      console.log('Skipping calendar event creation (Google Calendar not configured)');
-    } else if (shouldCreateCalendarEvents) {
-      try {
-        let squareItemUrl = null;
-        try {
-          const itemId = createItemData.catalog_object.id;
-          const itemDetailsResponse = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${itemId}?include_related_objects=true`, {
-            method: 'GET'
-          });
-          
-          if (itemDetailsResponse.ok) {
-            const itemDetails = await itemDetailsResponse.json();
-            squareItemUrl = globalConfig.ECOMMERCE_SITE_URL+`/product/${eventData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/${itemId}`;
-            console.log(`Square item URL: ${squareItemUrl}`);
-          }
-        } catch (urlError) {
-          console.warn('Could not fetch Square item URL:', urlError);
-        }
-        
-        // Extract runtime/duration from eventData (default 2 hours for events)
-        let durationMinutes = 120;
-        if (eventData.duration && eventData.duration !== '--') {
-          const durationMatch = eventData.duration.match(/(\d+)/);
-          if (durationMatch) {
-            durationMinutes = parseInt(durationMatch[1]);
-            console.log(`Using event duration: ${durationMinutes} minutes`);
-          }
-        }
-        
-        // Parse showtime strings (USE SAME LOGIC AS MOVIES)
-        const parseShowtimeString = (showtimeStr) => {
-          const parenthesesMatch = showtimeStr.match(/\(([^)]+)\)/);
-          let location = 'Main Theater';
-          let descriptors = [];
-          
-          if (parenthesesMatch) {
-            const parts = parenthesesMatch[1].split(',').map(s => s.trim());
-            location = parts[0];
-            descriptors = parts.slice(1);
-          }
-          
-          const dateTimeMatch = showtimeStr.match(/([A-Za-z]+)\s+(\d{2})-(\d{2})-(\d{4})\s+(\d{1,2}):(\d{2})\s+(AM|PM)/);
-          
-          if (!dateTimeMatch) {
-            console.error(`Unable to parse showtime: ${showtimeStr}`);
-            throw new Error(`Invalid showtime format: ${showtimeStr}`);
-          }
-          
-          const [, dayOfWeek, month, day, year, hour, minute, ampm] = dateTimeMatch;
-          
-          let hour24 = parseInt(hour);
-          if (ampm === 'PM' && hour24 !== 12) {
-            hour24 += 12;
-          } else if (ampm === 'AM' && hour24 === 12) {
-            hour24 = 0;
-          }
-          
-          const startDate = new Date(
-            parseInt(year),
-            parseInt(month) - 1,
-            parseInt(day),
-            hour24,
-            parseInt(minute),
-            0,
-            0
-          );
-          
-          const totalMinutes = durationMinutes;
-          const endDate = new Date(startDate.getTime() + totalMinutes * 60 * 1000);
-          
-          // Format as local datetime without timezone indicator (no 'Z')
-          // Google Calendar will interpret this with the timeZone field we provide
-          const formatLocalDateTime = (date) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            const seconds = String(date.getSeconds()).padStart(2, '0');
-            return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-          };
-          
-          return {
-            location: location,
-            descriptors: descriptors,
-            startDateTime: formatLocalDateTime(startDate),
-            endDateTime: formatLocalDateTime(endDate),
-            originalString: showtimeStr
-          };
-        };
-        
-        const parsedShowtimes = eventData.showtimes.map(showtimeStr => 
-          parseShowtimeString(showtimeStr)
-        );
-        
-        console.log(`Parsed ${parsedShowtimes.length} showtimes for calendar`);
-        console.log('Sample parsed showtime:', parsedShowtimes[0]);
-        
-        console.log(`📅 EVENT: Attempting to create calendar events...`);
-        console.log(`   - Calendar ID: ${globalConfig.EVENT_CALENDAR_ID || 'NOT SET!'}`);
-        console.log(`   - Number of showtimes: ${parsedShowtimes.length}`);
-        console.log(`   - Client ID: ${req.user.username}`);
-        
-        if (!globalConfig.EVENT_CALENDAR_ID) {
-          console.error('❌ EVENT_CALENDAR_ID is not set in config!');
-        }
-        
-        const calendarResponse = await createCalendarEvents(
-          eventData,
-          parsedShowtimes,
-          globalConfig.EVENT_CALENDAR_ID,
-          squareItemUrl,
-          req.user.username,
-          req.body.userTimezone
-        );
-        
-        console.log('📅 EVENT: Calendar response:', JSON.stringify(calendarResponse, null, 2));
-        
-        if (!calendarResponse.success) {
-          console.error('❌ EVENT: Calendar events creation failed:', calendarResponse.error);
-          calendarNote = ' Calendar events could not be created (see the server log).';
-        } else {
-          console.log(`✅ Created ${calendarResponse.eventsCreated} calendar events`);
-          calendarNote = ' Calendar events created.';
-        }
-      } catch (calendarError) {
-        console.error('❌ EVENT: Calendar integration error:', calendarError);
-        console.error('❌ EVENT: Calendar error stack:', calendarError.stack);
-        calendarNote = ' Calendar events could not be created (see the server log).';
-        // Don't fail the whole request if calendar fails
-      }
-    } else {
-      console.log('Skipping calendar event creation (checkbox not checked)');
-    }
-
-    res.json({
-      success: true,
-      itemId: createItemData.catalog_object.id,
-      eventId: nativePublished ? nativeDraft.eventId : null,
-      message: `Successfully created "${eventData.title}" in Square with ${eventData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}${nativeNote}`,
-      squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
-    });
-    
-  } catch (error) {
-    console.error('Error:', error);
-    if (clientPool) await clientPool.end();
-    res.status(500).json({ error: 'Failed to create event item', details: error.message });
-  } finally {
-    // ---- NATIVE EVENTS: a draft whose Square item was never made is removed ----
-    if (nativeDraft && !nativePublished && !nativeCleanup) nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
-    if (nativeCleanup) await nativeCleanup;
-    if (nativePool) await nativePool.end().catch(() => {});
-  }
-});
+app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit'), (req, res) => createTicketItem(req, res, 'movie'));
+app.post('/api/square/create-event-item', requireAuth, requirePermission('edit'), (req, res) => createTicketItem(req, res, 'event'));
+// ---- END CREATE TICKET ITEM ----
 
 // ---- SHOWTIME MANAGEMENT ROUTES ----
 // The Showtimes page (showtimes.html). Logic and rules live in
