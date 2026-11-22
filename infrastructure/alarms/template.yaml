@@ -166,11 +166,37 @@ Resources:
           MetricValue: '1'
           DefaultValue: 0
 
+  # Same metric from QRScanner (a refund, cancel or seat change that couldn't
+  # update Square) and the nightly expiry job (showtimes changed in Square by
+  # hand), so one alarm covers all three.
+  ShowtimeSyncQRScannerFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${QRScannerFunction}'
+      FilterPattern: '"SHOWING_SYNC_FAILED"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  ShowtimeSyncExpireFilter:
+    Type: AWS::Logs::MetricFilter
+    Condition: HasExpireModifiers
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ExpireModifiersFunction}'
+      FilterPattern: '"SHOWTIME_DRIFT"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+          MetricValue: '1'
+          DefaultValue: 0
+
   ShowtimeSyncAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub '${EnvPrefix}-showtime-out-of-sync'
-      AlarmDescription: A ticket sold for a showtime IndieTix doesn't know (someone added it in Square instead of the Showtimes page), or a full showtime couldn't be taken off sale in Square. Tickets were issued. Search getSquareOrders' log for UNMATCHED_SHOWTIME or CAPACITY_ENFORCEMENT_FAILED, then fix the showtime on the Showtimes page or in Square.
+      AlarmDescription: A showtime in Square no longer matches IndieTix. Either a ticket sold for a showtime IndieTix doesn't know (added in Square instead of the Showtimes page; tickets were issued), a full or freed-up showtime couldn't be taken off or put back on sale in Square, or the nightly check found showtimes added, removed or renamed in Square by hand. Search the logs of getSquareOrders (UNMATCHED_SHOWTIME, CAPACITY_ENFORCEMENT_FAILED), QRScanner (SHOWING_SYNC_FAILED) and the expiry job (SHOWTIME_DRIFT), then fix the showtime on the Showtimes page or in Square.
       Namespace: IndieTix
       MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
       Statistic: Sum

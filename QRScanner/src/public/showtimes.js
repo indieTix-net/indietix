@@ -194,6 +194,13 @@
             try {
                 const data = await api('PUT', `/api/events/${currentEvent.id}/showings/${s.id}/seats`, { capacity: cap.value.trim(), heldSeats: held.value.trim() });
                 renderEvent(data.event);
+                if (data.sync?.action === 'reopened') {
+                    await UIDialogs.showMessage({ type: 'success', title: 'Back on sale', message: `There are seats again, so this showtime is back on sale in Square${data.sync.unarchived ? ` (and ${data.event.title} is no longer archived)` : ''}.` });
+                } else if (data.sync?.action === 'sold_out') {
+                    await UIDialogs.showMessage({ type: 'info', title: 'Sold out', message: `Every seat is now sold, so this showtime was taken off sale in Square${data.sync.archived ? `, and ${data.event.title} was archived (no other upcoming showtimes)` : ''}.` });
+                } else if (data.sync?.error) {
+                    await UIDialogs.showMessage({ type: 'warning', title: 'Seats saved', message: 'Seats were saved, but Square could not be updated to match. Check this showtime in Square.' });
+                }
             } catch (error) {
                 save.disabled = false;
                 await UIDialogs.showMessage({ type: 'error', title: 'Seats not saved', message: error.message });
@@ -309,10 +316,21 @@
             lines.push(`${linked} ticket${linked === 1 ? '' : 's'} already sold now show${linked === 1 ? 's' : ''} which showtime ${linked === 1 ? 'it is' : 'they are'} for.`);
         }
         if (report.skipped.length) lines.push(`${report.skipped.length} skipped (${[...new Set(report.skipped.map((s) => s.reason))].join('; ')}).`);
+        const full = report.imported.reduce((n, i) => n + (i.full || []).length, 0);
+        if (full && report.dryRun) {
+            lines.push(report.enforceCapacity
+                ? `${full} showtime${full === 1 ? ' is' : 's are'} already full and will be taken off sale in Square.`
+                : `${full} showtime${full === 1 ? ' is' : 's are'} already full; they stay on sale because "Stop selling a showtime when it's full" is off in Client Settings.`);
+        } else if (full) {
+            const soldOut = report.imported.reduce((n, i) => n + (i.soldOut || []).length, 0);
+            lines.push(report.enforceCapacity
+                ? `${soldOut} full showtime${soldOut === 1 ? ' was' : 's were'} taken off sale in Square.`
+                : `${full} showtime${full === 1 ? ' is' : 's are'} already full but still on sale ("Stop selling a showtime when it's full" is off).`);
+        }
         return lines.join(' ');
     }
     function importDetails(report) {
-        const parts = report.imported.map((i) => `${i.title}: ${i.showtimes} showtimes`);
+        const parts = report.imported.map((i) => `${i.title}: ${i.showtimes} showtimes${(i.full || []).length ? ` (full: ${i.full.join('; ')})` : ''}`);
         report.problems.forEach((p) => parts.push(`${p.title}: ${p.problem}`));
         return parts.slice(0, 40).join(' \u2022 ') + (parts.length > 40 ? ` \u2022 ...and ${parts.length - 40} more` : '');
     }
@@ -327,7 +345,7 @@
             }
             const go = await UIDialogs.showConfirm({
                 title: 'Bring these into IndieTix?',
-                message: `${importSummary(preview)}${preview.problems.length ? ` ${preview.problems.length} need${preview.problems.length === 1 ? 's' : ''} a look (listed below). ` : ' '}Nothing changes in Square.`,
+                message: `${importSummary(preview)}${preview.problems.length ? ` ${preview.problems.length} need${preview.problems.length === 1 ? 's' : ''} a look (listed below). ` : ' '}${preview.enforceCapacity && preview.imported.some((i) => (i.full || []).length) ? 'Only the full showtimes change in Square.' : 'Nothing changes in Square.'}`,
                 details: importDetails(preview),
                 confirmText: 'Bring them in'
             });

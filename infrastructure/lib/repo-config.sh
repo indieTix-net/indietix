@@ -60,7 +60,7 @@ load_config() {
     expireQRCodeSquareModifiers)
       AWS_FN="expireQRCodeSquareModifiers"
       SRC_DIR="$ROOT/expireQRCodeSquareModifiers/src"
-      FILES=$'index.mjs'
+      FILES=$'index.mjs\nnative-events.mjs'
       LAYER_NAME="expiredModifiers"
       LAYER_PKG_DIR="$ROOT/expireQRCodeSquareModifiers/src/nodejs"
       DEV_FN="indietix-sandbox-expire-modifiers"

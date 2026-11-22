@@ -1,6 +1,7 @@
 import { Client } from 'pg';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 import * as squareApi from 'square-api-lib';
+import { syncNativeEvents } from './native-events.mjs';
 
 // Initialize AWS clients
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
@@ -289,6 +290,18 @@ export const handler = async (event, context) => {
     const results = [];
     for (const client of clients) {
       const result = await processClientModifiers(client);
+
+      // ---- NATIVE EVENTS: nightly sync + drift check (after Square's cleanup) ----
+      if (client.configuration?.SQUARE_ACCESS_TOKEN) {
+        try {
+          result.nativeEvents = await syncNativeEvents({ ...baseDbConfig, database: client.clientId }, client.configuration.SQUARE_ACCESS_TOKEN, client.clientId);
+          console.log(`Native events for ${client.clientId}:`, JSON.stringify({ ...result.nativeEvents, drift: result.nativeEvents.drift?.length }));
+        } catch (error) {
+          console.error(`SHOWTIME_DRIFT: ${client.clientId}: the nightly native-events check failed: ${error.message}`);
+          result.nativeEvents = { error: error.message };
+        }
+      }
+      // ---- END NATIVE EVENTS ----
       results.push(result);
       
       // Add a small delay between clients to avoid overwhelming Square API

@@ -27,7 +27,7 @@ import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, even
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
 import { buildZip } from './utils/zip.mjs';
-import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare } from './utils/native-events.mjs';
+import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare, showingsForTickets, syncShowingSales } from './utils/native-events.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -3845,9 +3845,23 @@ app.post('/api/products/:id/refund', requireAuth, requirePermission(...PERMS_DOO
       status: newStatus,
       lastEditedDate: new Date()
     });
+
+    // ---- NATIVE EVENTS: showings follow ticket changes ----
+    let showtimes = [];
+    let syncPool;
+    try {
+      syncPool = await createDbConnection(req.user.dbName);
+      showtimes = await syncShowingsAfterTicketChange(syncPool, { ticketIds: [Number(id)] });
+    } catch (error) {
+      console.error(`SHOWING_SYNC_FAILED: after ticket ${id} changed: ${error.message}`);
+    } finally {
+      if (syncPool) await syncPool.end().catch(() => {});
+    }
+    // ---- END NATIVE EVENTS ----
     
     return res.json({ 
       success: true, 
+      showtimes,
       returnStatus: 'successful_refund_toggle',
       message: `Product status changed to ${newStatus}`,
       newStatus: newStatus,
@@ -4815,6 +4829,9 @@ app.post('/api/orders/:orderId/refund', requireAuth, requirePermission(...PERMS_
 
       console.log('OrderMetaData updated with refund information and Status set to Refunded');
 
+      // ---- NATIVE EVENTS: showings follow ticket changes ----
+      const showtimes = await syncShowingsAfterTicketChange(userPool, { ticketIds: updateTicketsResult.rows.map(r => r.ID) });
+
       await userPool.end();
 
       const successResponse = {
@@ -4827,7 +4844,8 @@ app.post('/api/orders/:orderId/refund', requireAuth, requirePermission(...PERMS_
         orderTotal: originalAmount,
         partial: isPartialRefund,
         ticketsInvalidated: ticketsInvalidated,
-        refundedTickets: updateTicketsResult.rows.map(r => r.QRCode)
+        refundedTickets: updateTicketsResult.rows.map(r => r.QRCode),
+        showtimes
       };
 
       console.log('Sending success response:', JSON.stringify(successResponse));
@@ -4955,11 +4973,15 @@ app.post('/api/orders/:orderId/cancel', requireAuth, requirePermission(...PERMS_
          )`,
         [orderId]
       );
+
+      // ---- NATIVE EVENTS: showings follow ticket changes ----
+      const showtimes = await syncShowingsAfterTicketChange(userPool, { orderId });
       
       await userPool.end();
       
       return res.status(200).json({
         success: true,
+        showtimes,
         message: 'Order cancelled successfully',
         orderId: order.OrderID
       });
@@ -5080,11 +5102,15 @@ app.post('/api/orders/:orderId/delete', requireAuth, requirePermission(...PERMS_
          )`,
         [orderId]
       );
+
+      // ---- NATIVE EVENTS: showings follow ticket changes ----
+      const showtimes = await syncShowingsAfterTicketChange(userPool, { orderId });
       
       await userPool.end();
       
       return res.status(200).json({
         success: true,
+        showtimes,
         message: 'Order deleted successfully',
         orderId: order.OrderID
       });
@@ -6374,6 +6400,31 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
 // The Showtimes page (showtimes.html). Logic and rules live in
 // utils/native-events.mjs (SHOWTIME MANAGEMENT); these only open the venue's
 // database, load its settings and map errors. Same permission as Add Movie.
+// ---- NATIVE EVENTS: showings follow ticket changes ----
+// After a refund, cancel or delete frees seats (or an un-refund takes one),
+// put a sold-out showtime back on sale or sell out a full one. Reads the
+// venue's own config from its database (not globalConfig, which another
+// request may have just replaced). Never throws: the ticket change stands.
+async function syncShowingsAfterTicketChange(pool, { ticketIds, orderId }) {
+  try {
+    let ids = ticketIds;
+    if (!ids) {
+      ids = (await pool.query(`SELECT "QRCodeProductID" FROM "QRCodeProductToOrder" WHERE "OrderID" = $1`, [orderId])).rows.map((r) => r.QRCodeProductID);
+    }
+    const showings = await showingsForTickets(pool, ids);
+    if (showings.length === 0) return [];
+    const config = (await pool.query(`SELECT "configuration" FROM "Client" WHERE "configuration" IS NOT NULL LIMIT 1`)).rows[0]?.configuration || {};
+    return await syncShowingSales(pool, showings, {
+      accessToken: config.SQUARE_ACCESS_TOKEN,
+      enforceCapacity: config.ENFORCE_CAPACITY === true || config.ENFORCE_CAPACITY === 'true'
+    });
+  } catch (error) {
+    if (error.code !== '42P01') console.error(`SHOWING_SYNC_FAILED: after a ticket change: ${error.message}`);
+    return [];
+  }
+}
+// ---- END NATIVE EVENTS: showings follow ticket changes ----
+
 async function withShowtimePool(req, res, work) {
   let pool;
   try {
@@ -6424,10 +6475,15 @@ app.put('/api/events/:eventId/showings/:showingId', requireAuth, requirePermissi
   }));
 
 app.put('/api/events/:eventId/showings/:showingId/seats', requireAuth, requirePermission('edit'), (req, res) =>
-  withShowtimePool(req, res, async (pool) => {
+  withShowtimePool(req, res, async (pool, config) => {
     const { eventId, showingId } = showtimeIds(req);
     const seats = await setShowingSeats(pool, eventId, showingId, { capacity: req.body?.capacity, heldSeats: req.body?.heldSeats });
-    return { success: true, ...seats, event: await getEventWithShowings(pool, eventId) };
+    // More seats can put a sold-out showtime back on sale; fewer can fill it.
+    const [sync] = await syncShowingSales(pool, [{ showingId, eventId }], {
+      accessToken: config.SQUARE_ACCESS_TOKEN,
+      enforceCapacity: config.ENFORCE_CAPACITY === true || config.ENFORCE_CAPACITY === 'true'
+    });
+    return { success: true, ...seats, sync: sync || { action: 'none' }, event: await getEventWithShowings(pool, eventId) };
   }));
 
 app.post('/api/events/:eventId/showings/:showingId/cancel', requireAuth, requirePermission('edit'), (req, res) =>

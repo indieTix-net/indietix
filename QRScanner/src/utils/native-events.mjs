@@ -214,10 +214,14 @@ export class ShowtimeError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
-const NOT_SOLD = ['refunded', 'cancelled', 'canceled', 'transferred'];
+// 'deleted' (an order deleted on the Orders page) frees its seat too.
+const NOT_SOLD = ['refunded', 'cancelled', 'canceled', 'transferred', 'deleted'];
 const CHICAGO_NOW = `(NOW() AT TIME ZONE 'America/Chicago')`;
 // Two-key advisory lock: one staff change per event at a time.
 const EVENT_LOCK_CLASS = 7101;
+// getSquareOrders' per-showing lock (its sell-out check). Taken after the
+// event lock, never before, so the two can't deadlock.
+const SHOWING_LOCK_CLASS = 7102;
 
 // Tickets sold for each showing (not refunded/cancelled/transferred), by
 // ShowingID (step 3 on) or by the showing's Square modifier IDs, which every
@@ -344,6 +348,38 @@ function abbreviationFor(event, label) {
   return m ? m[1] : undefined;
 }
 
+/**
+ * Put a showtime on the item's Square showtime list (a new modifier, after
+ * the ones already there) and link it to the showing. Used by addShowing and
+ * by putting a sold-out showing back on sale. Returns the modifier id; the
+ * caller removes it from Square if its transaction then fails.
+ */
+async function createShowtimeModifier(client, accessToken, event, link, showingId, label) {
+  const list = await squareApi.retrieveCatalogObject(accessToken, link.MODIFIER_LIST);
+  const ordinals = (list.object?.modifier_list_data?.modifiers || []).map((m) => m.modifier_data?.ordinal || 0);
+  const modifierData = { name: label, price_money: { amount: 0, currency: 'USD' }, ordinal: Math.max(0, ...ordinals) + 1, modifier_list_id: link.MODIFIER_LIST };
+  const abbreviation = abbreviationFor(event, label);
+  if (abbreviation) modifierData.abbreviation = abbreviation;
+  const created = await squareApi.upsertCatalogObject(accessToken, {
+    idempotency_key: `indietix-showing-${event.ID}-${showingId}-${Date.now()}`,
+    object: { type: 'MODIFIER', id: '#new_showtime', ...(list.object?.present_at_location_ids ? { present_at_location_ids: list.object.present_at_location_ids } : {}), modifier_data: modifierData }
+  });
+  const modifierId = created.catalog_object?.id;
+  if (!modifierId) throw new Error('Square did not return the new showtime\'s id');
+  await client.query(
+    `INSERT INTO "ExternalCatalogLink" ("EntityType", "EntityID", "Provider", "ExternalType", "ExternalID") VALUES ('showing', $1, 'square', 'MODIFIER', $2)`,
+    [showingId, modifierId]);
+  return modifierId;
+}
+
+// A showtime going on sale on an archived event puts the item back on sale.
+async function unarchiveIfArchived(client, accessToken, event, link) {
+  if (event.Status !== 'archived') return false;
+  await squareApi.unarchiveItem(accessToken, link.ITEM);
+  await client.query(`UPDATE "Event" SET "Status" = 'active', "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [event.ID]);
+  return true;
+}
+
 /** Add a showtime: Showing + a new modifier on the item's Square showtime list. */
 export async function addShowing(pool, accessToken, eventId, { label, capacity, heldSeats }, { roomCapacities } = {}) {
   let createdModifierId = null;
@@ -357,30 +393,8 @@ export async function addShowing(pool, accessToken, eventId, { label, capacity, 
         `INSERT INTO "Showing" ("EventID", "StartsAt", "Venue", "Descriptors", "Label", "Capacity", "HeldSeats") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING "ID"`,
         [eventId, parsed.startsAt, parsed.venue, parsed.descriptors.join(', '), parsed.label, seats.capacity, seats.heldSeats]);
       const showingId = row.rows[0].ID;
-
-      // Next ordinal after the showtimes already in Square's list.
-      const list = await squareApi.retrieveCatalogObject(accessToken, link.MODIFIER_LIST);
-      const ordinals = (list.object?.modifier_list_data?.modifiers || []).map((m) => m.modifier_data?.ordinal || 0);
-      const modifierData = { name: parsed.label, price_money: { amount: 0, currency: 'USD' }, ordinal: Math.max(0, ...ordinals) + 1, modifier_list_id: link.MODIFIER_LIST };
-      const abbreviation = abbreviationFor(event, parsed.label);
-      if (abbreviation) modifierData.abbreviation = abbreviation;
-      const created = await squareApi.upsertCatalogObject(accessToken, {
-        idempotency_key: `indietix-showing-${eventId}-${showingId}-${Date.now()}`,
-        object: { type: 'MODIFIER', id: '#new_showtime', ...(list.object?.present_at_location_ids ? { present_at_location_ids: list.object.present_at_location_ids } : {}), modifier_data: modifierData }
-      });
-      createdModifierId = created.catalog_object?.id;
-      if (!createdModifierId) throw new Error('Square did not return the new showtime\'s id');
-      await client.query(
-        `INSERT INTO "ExternalCatalogLink" ("EntityType", "EntityID", "Provider", "ExternalType", "ExternalID") VALUES ('showing', $1, 'square', 'MODIFIER', $2)`,
-        [showingId, createdModifierId]);
-
-      // A showtime added to an archived event puts the item back on sale.
-      let unarchived = false;
-      if (event.Status === 'archived') {
-        await squareApi.unarchiveItem(accessToken, link.ITEM);
-        await client.query(`UPDATE "Event" SET "Status" = 'active', "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
-        unarchived = true;
-      }
+      createdModifierId = await createShowtimeModifier(client, accessToken, event, link, showingId, parsed.label);
+      const unarchived = await unarchiveIfArchived(client, accessToken, event, link);
       await client.query(`UPDATE "Event" SET "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
       return { showingId, modifierId: createdModifierId, unarchived };
     });
@@ -484,6 +498,127 @@ export async function cancelShowing(pool, accessToken, eventId, showingId) {
   }
   return { soldTickets: outcome.sold, archived, archiveError };
 }
+
+// ---- SHOWING SALES SYNC ----
+// Keeps a showing's on-sale state in line with its sold count after anything
+// changes that count or its seats here: a refund, an order cancelled or
+// deleted, a seat change, an import. (getSquareOrders does the same check
+// when a ticket is sold.)
+//  - sold out, and room again -> back on sale: a new showtime in Square (the
+//    old one was deleted), and the item unarchived if selling out archived it
+//  - on sale, full, and the venue has ENFORCE_CAPACITY on -> sold out: the
+//    showtime removed from Square, the item archived if nothing upcoming is
+//    left on sale
+// Past, cancelled, expired and no-limit showings are left alone. Never
+// throws: a refund must not fail because Square couldn't be updated. Failures
+// log SHOWING_SYNC_FAILED (alarm <prefix>-showtime-out-of-sync).
+
+/** The showings (with their event) that these tickets count toward. */
+export async function showingsForTickets(pool, ticketIds) {
+  const ids = [...new Set((ticketIds || []).map(Number).filter(Number.isInteger))];
+  if (ids.length === 0) return [];
+  const result = await pool.query(`
+    SELECT DISTINCT s."ID" AS "ShowingID", s."EventID"
+    FROM "QRCodeProduct" q
+    JOIN "Showing" s ON s."ID" = q."ShowingID"
+    WHERE q."ID" = ANY($1::int[])
+    UNION
+    SELECT DISTINCT s."ID", s."EventID"
+    FROM "QRCodeProduct" q
+    JOIN "ExternalCatalogLink" l
+      ON l."EntityType" = 'showing' AND l."ExternalType" = 'MODIFIER'
+     AND q."ProductMetadata" @> jsonb_build_object('modifiers', jsonb_build_array(jsonb_build_object('catalog_object_id', l."ExternalID")))
+    JOIN "Showing" s ON s."ID" = l."EntityID"
+    WHERE q."ID" = ANY($1::int[])`, [ids]);
+  return result.rows.map((r) => ({ showingId: r.ShowingID, eventId: r.EventID }));
+}
+
+/**
+ * @param {Array<{showingId, eventId}>} showings
+ * @param {{ accessToken: string, enforceCapacity: boolean }} options
+ * @returns {Promise<Array<{ showingId, action: 'none'|'reopened'|'sold_out', label?, unarchived?, archived?, error? }>>}
+ */
+export async function syncShowingSales(pool, showings, { accessToken, enforceCapacity }) {
+  const results = [];
+  if (!accessToken) return results;
+  const seen = new Set();
+  for (const { showingId, eventId } of showings || []) {
+    if (seen.has(showingId)) continue;
+    seen.add(showingId);
+    try {
+      results.push(await syncOneShowing(pool, accessToken, enforceCapacity, eventId, showingId));
+    } catch (error) {
+      // Not linked to Square, a draft, or no tables: nothing to keep in step.
+      if (error instanceof ShowtimeError) { results.push({ showingId, action: 'none' }); continue; }
+      console.error(`SHOWING_SYNC_FAILED: showing ${showingId}: ${error.message}. Its on-sale state in Square may not match its seats; check the Showtimes page.`);
+      results.push({ showingId, action: 'none', error: error.message });
+    }
+  }
+  return results;
+}
+
+async function syncOneShowing(pool, accessToken, enforceCapacity, eventId, showingId) {
+  let createdModifierId = null;
+  let outcome;
+  try {
+    outcome = await inEventTransaction(pool, eventId, async (client, event, link) => {
+      await client.query('SELECT pg_advisory_xact_lock($1, $2)', [SHOWING_LOCK_CLASS, showingId]);
+      const showing = await loadShowing(client, eventId, showingId);
+      if (showing.IsPast || showing.Capacity === null || !['on_sale', 'sold_out'].includes(showing.Status)) return { showingId, action: 'none' };
+      const sold = await soldFor(client, eventId, showingId);
+      const sellable = showing.Capacity - showing.HeldSeats;
+
+      if (showing.Status === 'sold_out' && sold < sellable) {
+        createdModifierId = await createShowtimeModifier(client, accessToken, event, link, showingId, showing.Label);
+        await client.query(`UPDATE "Showing" SET "Status" = 'on_sale', "SoldOutAt" = NULL WHERE "ID" = $1`, [showingId]);
+        const unarchived = await unarchiveIfArchived(client, accessToken, event, link);
+        await client.query(`UPDATE "Event" SET "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
+        console.log(`SHOWING_REOPENED: showing ${showingId} ("${showing.Label}") has ${sellable - sold} seat(s) again; back on sale in Square${unarchived ? ', item unarchived' : ''}.`);
+        return { showingId, action: 'reopened', label: showing.Label, unarchived };
+      }
+
+      if (showing.Status === 'on_sale' && enforceCapacity && sold >= sellable) {
+        const links = await client.query(
+          `SELECT "ExternalID" FROM "ExternalCatalogLink" WHERE "EntityType" = 'showing' AND "EntityID" = $1 AND "ExternalType" = 'MODIFIER' AND "Provider" = 'square' AND "DeletedAt" IS NULL`,
+          [showingId]);
+        for (const { ExternalID } of links.rows) {
+          const response = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${ExternalID}`, { method: 'DELETE' });
+          if (!response.ok && response.status !== 404) throw new Error(`Square could not remove showtime ${ExternalID}: ${response.status} ${await response.text()}`);
+        }
+        await client.query(
+          `UPDATE "ExternalCatalogLink" SET "DeletedAt" = CURRENT_TIMESTAMP, "DeletedReason" = 'sold_out' WHERE "EntityType" = 'showing' AND "EntityID" = $1 AND "ExternalType" = 'MODIFIER' AND "DeletedAt" IS NULL`,
+          [showingId]);
+        await client.query(`UPDATE "Showing" SET "Status" = 'sold_out', "SoldOutAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [showingId]);
+        const remaining = await client.query(
+          `SELECT COUNT(*)::int AS n FROM "Showing" WHERE "EventID" = $1 AND "Status" = 'on_sale' AND "StartsAt" >= ${CHICAGO_NOW}`, [eventId]);
+        await client.query(`UPDATE "Event" SET "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
+        console.log(`SHOWING_SOLD_OUT: showing ${showingId} ("${showing.Label}") sold ${sold} of ${sellable}; removed from Square.`);
+        return { showingId, action: 'sold_out', label: showing.Label, archiveItemId: remaining.rows[0].n === 0 && event.Status === 'active' ? link.ITEM : null };
+      }
+      return { showingId, action: 'none' };
+    });
+  } catch (error) {
+    if (createdModifierId) {
+      await squareApi.deleteCatalogObject(accessToken, createdModifierId).catch((e) => console.error(`Could not remove showtime ${createdModifierId} from Square after a failed reopen:`, e.message));
+    }
+    throw error;
+  }
+
+  // After the commit, like cancelShowing: the showtime is already off sale.
+  const { archiveItemId, ...result } = outcome;
+  if (archiveItemId) {
+    try {
+      await squareApi.archiveItem(accessToken, archiveItemId);
+      await pool.query(`UPDATE "Event" SET "Status" = 'archived', "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
+      result.archived = true;
+    } catch (error) {
+      console.error(`SHOWING_SYNC_FAILED: showing ${showingId} sold out and was removed, but archiving Square item ${archiveItemId} failed: ${error.message}`);
+      result.archived = false;
+    }
+  }
+  return result;
+}
+// ---- END SHOWING SALES SYNC ----
 // ---- END SHOWTIME MANAGEMENT ----
 
 // ---- SQUARE IMPORT ----
@@ -566,7 +701,8 @@ export async function importFromSquare(pool, accessToken, config, { dryRun = tru
   const listIds = [...new Set(items.flatMap((i) => (i.item_data?.modifier_list_info || []).map((m) => m.modifier_list_id)))];
   const lists = new Map((listIds.length ? await batchRetrieve(accessToken, listIds) : []).map((o) => [o.id, o]));
 
-  const report = { dryRun, imported: [], skipped: [], problems: [] };
+  const enforceCapacity = config.ENFORCE_CAPACITY === true || config.ENFORCE_CAPACITY === 'true';
+  const report = { dryRun, enforceCapacity, imported: [], skipped: [], problems: [] };
   for (const item of items) {
     const title = item.item_data?.name || item.id;
     if (linkedItems.has(item.id)) { report.skipped.push({ title, reason: 'already in IndieTix' }); continue; }
@@ -598,18 +734,44 @@ export async function importFromSquare(pool, accessToken, config, { dryRun = tru
       itemId: item.id,
       modifierListId: showtimeList.id
     };
+    // Showtimes whose tickets already fill their room's seats.
+    const full = await fullShowtimes(pool, showings, config.ROOM_CAPACITY);
     if (dryRun) {
-      report.imported.push({ title, kind: plan.kind, showtimes: showings.length, ticketTypes: plan.ticketTypes.map((t) => t.name) });
+      report.imported.push({ title, kind: plan.kind, showtimes: showings.length, ticketTypes: plan.ticketTypes.map((t) => t.name), full });
       continue;
     }
     try {
       const result = await saveImportedEvent(pool, plan, config.ROOM_CAPACITY);
-      report.imported.push({ title, kind: plan.kind, showtimes: showings.length, ticketTypes: plan.ticketTypes.map((t) => t.name), eventId: result.eventId, ticketsLinked: result.ticketsLinked });
+      const entry = { title, kind: plan.kind, showtimes: showings.length, ticketTypes: plan.ticketTypes.map((t) => t.name), eventId: result.eventId, ticketsLinked: result.ticketsLinked, full };
+      if (enforceCapacity && full.length) {
+        const synced = await syncShowingSales(pool, result.showingIds.map((id) => ({ showingId: id, eventId: result.eventId })), { accessToken, enforceCapacity });
+        entry.soldOut = synced.filter((s) => s.action === 'sold_out').map((s) => s.label);
+        if (synced.some((s) => s.error)) report.problems.push({ title, problem: 'a full showtime could not be taken off sale in Square; check it on the Showtimes page' });
+      }
+      report.imported.push(entry);
     } catch (error) {
       report.problems.push({ title, problem: `not imported: ${error.message}` });
     }
   }
   return report;
+}
+
+// Labels of the upcoming showtimes whose sold tickets already reach their
+// room's seats (the capacity the import will give them).
+async function fullShowtimes(pool, showings, roomCapacities) {
+  const withSeats = showings.filter((s) => roomCapacity(roomCapacities, s.venue) !== null);
+  if (withSeats.length === 0) return [];
+  const result = await pool.query(`
+    SELECT m."ModifierID", COUNT(DISTINCT q."ID")::int AS "Sold"
+    FROM unnest($1::text[], $2::timestamp[]) AS m("ModifierID", "StartsAt")
+    LEFT JOIN "QRCodeProduct" q
+      ON q."ProductMetadata" @> jsonb_build_object('modifiers', jsonb_build_array(jsonb_build_object('catalog_object_id', m."ModifierID")))
+     AND COALESCE(q."Status", 'valid') <> ALL($3::text[])
+    WHERE m."StartsAt" >= ${CHICAGO_NOW}
+    GROUP BY m."ModifierID"`,
+    [withSeats.map((s) => s.modifierId), withSeats.map((s) => s.startsAt), NOT_SOLD]);
+  const sold = new Map(result.rows.map((r) => [r.ModifierID, r.Sold]));
+  return withSeats.filter((s) => sold.has(s.modifierId) && sold.get(s.modifierId) >= roomCapacity(roomCapacities, s.venue)).map((s) => s.label);
 }
 
 async function saveImportedEvent(pool, plan, roomCapacities) {
@@ -629,11 +791,13 @@ async function saveImportedEvent(pool, plan, roomCapacities) {
       await link('ticket_type', id, 'ITEM_VARIATION', t.variationId);
     }
     let ticketsLinked = 0;
+    const showingIds = [];
     for (const s of plan.showings) {
       const id = (await client.query(
         `INSERT INTO "Showing" ("EventID", "StartsAt", "Venue", "Descriptors", "Label", "Capacity") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "ID"`,
         [eventId, s.startsAt, s.venue, s.descriptors.join(', '), s.label, roomCapacity(roomCapacities, s.venue)])).rows[0].ID;
       await link('showing', id, 'MODIFIER', s.modifierId);
+      showingIds.push(id);
       // Tickets already sold for this showtime get their ShowingID.
       const updated = await client.query(
         `UPDATE "QRCodeProduct" SET "ShowingID" = $1
@@ -642,7 +806,7 @@ async function saveImportedEvent(pool, plan, roomCapacities) {
       ticketsLinked += updated.rowCount;
     }
     await client.query('COMMIT');
-    return { eventId, ticketsLinked };
+    return { eventId, ticketsLinked, showingIds };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     if (error.code === '23505') throw new Error('one of its Square objects is already linked to another IndieTix event');

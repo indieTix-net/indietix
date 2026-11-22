@@ -2,6 +2,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, stopTestServer, squareHandlers, resetSquareHandlers } from './helpers/testServer.mjs';
 import { roomCapacity, validateRoomCapacity } from '../src/utils/native-events.mjs';
+import { installFakeCatalog } from './helpers/fakeSquareCatalog.mjs';
 
 // ---- SHOWTIME MANAGEMENT: the Showtimes page's API ----
 // A tiny fake Square catalog records what each call did to the item, its
@@ -18,68 +19,12 @@ before(async () => {
 });
 after(async () => { await stopTestServer(ctx); });
 
-const ok = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) });
-const fail = (status) => ({ ok: false, status, json: async () => ({ errors: [{ code: 'X' }] }), text: async () => `Square ${status}` });
-
-function installFakeCatalog() {
-  square = { objects: new Map(), calls: [], nextModifier: 0, failNext: null };
-  const original = squareHandlers.createCatalogObject;
-  squareHandlers.createCatalogObject = async (body) => {
-    const obj = body.object;
-    square.calls.push({ op: 'upsert', type: obj.type, object: obj });
-    if (square.failNext === 'upsert') { square.failNext = null; return fail(500); }
-    if (obj.type === 'ITEM' && obj.id === '#movie_item') { // Add Movie
-      const response = await original(body);
-      const data = await response.json();
-      square.objects.set(data.catalog_object.id, { ...data.catalog_object, version: 1 });
-      return ok(data);
-    }
-    if (obj.type === 'MODIFIER_LIST' && obj.id.startsWith('#')) {
-      const response = await original(body);
-      const data = await response.json();
-      square.objects.set(data.catalog_object.id, { ...data.catalog_object, version: 1 });
-      for (const m of data.catalog_object.modifier_list_data.modifiers) square.objects.set(m.id, { ...m, version: 1 });
-      return ok(data);
-    }
-    if (obj.type === 'MODIFIER' && obj.id.startsWith('#')) {
-      const id = `NEW_MOD_${square.nextModifier++}`;
-      const created = { ...obj, id, version: 1 };
-      square.objects.set(id, created);
-      const list = square.objects.get(obj.modifier_data.modifier_list_id);
-      list.modifier_list_data.modifiers.push(created);
-      return ok({ catalog_object: created });
-    }
-    if (String(obj.id).startsWith('#')) return original(body); // anything else new (custom attributes, categories)
-    const existing = square.objects.get(obj.id);
-    if (!existing) return fail(404);
-    if (obj.version !== existing.version) return fail(409);
-    const updated = { ...obj, version: existing.version + 1 };
-    square.objects.set(obj.id, updated);
-    return ok({ catalog_object: updated });
-  };
-  squareHandlers.getCatalogObject = async (id) => {
-    square.calls.push({ op: 'get', id });
-    const obj = square.objects.get(id);
-    return obj ? ok({ object: obj }) : fail(404);
-  };
-  squareHandlers.deleteCatalogObject = async (id) => {
-    square.calls.push({ op: 'delete', id });
-    if (square.failNext === 'delete') { square.failNext = null; return fail(500); }
-    if (!square.objects.has(id)) return fail(404);
-    square.objects.delete(id);
-    for (const obj of square.objects.values()) {
-      if (obj.modifier_list_data) obj.modifier_list_data.modifiers = obj.modifier_list_data.modifiers.filter((m) => m.id !== id);
-    }
-    return ok({ deleted_object_ids: [id] });
-  };
-}
-
 const FUTURE = ['Fri 06-07-2030 7:00 PM (Main Auditorium)', 'Sat 06-08-2030 9:30 PM (Little Theater, 21+)'];
 let eventId;
 
 beforeEach(async () => {
   resetSquareHandlers();
-  installFakeCatalog();
+  square = installFakeCatalog(squareHandlers);
   for (const table of ['ExternalCatalogLink', 'Showing', 'TicketType', 'Event', 'QRCodeProductToOrder', 'QRCodeProduct']) {
     await ctx.pgClient.query(`DELETE FROM "${table}"`);
   }

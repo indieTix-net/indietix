@@ -138,3 +138,39 @@ test('import needs edit permission', async () => {
   const { token } = await ctx.insertUser({ username: 'importdoor', permissions: { view: false, edit: false, checkIn: true } });
   assert.equal((await ctx.request('POST', '/api/events/import-from-square', { token, body: { dryRun: true } })).status, 403);
 });
+
+// ---- full showtimes at import ----
+async function withConfig(patch, work) {
+  const before = (await ctx.pgClient.query(`SELECT "configuration"::text AS c FROM "Client"`)).rows[0].c;
+  await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = ("configuration"::jsonb || $1::jsonb)::json`, [JSON.stringify(patch)]);
+  try { await work(); } finally { await ctx.pgClient.query(`UPDATE "Client" SET "configuration" = $1::json`, [before]); }
+}
+
+test('import: a showtime whose room is already full is reported; with stop-when-full off it stays on sale', async () => {
+  await withConfig({ ROOM_CAPACITY: { Spacement: 1 }, ENFORCE_CAPACITY: 'false' }, async () => {
+    await soldTicket('MOD-LIVE');
+    const preview = (await runImport(true)).json;
+    assert.equal(preview.enforceCapacity, false);
+    assert.deepEqual(preview.imported.find((i) => i.title === 'Jazz Sunday').full, ['Sun 06-09-2030 7:00 PM (Spacement)']);
+    assert.deepEqual(preview.imported.find((i) => i.title === 'Naza (2026)').full, [], 'no seats set for its rooms');
+    const result = (await runImport(false)).json;
+    assert.equal(result.imported.find((i) => i.title === 'Jazz Sunday').soldOut, undefined);
+    assert.equal(writes.length, 0, 'nothing changed in Square');
+    const s = await ctx.pgClient.query(`SELECT "Status" FROM "Showing" WHERE "Label" = 'Sun 06-09-2030 7:00 PM (Spacement)'`);
+    assert.equal(s.rows[0].Status, 'on_sale');
+  });
+});
+
+test('import: with stop-when-full on, an already-full showtime is taken off sale in Square', async () => {
+  await withConfig({ ROOM_CAPACITY: { Spacement: 1 }, ENFORCE_CAPACITY: 'true' }, async () => {
+    await soldTicket('MOD-LIVE');
+    const preview = (await runImport(true)).json;
+    assert.equal(preview.enforceCapacity, true);
+    assert.equal(writes.length, 0, 'the preview changes nothing');
+    const result = (await runImport(false)).json;
+    assert.deepEqual(result.imported.find((i) => i.title === 'Jazz Sunday').soldOut, ['Sun 06-09-2030 7:00 PM (Spacement)']);
+    assert.ok(writes.some((w) => w.delete === 'MOD-LIVE'), 'the full showtime was removed from Square');
+    const s = await ctx.pgClient.query(`SELECT s."Status", l."DeletedReason" FROM "Showing" s JOIN "ExternalCatalogLink" l ON l."EntityType" = 'showing' AND l."EntityID" = s."ID" WHERE s."Label" = 'Sun 06-09-2030 7:00 PM (Spacement)'`);
+    assert.deepEqual([s.rows[0].Status, s.rows[0].DeletedReason], ['sold_out', 'sold_out']);
+  });
+});

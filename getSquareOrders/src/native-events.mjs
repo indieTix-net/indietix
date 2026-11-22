@@ -9,7 +9,8 @@
 import * as squareApi from 'square-api-lib';
 
 const UNDEFINED_TABLE = '42P01';
-const NOT_SOLD = ['refunded', 'cancelled', 'canceled', 'transferred'];
+// Same list as QRScanner's Showtimes page; 'deleted' = order deleted there.
+const NOT_SOLD = ['refunded', 'cancelled', 'canceled', 'transferred', 'deleted'];
 const CHICAGO_NOW = `(NOW() AT TIME ZONE 'America/Chicago')`;
 // Same lock class QRScanner's Showtimes page takes per event (7101); this
 // one is per showing.
