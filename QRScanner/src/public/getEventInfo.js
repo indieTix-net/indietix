@@ -155,50 +155,11 @@ async function uploadCustomPosterToS3() {
     if (!customPosterFile) {
         return null;
     }
-    
     try {
-        console.log('Uploading custom poster to S3...');
-        
-        // Step 1: Get presigned upload URL from backend
-        const presignedResponse = await fetch(`${API_URL}/api/presigned-upload`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                fileName: customPosterFile.name,
-                contentType: customPosterFile.type,
-                folder: 'movie-posters' // Use same folder as movies
-            })
-        });
-        
-        if (!presignedResponse.ok) {
-            const errorData = await presignedResponse.json();
-            throw new Error(errorData.error || 'Failed to get upload URL');
-        }
-        
-        const presignedData = await presignedResponse.json();
-        console.log('Presigned URL obtained');
-        
-        // Step 2: Upload file directly to S3 using presigned URL
-        const uploadResponse = await fetch(presignedData.uploadUrl, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': customPosterFile.type
-            },
-            body: customPosterFile // Upload file directly (no base64 needed!)
-        });
-        
-        if (!uploadResponse.ok) {
-            throw new Error(`Failed to upload to S3: ${uploadResponse.status}`);
-        }
-        
-        customPosterUrl = presignedData.fileUrl;
+        // Shared with the other create page (create-item-common.js).
+        customPosterUrl = await uploadBlobToS3(customPosterFile, customPosterFile.name, 'movie-posters');
         console.log('Custom poster uploaded successfully:', customPosterUrl);
-        
         return customPosterUrl;
-        
     } catch (error) {
         console.error('Error uploading custom poster:', error);
         throw new Error(`Failed to upload custom poster: ${error.message}`);
@@ -507,36 +468,5 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Event Info page initialized');
 });
 
-// ---- INTEGRATION STATUS ----
-// Asks the server which integrations Client Settings has set up (booleans
-// only). Without Google Calendar the "Create event(s) in Google Calendar"
-// box is unchecked and disabled, rather than left checked to "succeed" at
-// nothing. If the check itself fails, the page is left as it was -- the
-// server skips an unconfigured calendar on its own either way.
-async function loadIntegrationStatus() {
-    try {
-        const response = await fetch(`${API_URL}/api/integrations/status`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-        });
-        if (!response.ok) return null;
-        return await response.json();
-    } catch (error) {
-        console.warn('Could not check integration settings:', error);
-        return null;
-    }
-}
 
-function disableCalendarCheckbox() {
-    const checkbox = document.getElementById('create-calendar-events');
-    if (!checkbox) return;
-    checkbox.checked = false;
-    checkbox.disabled = true;
-    const label = document.querySelector('label[for="create-calendar-events"]');
-    if (label) {
-        const note = document.createElement('small');
-        note.className = 'd-block text-muted';
-        note.textContent = 'Google Calendar is not set up in Client Settings (service account key and calendar ID).';
-        label.appendChild(note);
-    }
-}
 // ---- END INTEGRATION STATUS ----
