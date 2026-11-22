@@ -21,7 +21,7 @@ One HTML/JS/CSS trio per page, all loaded with `config.js` as the first script t
 | `insights.html` | AI-driven sales Q&A, admin-only |
 | `getMovieInfo.html` | Movie Info Lookup — OMDB-backed movie creation, builds the Square catalog item |
 | `getEventInfo.html` | Event Info Entry — same idea for non-movie events |
-| `showtimes.html` | Showtimes — add, change, re-seat and cancel showtimes of an existing movie/event (writes to Square right away), and bring existing Square items into IndieTix's own event records |
+| `showtimes.html` (+ `showtimes.css`) | Showtimes — add, change, re-seat and cancel showtimes of an existing movie/event (writes to Square right away), and bring existing Square items into IndieTix's own event records |
 | `marketing.html` | Marquee Engine — schedules, drafts, approve/edit/send |
 | `email-list.html` | Marketing email subscriber management |
 | `client.html` | Client Settings — the whole `Client.configuration` control panel, admin-only |

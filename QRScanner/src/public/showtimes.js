@@ -94,7 +94,8 @@
         $('event-panel').style.display = 'block';
         $('event-title').textContent = event.title;
         $('event-meta').textContent = [event.kind === 'movie' ? 'Movie' : 'Event', event.eventType, event.distributor, event.status === 'archived' ? 'Archived in Square (add a showtime to put it back on sale)' : null]
-            .filter(Boolean).join(' · ');
+            .filter((part, i, all) => part && all.findIndex((p) => String(p).toLowerCase() === String(part).toLowerCase()) === i) // no "Movie · Movie"
+            .join(' · ');
         const body = $('showings-body');
         body.replaceChildren();
         if (event.showings.length === 0) {

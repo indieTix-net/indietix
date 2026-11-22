@@ -1,0 +1,104 @@
+/* =======================
+   SHOWTIMES PAGE
+   Same page frame as Client Settings / Event Info Entry: padded content and
+   the theme's rounded panels (--lh-panel-grad), loaded before
+   oxblood-theme.css like the other pages' own stylesheets.
+   ======================= */
+
+/* Content padding (style.css's .container has none; each page sets its own) */
+.container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+}
+
+#user-info {
+    width: 100%;
+}
+
+/* =======================
+   PANELS
+   ======================= */
+.showtimes-panel {
+    background: var(--lh-panel-grad, #fff);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--lh-border, #e9ecef);
+    padding: 25px 30px;
+    margin-bottom: 30px;
+}
+
+.showtimes-panel:first-of-type {
+    margin-top: 20px;
+}
+
+.section-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--lh-border, #f8f9fa);
+}
+
+.section-header h3,
+.section-header h4 {
+    margin-bottom: 5px;
+    color: var(--lh-heading, #495057);
+    font-weight: 600;
+}
+
+.section-header p {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    color: var(--lh-muted, #6c757d);
+}
+
+/* =======================
+   SHOWTIMES TABLE + FORM
+   ======================= */
+.showtimes-table {
+    margin-bottom: 0;
+}
+
+.showtimes-table td,
+.showtimes-table th {
+    vertical-align: middle;
+}
+
+.showtimes-table tr.is-past td,
+.showtimes-table tr.is-cancelled td {
+    color: #888;
+}
+
+.showtimes-table tr.is-cancelled .showtime-label {
+    text-decoration: line-through;
+}
+
+.seat-input {
+    width: 90px;
+    display: inline-block;
+}
+
+.descriptor-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 14px;
+}
+
+.row-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.form-hint {
+    font-size: 0.85em;
+    color: var(--lh-muted, #777);
+}
+
+/* Phones: a little less padding inside the panels */
+@media (max-width: 576px) {
+    .showtimes-panel {
+        padding: 18px 16px;
+    }
+}
