@@ -36,6 +36,19 @@ async function getDatabaseCredentials(secretName) {
   }
 }
 
+// Same rule as clientSetup-Teardown's getAdminDbCredentials: environments
+// built by bootstrap.sh pass their own Aurora cluster's master secret and
+// endpoint (DB_ADMIN_SECRET_ARN / DB_HOST); production keeps its hand-made
+// fixed-name secret. Without this the job could never run in a test
+// environment (no such secret there; found 2026-11-21).
+async function getAdminDbCredentials() {
+  if (process.env.DB_ADMIN_SECRET_ARN && process.env.DB_HOST) {
+    const master = await getDatabaseCredentials(process.env.DB_ADMIN_SECRET_ARN);
+    return { host: process.env.DB_HOST, port: process.env.DB_PORT || '5432', username: master.username, password: master.password, ssl: 'true' };
+  }
+  return getDatabaseCredentials('indieTix/rds/clients/indietix/credentials');
+}
+
 /**
  * Gets all client databases by querying system catalogs
  * @param {Object} dbConfig - Database configuration object (connects to known client db)
@@ -252,7 +265,7 @@ export const handler = async (event, context) => {
   try {
     // Get indietix superuser credentials from Secrets Manager
     console.log('Retrieving indietix superuser credentials...');
-    const dbCredentials = await getDatabaseCredentials('indieTix/rds/clients/indietix/credentials');
+    const dbCredentials = await getAdminDbCredentials();
     
     // Base database configuration using indietix superuser
     const baseDbConfig = {
