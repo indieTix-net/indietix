@@ -52,7 +52,27 @@ Resources:
           TargetOriginId: StaticSiteBucketOrigin
           ViewerProtocolPolicy: redirect-to-https
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # AWS Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref StaticSiteNoCacheHeaders
           Compress: true
+
+  # Browsers check back before reusing a page or script (a cheap 304 when
+  # unchanged), so a deploy is picked up on the next load instead of whenever
+  # the browser's guess expires. The pages and scripts have fixed names and
+  # S3 sends no Cache-Control of its own; found 2026-11-22 when Chrome kept
+  # running an old order.js after a deploy. CloudFront's own edge cache is
+  # unchanged (deploys invalidate it). Production's hand-made distribution
+  # gets the same policy from `deploy.sh static-cache-headers`.
+  StaticSiteNoCacheHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${EnvPrefix}-static-no-cache"
+        Comment: Browsers revalidate static pages and scripts on every load
+        CustomHeadersConfig:
+          Items:
+            - Header: Cache-Control
+              Value: no-cache
+              Override: true
 
   StaticSiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
