@@ -20,7 +20,7 @@ Square's Catalog Search API still returns archived items by default (`item_data.
 
 **Archiving keeps the item whole (fixed 2026-11-20 in `square-api-lib`).** The old archive call sent only part of the item, and Square dropped what was left out, including the `UseQRCode` custom attribute and the item's locations. `archiveItem` now sends the whole item with `is_archived: true`, and `unarchiveItem` reverses it (used by QRScanner's Showtimes page). Items this job archived in production before the fix have lost those attributes.
 
-**IndieTix's own event records follow along (2026-11-21).** After cleaning up Square, the job updates each venue's native event tables to match: showtimes more than 5 hours past are marked expired, and events whose Square item is archived are marked archived. It also reports, without changing anything, showtimes that were added, removed or renamed in Square by hand, and items deleted or unarchived there (`SHOWTIME_DRIFT` in the log, alarm `<prefix>-showtime-out-of-sync`). See `src/native-events.mjs`.
+**IndieTix's own event records follow along (2026-11-21).** After cleaning up Square, the job updates each venue's native event tables to match: showtimes more than 5 hours past are marked expired, and events whose Square item is archived are marked archived. It also reports, without changing anything, showtimes that were added, removed or renamed in Square by hand, items deleted or unarchived there, and (2026-11-23) an item's name, description or poster changed there (the poster only once IndieTix knows its image: Add Movie/Event, an edit on the Showtimes page, or an import from then on) (`SHOWTIME_DRIFT` in the log, alarm `<prefix>-showtime-out-of-sync`). See `src/native-events.mjs`.
 
 ## Config fields this Lambda reads
 

@@ -27,7 +27,7 @@ import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, even
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
 import { buildZip } from './utils/zip.mjs';
-import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare, showingsForTickets, syncShowingSales, readShowtimeSeats } from './utils/native-events.mjs';
+import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare, getEventDetails, editEventDetails, deleteEvent, showingsForTickets, syncShowingSales, readShowtimeSeats } from './utils/native-events.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -5516,7 +5516,9 @@ async function createTicketItem(req, res, kind) {
       eventType: eventTypeSelectionUid ? ticketSettings.eventTypeChoice : null,
       distributor: distributorSelectionUid ? ticketSettings.distributorChoice : null,
       imdbID: data.imdbID,
-      description: data.description,
+      // The text the Square item gets (with a movie's rating, genre, cast), so
+      // the nightly drift check compares like with like.
+      description: buildItemDescription(data),
       posterUrl: data.posterUrl,
       createdBy: req.user.username,
       ticketTypes: ticketSettings.ticketTypes,
@@ -6027,6 +6029,42 @@ app.post('/api/events/:eventId/showings/:showingId/cancel', requireAuth, require
     const cancelled = await cancelShowing(pool, requireSquareToken(config), eventId, showingId);
     return { success: true, ...cancelled, event: await getEventWithShowings(pool, eventId) };
   }));
+// ---- EVENT DETAILS ROUTES ----
+// Name, description and poster (changed here and in Square together), and
+// Delete event: deleted outright if no ticket was ever made for it, else
+// ended (upcoming showtimes cancelled, item archived, nothing refunded).
+app.get('/api/events/:eventId/details', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => ({
+    details: await getEventDetails(pool, requireSquareToken(config), showtimeIds(req).eventId)
+  })));
+
+// PUT { title?, description?, posterDataUrl? } -- a new poster is an uploaded
+// image (data: URL), made into the same square JPEG Add Movie/Event uses.
+app.put('/api/events/:eventId', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId } = showtimeIds(req);
+    const { title, description, posterDataUrl } = req.body || {};
+    let poster;
+    if (posterDataUrl !== undefined && posterDataUrl !== null && posterDataUrl !== '') {
+      if (typeof posterDataUrl !== 'string' || !posterDataUrl.startsWith('data:image/')) throw new ShowtimeError(400, 'The poster must be an image file');
+      try {
+        poster = { buffer: (await normalizePosterImage({ dataUrl: posterDataUrl }, { square: true })).buffer, sourceUrl: null };
+      } catch (error) {
+        throw new ShowtimeError(400, 'That image couldn\'t be read; try a JPEG or PNG');
+      }
+    }
+    const edited = await editEventDetails(pool, requireSquareToken(config), eventId, { title, description, poster });
+    return { success: true, ...edited, event: await getEventWithShowings(pool, eventId) };
+  }));
+
+app.delete('/api/events/:eventId', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId } = showtimeIds(req);
+    const result = await deleteEvent(pool, requireSquareToken(config), eventId);
+    return { success: true, ...result, event: result.action === 'ended' ? await getEventWithShowings(pool, eventId) : null };
+  }));
+// ---- END EVENT DETAILS ROUTES ----
+
 // Bring the venue's existing Square ticket items into IndieTix (native
 // events step 4). { dryRun: true } (the default) only reports.
 app.post('/api/events/import-from-square', requireAuth, requirePermission('edit'), (req, res) =>

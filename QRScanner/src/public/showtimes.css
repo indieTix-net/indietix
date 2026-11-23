@@ -96,6 +96,29 @@
     color: var(--lh-muted, #777);
 }
 
+/* =======================
+   EVENT DETAILS (edit / delete)
+   ======================= */
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.details-form {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--lh-border, #f8f9fa);
+}
+
+.poster-preview img {
+    max-width: 100%;
+    max-height: 220px;
+    border-radius: 6px;
+}
+
 /* Phones: a little less padding inside the panels */
 @media (max-width: 576px) {
     .showtimes-panel {
