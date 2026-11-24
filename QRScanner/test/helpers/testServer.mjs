@@ -161,15 +161,32 @@ function defaultSquareHandlers() {
           json: async () => ({ catalog_object: { ...obj, id: 'MOCK_ITEM_ID', item_data: { ...obj.item_data, variations } } })
         };
       }
+      // A MODIFIER_LIST's modifiers get ids too, as Square assigns them.
+      const listData = obj.modifier_list_data
+        ? { ...obj.modifier_list_data, modifiers: (obj.modifier_list_data.modifiers || []).map((m, i) => ({ ...m, id: `MOCK_MOD_${i}` })) }
+        : undefined;
       return {
         ok: true, status: 200,
-        json: async () => ({ catalog_object: { ...obj, id: 'MOCK_MODIFIER_LIST_ID' } })
+        json: async () => ({ catalog_object: { ...obj, id: 'MOCK_MODIFIER_LIST_ID', ...(listData ? { modifier_list_data: listData } : {}) } })
       };
     },
+    listCatalogItems: async () => ({ ok: true, status: 200, json: async () => ({ objects: [] }) }),
+    // GET / DELETE /v2/catalog/object/{id}: nothing there unless a test says so.
+    getCatalogObject: async () => ({ ok: false, status: 404, json: async () => ({ errors: [{ code: 'NOT_FOUND' }] }), text: async () => 'NOT_FOUND' }),
+    deleteCatalogObject: async (objectId) => ({ ok: true, status: 200, json: async () => ({ deleted_object_ids: [objectId] }), text: async () => '{}' }),
     batchCreateInventory: async () => ({
       ok: true,
       status: 200,
       json: async () => ({})
+    }),
+    // POST /v2/catalog/images (multipart) -- the Add Movie / Add Event
+    // poster upload, via square-api-lib's uploadCatalogImage. Gets the
+    // FormData as sent.
+    uploadCatalogImage: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ image: { id: 'MOCK_IMAGE_ID' } }),
+      text: async () => JSON.stringify({ image: { id: 'MOCK_IMAGE_ID' } })
     }),
     // POST /v2/catalog/batch-retrieve -- the Posts page's show names.
     batchRetrieveCatalog: async () => ({
@@ -206,10 +223,19 @@ function patchFetch() {
       const types = new URL(urlStr).searchParams.get('types');
       if (types === 'CATEGORY') return squareHandlers.listCatalogCategories();
       if (types === 'CUSTOM_ATTRIBUTE_DEFINITION') return squareHandlers.listCatalogCustomAttributes();
+      if (types === 'ITEM') return squareHandlers.listCatalogItems(new URL(urlStr).searchParams.get('cursor'));
       return { ok: true, status: 200, json: async () => ({ objects: [] }) };
     }
     if (urlStr === 'https://connect.squareup.com/v2/catalog/object' && opts.method === 'POST') {
       return squareHandlers.createCatalogObject(JSON.parse(opts.body));
+    }
+    if (urlStr.startsWith('https://connect.squareup.com/v2/catalog/object/')) {
+      const objectId = new URL(urlStr).pathname.split('/').pop();
+      if (opts.method === 'DELETE') return squareHandlers.deleteCatalogObject(objectId);
+      if (!opts.method || opts.method === 'GET') return squareHandlers.getCatalogObject(objectId);
+    }
+    if (urlStr === 'https://connect.squareup.com/v2/catalog/images' && opts.method === 'POST') {
+      return squareHandlers.uploadCatalogImage(opts.body, opts.headers);
     }
     if (urlStr === 'https://connect.squareup.com/v2/catalog/batch-retrieve' && opts.method === 'POST') {
       return squareHandlers.batchRetrieveCatalog(JSON.parse(opts.body));
@@ -222,6 +248,10 @@ function patchFetch() {
     if (urlStr.startsWith('https://www.omdbapi.com/') || urlStr.startsWith('https://img.omdbapi.com/')) {
       omdbCalls.push(urlStr);
       return omdbHandler(new URL(urlStr));
+    }
+    // Never let a test reach the real Square.
+    if (urlStr.startsWith('https://connect.squareup.com/')) {
+      throw new Error(`Unmocked Square call in a test: ${opts.method || 'GET'} ${urlStr}`);
     }
     return realFetch(url, opts);
   };

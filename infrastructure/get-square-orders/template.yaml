@@ -27,6 +27,9 @@ Parameters:
   TicketPdfLibLayerArn:
     Type: String
     Description: LayerVersion ARN for this environment's ticket-pdf-lib layer (published by bootstrap.sh before this stack deploys)
+  SquareApiLibLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's square-api-lib layer (published by bootstrap.sh before this stack deploys)
 
 Resources:
   GetSquareOrdersLayer:
@@ -51,6 +54,7 @@ Resources:
         - !Ref GetSquareOrdersLayer
         - !Ref SmsUtilsLayerArn
         - !Ref TicketPdfLibLayerArn
+        - !Ref SquareApiLibLayerArn
       VpcConfig:
         SecurityGroupIds:
           - !ImportValue

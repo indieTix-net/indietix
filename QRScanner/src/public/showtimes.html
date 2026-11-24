@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Showtimes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="oxblood-theme.css">
+    <style>
+        .showtimes-section { margin-top: 20px; }
+        .showtimes-table td, .showtimes-table th { vertical-align: middle; }
+        .showtimes-table tr.is-past td, .showtimes-table tr.is-cancelled td { color: #888; }
+        .showtimes-table tr.is-cancelled .showtime-label { text-decoration: line-through; }
+        .seat-input { width: 90px; display: inline-block; }
+        .descriptor-checkbox { display: inline-flex; align-items: center; gap: 4px; margin-right: 14px; }
+        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .form-hint { font-size: 0.85em; color: #777; }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="container">
+        <div id="header-container"></div>
+
+        <div class="showtimes-section">
+            <h3>Showtimes</h3>
+            <p class="text-muted">Add, change or cancel the showtimes of a movie or event. Changes go to Square right away. Events made with Movie Info Lookup or Event Info Entry are listed here.</p>
+
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-8">
+                    <label for="event-select" class="form-label"><strong>Movie or event</strong></label>
+                    <select id="event-select" class="form-select"><option value="">Loading...</option></select>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="show-archived">
+                        <label class="form-check-label" for="show-archived">Include archived (no upcoming showtimes)</label>
+                    </div>
+                </div>
+            </div>
+            <div id="no-events" class="alert alert-info" style="display: none;"></div>
+            <div class="mb-3">
+                <button type="button" id="import-btn" class="btn btn-outline-secondary btn-sm">Bring in existing Square items</button>
+                <span class="form-hint ms-2">Adds your current Square ticket items and their showtimes here. Shows what it will do first; items already here are skipped.</span>
+            </div>
+
+            <div id="event-panel" style="display: none;">
+                <h4 id="event-title"></h4>
+                <p id="event-meta" class="text-muted"></p>
+
+                <div class="table-responsive">
+                    <table class="table showtimes-table">
+                        <thead>
+                            <tr>
+                                <th>Showtime</th>
+                                <th>Sold</th>
+                                <th>Capacity</th>
+                                <th>Held</th>
+                                <th>Available</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="showings-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5 id="form-heading" class="card-title">Add a showtime</h5>
+                        <form id="showtime-form" novalidate>
+                            <div class="row g-2">
+                                <div class="col-sm-3">
+                                    <label for="showtime-date" class="form-label">Date *</label>
+                                    <input type="date" id="showtime-date" class="form-control" required>
+                                </div>
+                                <div class="col-sm-3">
+                                    <label for="showtime-time" class="form-label">Time *</label>
+                                    <input type="time" id="showtime-time" class="form-control" required>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label for="showtime-location" class="form-label">Room *</label>
+                                    <select id="showtime-location" class="form-select" required></select>
+                                </div>
+                            </div>
+                            <div id="descriptors-row" class="mt-2" style="display: none;">
+                                <label class="form-label">Extras</label>
+                                <div id="descriptors-checkboxes"></div>
+                            </div>
+                            <div id="seats-row" class="row g-2 mt-1">
+                                <div class="col-sm-3">
+                                    <label for="showtime-capacity" class="form-label">Capacity</label>
+                                    <input type="number" id="showtime-capacity" class="form-control" min="0" step="1" placeholder="No limit">
+                                </div>
+                                <div class="col-sm-3">
+                                    <label for="showtime-held" class="form-label">Held seats</label>
+                                    <input type="number" id="showtime-held" class="form-control" min="0" step="1" value="0">
+                                </div>
+                                <div class="col-sm-6 d-flex align-items-end">
+                                    <span class="form-hint">Capacity starts at the room's seats from Client Settings. Held seats (passes, guests) aren't sold.</span>
+                                </div>
+                            </div>
+                            <p id="form-preview" class="form-hint mt-2"></p>
+                            <div class="mt-2 d-flex gap-2">
+                                <button type="submit" id="form-submit" class="btn btn-primary">Add showtime</button>
+                                <button type="button" id="form-cancel-edit" class="btn btn-secondary" style="display: none;">Stop editing</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="ui-dialogs.js"></script>
+<script src="auth-helper.js"></script>
+<script src="showtimes.js"></script>
+<script src="header-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        HeaderLoader.initializeHeader('header-container');
+    });
+</script>
+</body>
+</html>

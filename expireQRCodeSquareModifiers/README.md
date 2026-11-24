@@ -1,6 +1,6 @@
 # expireQRCodeSquareModifiers
 
-**Last Edited:** 2026-10-28
+**Last Edited:** 2026-11-21
 
 Scheduled Lambda that keeps a venue's Square catalog clean: removes showtime modifiers for showtimes that have already happened, and archives Square items whose entire run has completed. Node 22, ESM.
 
@@ -8,7 +8,7 @@ Scheduled Lambda that keeps a venue's Square catalog clean: removes showtime mod
 
 Runs on a schedule (an EventBridge rule — check your deployment's actual cron expression rather than assuming one here). On each run:
 
-1. Connects to the shared Aurora cluster's `postgres` maintenance database (a system catalog every cluster has, not any one client's own database) to discover every client database that exists — this is how it finds "every venue," without a separate routing table.
+1. Connects (with the cluster's master login: `DB_ADMIN_SECRET_ARN`/`DB_HOST` in a bootstrap environment, the `indieTix/rds/clients/indietix/credentials` secret in production) to the shared Aurora cluster's `postgres` maintenance database (a system catalog every cluster has, not any one client's own database) to discover every client database that exists — this is how it finds "every venue," without a separate routing table.
 2. For each client, reads its `Client.configuration` from Secrets Manager / its own database and skips it entirely if `SQUARE_ACCESS_TOKEN` is missing.
 3. Fetches Square catalog items in that venue's configured categories (`TARGET_CATEGORIES`, comma-separated, default `Cinema,Events`) with the ticketed-item attribute set (`USE_QR_CODE` attribute name, default `UseQRCode`; `USE_QR_CODE_VALUE`, default `"true"`).
 4. For each item, inspects its showtime modifiers (filtered by name via `MODIFIER_NAME_FILTER`, default `"Show Times"`) and parses the date/time embedded in each modifier's name (`MM-DD-YYYY H:MM AM/PM`, assumed Chicago time — the same format IndieTix's own Add Movie/Add Event flow generates). A modifier is considered expired once its showtime is more than **5 hours** in the past, not the instant it passes — a deliberate grace window.
@@ -17,6 +17,10 @@ Runs on a schedule (an EventBridge rule — check your deployment's actual cron 
 ## Why archiving, not deleting
 
 Square's Catalog Search API still returns archived items by default (`item_data.is_archived === true` on the object) — archiving isn't the same as hiding from every query. `filterItemsByCustomAttribute()` explicitly skips already-archived items when picking candidates for further processing, so a venue's catalog doesn't accumulate repeat-processing of the same already-done items. (The exact same class of bug — forgetting to filter out archived items — has shown up independently in QRScanner's own marketing item search; if you're touching either, worth checking the other.)
+
+**Archiving keeps the item whole (fixed 2026-11-20 in `square-api-lib`).** The old archive call sent only part of the item, and Square dropped what was left out, including the `UseQRCode` custom attribute and the item's locations. `archiveItem` now sends the whole item with `is_archived: true`, and `unarchiveItem` reverses it (used by QRScanner's Showtimes page). Items this job archived in production before the fix have lost those attributes.
+
+**IndieTix's own event records follow along (2026-11-21).** After cleaning up Square, the job updates each venue's native event tables to match: showtimes more than 5 hours past are marked expired, and events whose Square item is archived are marked archived. It also reports, without changing anything, showtimes that were added, removed or renamed in Square by hand, and items deleted or unarchived there (`SHOWTIME_DRIFT` in the log, alarm `<prefix>-showtime-out-of-sync`). See `src/native-events.mjs`.
 
 ## Config fields this Lambda reads
 

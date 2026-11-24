@@ -15,6 +15,9 @@ Parameters:
     Type: String
     Default: indietix-sandbox
     Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  SquareApiLibLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's square-api-lib layer (published by bootstrap.sh before this stack deploys)
 
 Resources:
   SquareTokenRefresherLayer:
@@ -37,6 +40,7 @@ Resources:
       MemorySize: 256
       Layers:
         - !Ref SquareTokenRefresherLayer
+        - !Ref SquareApiLibLayerArn
       VpcConfig:
         SecurityGroupIds:
           - !ImportValue

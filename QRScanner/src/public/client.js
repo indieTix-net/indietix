@@ -117,6 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const modifierNameFilterInput = document.getElementById('modifier-name-filter');
     const targetCategoriesInput = document.getElementById('target-categories');
     const sendSmsInput = document.getElementById('send-sms');
+    const enforceCapacityInput = document.getElementById('enforce-capacity');
     const useFtpInput = document.getElementById('use-ftp');
     
     // FTP fields
@@ -150,8 +151,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const tiktokRefreshTokenInput = document.getElementById('tiktok-refresh-token');
     const tiktokPrivacyLevelInput = document.getElementById('tiktok-privacy-level');
 
-    // EVENT_LOCATIONS management
+    // EVENT_LOCATIONS management (+ ROOM_CAPACITY: seats per room, the
+    // starting capacity of each new showing in that room; blank = no limit)
     let eventLocations = [];
+    let roomCapacity = {};
     const newLocationInput = document.getElementById('new-location');
     const addLocationBtn = document.getElementById('add-location-btn');
     const locationsListDiv = document.getElementById('locations-list');
@@ -184,6 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Remove location function (globally accessible)
     window.removeLocation = async function(index) {
         if (await UIDialogs.showConfirm({ title: 'Remove location?', message: `Remove "${eventLocations[index]}" from the list? The change is kept when you save your settings.`, confirmText: 'Remove', danger: true })) {
+            delete roomCapacity[eventLocations[index]];
             eventLocations.splice(index, 1);
             renderLocationsList();
         }
@@ -199,13 +203,24 @@ document.addEventListener('DOMContentLoaded', function() {
         locationsListDiv.innerHTML = eventLocations.map((location, index) => `
             <div class="location-item">
                 <div class="location-item-name">${location}</div>
-                <div class="location-item-actions">
+                <div class="location-item-actions" style="display: flex; gap: 8px; align-items: center;">
+                    <label for="room-seats-${index}" class="text-muted" style="margin: 0;">Seats</label>
+                    <input type="number" id="room-seats-${index}" class="form-control form-control-sm room-seats" data-index="${index}" min="0" step="1" placeholder="No limit" style="width: 100px;">
                     <button type="button" class="btn btn-sm btn-danger" onclick="removeLocation(${index})">
                         Remove
                     </button>
                 </div>
             </div>
         `).join('');
+        locationsListDiv.querySelectorAll('.room-seats').forEach(input => {
+            const room = eventLocations[Number(input.dataset.index)];
+            const seats = roomCapacity[room];
+            input.value = seats === undefined || seats === null ? '' : String(seats);
+            input.addEventListener('input', () => {
+                const value = input.value.trim();
+                if (value === '') delete roomCapacity[room]; else roomCapacity[room] = value;
+            });
+        });
     }
     
     // SCREEN_NUMBERS management: rows of [venue text, screen number]
@@ -833,6 +848,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Checkbox fields
         sendSmsInput.checked = config.SEND_SMS === 'true';
+        enforceCapacityInput.checked = config.ENFORCE_CAPACITY === true || config.ENFORCE_CAPACITY === 'true';
         useFtpInput.checked = config.USE_FTP === 'true';
         
         // Show/hide FTP settings based on checkbox
@@ -869,6 +885,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Load EVENT_LOCATIONS
         eventLocations = config.EVENT_LOCATIONS || ['Main Auditorium'];
+        roomCapacity = config.ROOM_CAPACITY && typeof config.ROOM_CAPACITY === 'object' && !Array.isArray(config.ROOM_CAPACITY) ? { ...config.ROOM_CAPACITY } : {};
         renderLocationsList();
         
         // Load EVENT_DESCRIPTORS
@@ -928,6 +945,7 @@ document.addEventListener('DOMContentLoaded', function() {
         config.MODIFIER_NAME_FILTER = modifierNameFilterInput.value.trim();
         config.TARGET_CATEGORIES = targetCategoriesInput.value.trim();
         config.SEND_SMS = sendSmsInput.checked ? 'true' : 'false';
+        config.ENFORCE_CAPACITY = enforceCapacityInput.checked ? 'true' : 'false';
         config.USE_FTP = useFtpInput.checked ? 'true' : 'false';
         
         // FTP settings
@@ -957,6 +975,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Save EVENT_LOCATIONS array
         config.EVENT_LOCATIONS = eventLocations;
+        // Seats per room, only for rooms still in the list
+        config.ROOM_CAPACITY = {};
+        eventLocations.forEach(room => {
+            if (roomCapacity[room] !== undefined && String(roomCapacity[room]).trim() !== '') config.ROOM_CAPACITY[room] = Number(roomCapacity[room]);
+        });
         
         // Save EVENT_DESCRIPTORS array
         config.EVENT_DESCRIPTORS = eventDescriptors;

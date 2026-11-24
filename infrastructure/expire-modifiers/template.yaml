@@ -2,15 +2,19 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Expires past showtimes / archives completed Square items. Discovers
-  clients via the Aurora master credentials (same
-  indieTix/rds/clients/indietix/credentials secret used by
-  clientSetup-Teardown and clientReporting), not Secrets Manager listing.
+  clients via this environment's Aurora master credentials
+  (DB_ADMIN_SECRET_ARN, like clientSetup-Teardown; production uses the
+  indieTix/rds/clients/indietix/credentials secret), not Secrets Manager
+  listing.
 
 Parameters:
   EnvPrefix:
     Type: String
     Default: indietix-sandbox
     Description: Namespace prefix for this environment (e.g. indietix-sandbox, indietix-prod, myvenue-prod)
+  SquareApiLibLayerArn:
+    Type: String
+    Description: LayerVersion ARN for this environment's square-api-lib layer (published by bootstrap.sh before this stack deploys)
 
 Resources:
   ExpireModifiersLayer:
@@ -33,6 +37,16 @@ Resources:
       MemorySize: 2560  # matches production
       Layers:
         - !Ref ExpireModifiersLayer
+        - !Ref SquareApiLibLayerArn
+      # This environment's own Aurora master login (see getAdminDbCredentials).
+      Environment:
+        Variables:
+          DB_ADMIN_SECRET_ARN: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraSecretArn'
+          DB_HOST: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraEndpoint'
+          DB_PORT: !ImportValue
+            'Fn::Sub': '${EnvPrefix}-AuroraPort'
       VpcConfig:
         SecurityGroupIds:
           - !ImportValue
@@ -50,3 +64,5 @@ Resources:
                 - secretsmanager:GetSecretValue
               Resource:
                 - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:indieTix/rds/clients/*"
+                - !ImportValue
+                  'Fn::Sub': '${EnvPrefix}-AuroraSecretArn'

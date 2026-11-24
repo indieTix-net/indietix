@@ -36,7 +36,7 @@ load_config() {
     getSquareOrders)
       AWS_FN="getSquareOrders"
       SRC_DIR="$ROOT/getSquareOrders/src"
-      FILES=$'index.mjs\ndatabaseSetup.sql'
+      FILES=$'index.mjs\nnative-events.mjs\ndatabaseSetup.sql'
       LAYER_NAME="ticketing"
       LAYER_PKG_DIR="$ROOT/getSquareOrders/ticketing"
       DEV_FN="indietix-sandbox-get-square-orders"
@@ -60,7 +60,7 @@ load_config() {
     expireQRCodeSquareModifiers)
       AWS_FN="expireQRCodeSquareModifiers"
       SRC_DIR="$ROOT/expireQRCodeSquareModifiers/src"
-      FILES=$'index.mjs'
+      FILES=$'index.mjs\nnative-events.mjs'
       LAYER_NAME="expiredModifiers"
       LAYER_PKG_DIR="$ROOT/expireQRCodeSquareModifiers/src/nodejs"
       DEV_FN="indietix-sandbox-expire-modifiers"
@@ -102,7 +102,7 @@ load_config() {
     QRScanner)
       AWS_FN="QRScanner"
       SRC_DIR="$ROOT/QRScanner/src"
-      FILES=$'index.mjs\napp.mjs\nmodels/index.mjs\nmodels/client.mjs\nmodels/order.mjs\nmodels/product.mjs\nmodels/user.mjs\nutils/crypto-utils.mjs\nutils/data-filter-utils.mjs\nutils/legal.mjs\nutils/privacy-requests.mjs\nutils/box-office-files.mjs\nutils/zip.mjs\nlegal/terms.html\nlegal/privacy.html'
+      FILES=$'index.mjs\napp.mjs\nmodels/index.mjs\nmodels/client.mjs\nmodels/order.mjs\nmodels/product.mjs\nmodels/user.mjs\nutils/crypto-utils.mjs\nutils/data-filter-utils.mjs\nutils/legal.mjs\nutils/privacy-requests.mjs\nutils/box-office-files.mjs\nutils/zip.mjs\nutils/native-events.mjs\nlegal/terms.html\nlegal/privacy.html'
       LAYER_NAME="qrscannerWebsite"
       LAYER_PKG_DIR="$ROOT/QRScanner/nodePackages"
       DEV_FN="indietix-sandbox-qrscanner"
@@ -169,6 +169,48 @@ load_config() {
       FILES=""
       LAYER_NAME="ticketPdfLib"
       LAYER_PKG_DIR="$ROOT/ticket-pdf-lib"
+      LAYER_INCLUDE_SELF="true"
+      DEV_FN="indietix-sandbox-get-square-orders"
+      ;;
+    square-api-lib)
+      # Shared Square API layer (every Square REST call goes through it)
+      # -- not a Lambda of its own, so deliberately NOT in ALL_REPOS (same
+      # reasoning as ticket-pdf-lib). One entry per consuming function,
+      # all sharing LAYER_NAME: this one attaches to the expire Lambda; the
+      # -marketing-engine, -qrscanner and -get-square-orders entries below
+      # attach it to the other three.
+      AWS_FN="expireQRCodeSquareModifiers"
+      SRC_DIR=""
+      FILES=""
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
+      LAYER_INCLUDE_SELF="true"
+      DEV_FN="indietix-sandbox-expire-modifiers"
+      ;;
+    square-api-lib-marketing-engine)
+      AWS_FN="marketingEngine"
+      SRC_DIR=""
+      FILES=""
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
+      LAYER_INCLUDE_SELF="true"
+      DEV_FN="indietix-sandbox-marketing-engine"
+      ;;
+    square-api-lib-qrscanner)
+      AWS_FN="QRScanner"
+      SRC_DIR=""
+      FILES=""
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
+      LAYER_INCLUDE_SELF="true"
+      DEV_FN="indietix-sandbox-qrscanner"
+      ;;
+    square-api-lib-get-square-orders)
+      AWS_FN="getSquareOrders"
+      SRC_DIR=""
+      FILES=""
+      LAYER_NAME="squareApiLib"
+      LAYER_PKG_DIR="$ROOT/square-api-lib"
       LAYER_INCLUDE_SELF="true"
       DEV_FN="indietix-sandbox-get-square-orders"
       ;;

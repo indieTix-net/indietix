@@ -92,13 +92,30 @@ export const handler = async (event, context) => {
       // every other client's orders). Falls back to a shared group only if
       // merchant_id can't be read, which keeps old behavior rather than
       // dropping the message outright.
+      //
+      // ---- VENUE GROUP (2026-11-19) ----
+      // 1. A webhook URL carrying the venue's client ID (?client=, see
+      //    getSquareOrders' VENUE FROM WEBHOOK URL) groups by that ID.
+      // 2. Otherwise merchant_id from the Square payload -- read from the
+      //    payload itself in either message shape. Before this, in
+      //    NODE_ENV=development (production's setting) messageObject.body
+      //    is the whole API Gateway event, which has no merchant_id, so
+      //    every production webhook silently shared 'unknown-merchant'.
       let merchantId = 'unknown-merchant';
-      try {
-        const bodyForRouting = typeof messageObject.body === 'string' ? JSON.parse(messageObject.body) : messageObject.body;
-        merchantId = bodyForRouting?.merchant_id || merchantId;
-      } catch (e) {
-        console.warn('Could not parse merchant_id from webhook body for MessageGroupId; using fallback group', e);
+      const urlClient = parsedEvent?.queryStringParameters?.client;
+      if (typeof urlClient === 'string' && /^[A-Za-z0-9]{1,64}$/.test(urlClient)) {
+        merchantId = urlClient;
+      } else {
+        try {
+          const squarePayload = typeof parsedEvent?.body === 'string'
+            ? JSON.parse(parsedEvent.body)
+            : (parsedEvent?.body ?? parsedEvent);
+          merchantId = squarePayload?.merchant_id || merchantId;
+        } catch (e) {
+          console.warn('Could not parse merchant_id from webhook body for MessageGroupId; using fallback group', e);
+        }
       }
+      // ---- END VENUE GROUP ----
 
       // Add required FIFO parameters
       params.MessageGroupId = merchantId;

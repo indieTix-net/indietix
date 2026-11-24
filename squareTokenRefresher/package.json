@@ -15,7 +15,8 @@
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.873.0",
     "@aws-sdk/client-ses": "^3.873.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "square-api-lib": "file:../square-api-lib"
   },
   "devDependencies": {
     "aws-sdk-client-mock": "^4.0.0",

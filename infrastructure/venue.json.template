@@ -2,7 +2,7 @@
   "_readme": "One venue for ./bootstrap.sh add-client <file>. Copy to venues/<name>.json (gitignored: it holds this venue's Square token and login secret) and fill in. Keys starting with _ are comments; blank values are skipped.",
 
   "username": "",
-  "_username": "3-63 letters, numbers, dots or hyphens, starting and ending with a letter or number. Becomes the client ID, database name and S3 bucket suffix. By convention, the venue Square merchant ID (e.g. M5E5N7KAHZA7Q).",
+  "_username": "3-63 letters, numbers, dots or hyphens, starting and ending with a letter or number. Becomes the client ID, database name and S3 bucket suffix. By convention, the venue Square merchant ID (e.g. M5E5N7KAHZA7Q). If it differs, square_webhook.auto points the subscription at <webhook URL>?client=<username> (letters and numbers only) and stores the merchant ID so getSquareOrders can find the venue.",
   "clientSecret": "",
   "_clientSecret": "The venue-level login secret (log in with username = client ID = the value above). A long random string; effectively a root credential.",
   "contactName": "",

@@ -60,7 +60,7 @@ Every client has a `Client.configuration` JSON blob — this is how almost all p
 
 ## Example 4: update a shared Lambda layer
 
-`sms-utils` and `ticket-pdf-lib` are real npm packages (their own repos), built into Lambda layers and attached to every Lambda that uses them — not copy-pasted per-repo. Changing one means rebuilding the layer, then re-attaching it to each consumer so they actually pick up the new version (an attached layer version doesn't auto-update).
+`sms-utils`, `ticket-pdf-lib` and `square-api-lib` are real npm packages (their own folders), built into Lambda layers and attached to every Lambda that uses them — not copy-pasted per-repo. Changing one means rebuilding the layer, then re-attaching it to each consumer so they actually pick up the new version (an attached layer version doesn't auto-update).
 
 ```bash
 cd sms-utils
@@ -73,6 +73,8 @@ cd ../infrastructure
 ```
 
 Why three separate `attach-layer` calls for one `deploy-layer`: `sms-utils` is one package but three different Lambdas consume it (see `infrastructure/lib/repo-config.sh` — `sms-utils-qrscanner`, `sms-utils-get-square-orders`, `sms-utils-sms-opt-in-opt-out` all share the same `LAYER_NAME`, built from the same source). One publish, multiple attaches — `./deploy.sh status` will flag any function still running an older layer version than what's published, if you want to double check nothing got missed.
+
+`square-api-lib` works the same way, with four production consumers (plus the bootstrap-only squareTokenRefresher, which bootstrap.sh wires itself): `./deploy.sh deploy-layer square-api-lib`, then `attach-layer` for `square-api-lib` (expireQRCodeSquareModifiers), `square-api-lib-marketing-engine`, `square-api-lib-qrscanner` and `square-api-lib-get-square-orders`. When a Lambda first starts using a shared layer, attach the layer **before** deploying that Lambda's new code -- the code imports the package at load time and fails without it.
 
 ## Example 5: stand up a second environment to test something bigger
 

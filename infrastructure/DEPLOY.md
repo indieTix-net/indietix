@@ -20,7 +20,7 @@ The user deploys exclusively via the AWS Console/CLI by hand, never `serverless 
 - **Diff-before-deploy, always.** `cmd_deploy` and `cmd_deploy_all` fetch the actual live `code.zip` from Lambda and diff it against the locally-built zip before ever asking to proceed. This is what it looked like in practice to catch real drift, like a missing utility file that would have caused a production outage.
 - **Lint-before-build, always.** `build_zip` calls `lint_build` before producing any zip — syntax-checks every staged `.js`/`.mjs` file, then walks every local `import`/`require` and verifies the target actually exists in that same build. This is the automated version of the exact bug caught by hand once (QRScanner missing `crypto-utils.mjs`/`data-filter-utils.mjs`) — it cannot be skipped, because every build path runs through it.
 - **`confirm()` gates every production-mutating action**, and respects `--yes`/`-y` to skip the prompt for scripted use. Never bypass this by hardcoding `--yes` into a habit without actually looking at the diff first. `deploy-dev` deliberately does NOT have this gate -- see its row below.
-- **File lists per repo are hand-verified, not guessed** (see the comment at the top of the script) — if a new source file is added to a repo, it must be added to that repo's `FILES` list in `load_config()` here too, or deploys will keep working but silently omit the new file. This same list is reused by `deploy-dev`, so there is exactly one source of truth for "what files does this Lambda need," not two that can drift apart.
+- **File lists per repo are hand-verified, not guessed** (see the comment at the top of the script) — if a new source file is added to a repo, it must be added to that repo's `FILES` list in `load_config()` here too, or deploys will keep working but silently omit the new file. This same list is reused by `deploy-dev` and by `bootstrap.sh`, so there is exactly one source of truth for "what files does this Lambda need," not two that can drift apart. Since 2026-11-21 `bootstrap.sh` also lints each function's build and stops on a missing file (it didn't before: a first sandbox deploy of native events shipped QRScanner without `utils/native-events.mjs` and every request failed until it was added to `FILES`).
 
 ## Commands
 
@@ -62,6 +62,7 @@ The user deploys exclusively via the AWS Console/CLI by hand, never `serverless 
 Separate from this script: one CloudFormation stack, `indietix-prod-alarms` (us-east-2), holding only CloudWatch alarms, one log metric filter and the SNS topic that emails them. It's the one piece of production made by IaC, because alarms touch nothing a function runs on. It emails when an alarm fires and again when it clears:
 
 - ticket orders: getSquareOrders logs an `ERROR` line, crashes, or an order waits in `webhook_square_processing.fifo` over 5 minutes
+- a refused Square webhook (`SQUARE_WEBHOOK_REJECTED`: bad signature, or a `?client=` venue whose settings don't match), which Square won't resend
 - the Square webhook: square-queue-forwarder crashes, or the `getSquareOrders/prod` API returns 5xx
 - QRScanner: 2+ server errors (Function URL 5xx) in 5 minutes, or a crash
 - any crash of the inbound SMS handler, expireQRCodeSquareModifiers, DailyPgQueryAndSftp, marketingEngine or the indietix.net mail forwarder

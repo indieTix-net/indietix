@@ -56,6 +56,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import sharp from 'sharp';
 import mailcomposer from 'mailcomposer';
+import * as squareApi from 'square-api-lib';
 
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
 const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-2' });
@@ -93,14 +94,9 @@ try {
   console.warn('Could not set up fontconfig for digest text rendering:', error.message);
 }
 
-// ---- SQUARE API BASE ----
-// Square's production API unless SQUARE_API_BASE says otherwise: an
-// environment pointed at Square's sandbox sets it to
-// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
-const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
-// ---- END SQUARE API BASE ----
-const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
-const SQUARE_CATALOG_OBJECT_API_URL = `${SQUARE_API_BASE}/v2/catalog/object`;
+// Square API: every Square call here goes through the shared
+// square-api-lib, which reads SQUARE_API_BASE (Square's sandbox when
+// bootstrap.sh sets SQUARE_ENVIRONMENT) and defaults to production.
 
 // Mirrors the module-level pattern in expireQRCodeSquareModifiers/src/index.mjs --
 // set once per client before that client's catalog calls, read by the
@@ -231,12 +227,8 @@ async function getAllClientsWithConfigurations(baseDbConfig) {
 
 async function getAllCategories() {
   try {
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_types: ['CATEGORY'],
         include_related_objects: false
@@ -288,12 +280,8 @@ async function getItemsByCategoryIds(categoryIds) {
     // Square doesn't support OR queries, so each category is searched separately.
     for (const categoryId of categoryIds) {
       try {
-        const categoryResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+        const categoryResponse = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-            "Content-Type": "application/json"
-          },
           body: JSON.stringify({
             object_types: ['ITEM'],
             query: {
@@ -341,12 +329,8 @@ async function getItemsByCategoryIds(categoryIds) {
 
 async function getAllCatalogItems() {
   try {
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         include_related_objects: true
@@ -384,27 +368,13 @@ async function getItemsByCategoryNames(categoryNames = ['Cinema', 'Events']) {
   }
 }
 
-async function retrieveCatalogObject(objectId) {
-  try {
-    const response = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${objectId}?include_related_objects=true`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to retrieve catalog object ${objectId}: ${response.status} ${errorText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error(`Error retrieving catalog object ${objectId}:`, error);
-    throw error;
-  }
+// ---- SQUARE CATALOG HELPER (shared: square-api-lib) ----
+// Used to be a full copy of expireQRCodeSquareModifiers' fetch code; now the
+// shared square-api-lib layer, given the current venue's token.
+function retrieveCatalogObject(objectId) {
+  return squareApi.retrieveCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
+// ---- END SQUARE CATALOG HELPER ----
 
 function filterItemsByCustomAttribute(catalogData, attributeName, attributeValue) {
   const itemsWithAttribute = [];

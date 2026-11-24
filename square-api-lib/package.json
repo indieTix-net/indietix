@@ -1,0 +1,21 @@
+{
+  "name": "square-api-lib",
+  "version": "1.0.0",
+  "description": "Shared Square REST API access for IndieTix (squareFetch for any endpoint, plus catalog helpers), packaged as a Lambda layer. Every Square call from getSquareOrders, QRScanner, expireQRCodeSquareModifiers, marketingEngine and squareTokenRefresher goes through it.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indieTix-net/indietix.git",
+    "directory": "square-api-lib"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "AGPL-3.0-or-later",
+  "engines": {
+    "node": "22.x"
+  }
+}

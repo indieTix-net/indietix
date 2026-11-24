@@ -28,6 +28,8 @@ import { sendSms, buildMessageBody, normalizeToE164 } from 'sms-utils';
 // equivalent to this file's old generateQRCode/overlayQRCodeOnPdf/
 // getPdfFromS3/savePdfToS3 (now removed) before switching over.
 import { generateQRCode, renderTicketPdf, fetchPdfFromS3, savePdfToS3 } from 'ticket-pdf-lib';
+import * as squareApi from 'square-api-lib';
+import { lookupShowings, enforceCapacity } from './native-events.mjs';
 
 const { Pool } = pg;
 
@@ -158,17 +160,12 @@ const transporter = nodemailer.createTransport({
 // a hardcoded Liberty Hall personal address shared across every client;
 // see clientSetup-Teardown's 2026-10-25 OWNER_BCC_EMAIL migration.
 
-// ---- SQUARE API BASE ----
-// Square's production API unless SQUARE_API_BASE says otherwise: an
-// environment pointed at Square's sandbox sets it to
-// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
-const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
-// ---- END SQUARE API BASE ----
-
-// Square API URLs
-const SQUARE_API_URL = `${SQUARE_API_BASE}/v2/orders/`;
-const SQUARE_CATALOG_API_URL = `${SQUARE_API_BASE}/v2/catalog/batch-retrieve`;
-const SQUARE_CUSTOMER_API_URL = `${SQUARE_API_BASE}/v2/customers/`;
+// ---- SQUARE API ----
+// Every Square API call (orders, payments, customers, catalog) goes through
+// the shared square-api-lib, which reads SQUARE_API_BASE: Square's
+// production API unless an environment points it at the sandbox
+// (bootstrap.sh, SQUARE_ENVIRONMENT).
+// ---- END SQUARE API ----
 
 /**
  * Generates a presigned URL for S3 object download
@@ -363,17 +360,13 @@ async function fetchSelectionValue(definitionId, selectionId) {
 
     console.log(`Fetching selection value for definitionId: ${definitionId}, selectionId: ${selectionId}`);
     
-    // Direct API call to get the definition
-    const url = `${SQUARE_API_BASE}/v2/catalog/object/${definitionId}`;
+    // Direct API call to get the definition (shared square-api-lib)
+    const path = `/v2/catalog/object/${definitionId}`;
     
-    console.log(`Making API call to: ${url}`);
+    console.log(`Making API call to: ${path}`);
     
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, path, {
+      method: "GET"
     });
 
     if (!response.ok) {
@@ -722,7 +715,7 @@ async function saveQRCodeToDatabase(pool, qrCode, productDetails = '', createJun
     await client.query('BEGIN');
     
     // First insert - QR code product with added Distributor, ProductVenue, ProductSeatCode, CustomerID columns
-    const productQuery = `
+    let productQuery = `
       INSERT INTO "QRCodeProduct" ("QRCode", "CheckedIn", "CreatedDate", "ExpirationDate", "LastEditedDate",
       "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductPrice",
        "ProductID", "ProductMetadata", "EmailAddress", "FirstName", "LastName", "PhoneNumber", "Distributor", "ProductVenue", "ProductSeatCode", "Status", "CustomerID")
@@ -757,6 +750,13 @@ async function saveQRCodeToDatabase(pool, qrCode, productDetails = '', createJun
       productDetails.customerId || null // CustomerID (NEW for SMS opt-in)
     ];
     
+    // NATIVE EVENTS: ShowingID only when known, so a venue database that
+    // predates the column keeps working.
+    if (productDetails.showingId) {
+      productValues.push(productDetails.showingId);
+      productQuery = productQuery.replace('"Status", "CustomerID")', '"Status", "CustomerID", "ShowingID")')
+        .replace('$21, $22)', '$21, $22, $23)');
+    }
     const productResult = await client.query(productQuery, productValues);
     const productId = productResult.rows[0].ID;
     console.log(`QR code saved to database with ID: ${productId}`);
@@ -852,12 +852,8 @@ async function saveQRCodeToDatabase(pool, qrCode, productDetails = '', createJun
 
 async function getCustomer(customerId) {
   try {
-    const response = await fetch(SQUARE_CUSTOMER_API_URL + customerId, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/customers/${customerId}`, {
+      method: "GET"
     });
 
     if (!response.ok) {
@@ -887,12 +883,8 @@ async function fetchCatalogItems(catalogObjectIds) {
 
     console.log(`Fetching catalog details for ${catalogObjectIds.length} items`);
     
-    const response = await fetch(SQUARE_CATALOG_API_URL, {
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/batch-retrieve', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_ids: catalogObjectIds,
         include_related_objects: true
@@ -910,8 +902,33 @@ async function fetchCatalogItems(catalogObjectIds) {
   }
   catch (error) {
     console.error(`Error fetching catalog items:`, error);
-    return {};
+    // Still an empty catalog to the caller (no ticketed items found), but
+    // flagged so the order isn't recorded as having none.
+    return { fetchFailed: true };
   } 
+}
+
+// ---- NoTicketOrder helpers (see NO-TICKET ORDER GUARD in processWebhook) ----
+// 42P01 = table doesn't exist: a venue database from before 2026-11-20 that
+// hasn't run that migration yet. Both helpers then do nothing.
+async function isKnownNoTicketOrder(pool, orderId) {
+  try {
+    const result = await pool.query(`SELECT 1 FROM "NoTicketOrder" WHERE "OrderID" = $1`, [orderId]);
+    return result.rows.length > 0;
+  } catch (error) {
+    if (error.code !== '42P01') console.error('NoTicketOrder lookup failed (processing the order anyway):', error.message);
+    return false;
+  }
+}
+
+async function rememberNoTicketOrder(pool, orderId) {
+  try {
+    await pool.query(`INSERT INTO "NoTicketOrder" ("OrderID") VALUES ($1) ON CONFLICT ("OrderID") DO NOTHING`, [orderId]);
+    // Square stops sending updates for a sale long before this; keeps the table small.
+    await pool.query(`DELETE FROM "NoTicketOrder" WHERE "CreatedDate" < NOW() - INTERVAL '90 days'`);
+  } catch (error) {
+    if (error.code !== '42P01') console.error('NoTicketOrder insert failed (harmless; a repeat webhook will reprocess):', error.message);
+  }
 }
 
 /**
@@ -1326,8 +1343,32 @@ async function processWebhook(event) {
   console.log('Webhook data:', JSON.stringify(webhookData));
 
   
+  // ---- VENUE FROM WEBHOOK URL ----
+  // A venue's own Square webhook subscription can carry its IndieTix client
+  // ID in the URL (.../webhook/square?client=indietix), so a venue's ID
+  // doesn't have to equal its Square merchant ID, with no shared lookup
+  // across venues. Square signs the full URL including the query string
+  // (proven against the Square sandbox 2026-11-19), so changing client=
+  // breaks the signature. A URL-routed venue must verify signatures and
+  // match its stored SQUARE_MERCHANT_ID; see the check after its config
+  // loads. No client= -> merchant_id is the client ID, exactly as before
+  // (Liberty Hall, and every Square-OAuth/hosted-signup venue, whose ID is
+  // their merchant ID by construction).
+  const urlClientId = event.queryStringParameters?.client;
+  const routedByUrl = urlClientId !== undefined && urlClientId !== null;
+  if (routedByUrl && !/^[A-Za-z0-9]{1,64}$/.test(urlClientId)) {
+    console.error(`SQUARE_WEBHOOK_REJECTED: malformed client= in webhook URL (${String(urlClientId).slice(0, 80)})`);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: 'Invalid client in webhook URL' })
+    };
+  }
+  // ---- END VENUE FROM WEBHOOK URL ----
+
   try {
-    if (webhookData.merchant_id) {
+    if (routedByUrl) {
+      clientId = urlClientId;
+    } else if (webhookData.merchant_id) {
       // Fallback to alternative ID extraction
       clientId = webhookData.merchant_id;
     }
@@ -1378,6 +1419,27 @@ async function processWebhook(event) {
     const TEMPLATE_PDF_SMS_KEY = clientConfig.TICKET_SMS_FILENAME || "ticket_vertical.pdf";
 
     
+    // ---- URL-ROUTED VENUE CHECKS ----
+    // Only honor client= for a venue that verifies Square signatures (so the
+    // ID in the URL is authenticated by Square) and whose stored Square
+    // merchant matches the webhook's.
+    if (routedByUrl) {
+      const problem =
+        clientConfig.ENV_TYPE !== 'prod' ? 'venue does not verify Square signatures (ENV_TYPE is not "prod")'
+        : !clientConfig.SQUARE_MERCHANT_ID ? 'venue has no SQUARE_MERCHANT_ID stored'
+        : clientConfig.SQUARE_MERCHANT_ID !== webhookData.merchant_id ? `webhook merchant ${webhookData.merchant_id} is not this venue's Square account`
+        : null;
+      if (problem) {
+        console.error(`SQUARE_WEBHOOK_REJECTED: client=${clientId}: ${problem}`);
+        await clientPool.end();
+        return {
+          statusCode: 401,
+          body: JSON.stringify({ message: 'Unauthorized: webhook does not match this venue' })
+        };
+      }
+    }
+    // ---- END URL-ROUTED VENUE CHECKS ----
+
     // Get signature verification details from client config
     let sigKey = clientConfig.SQUARE_SIGNATURE_KEY;
     let notURL = clientConfig.SQUARE_WEBHOOK_URL;
@@ -1399,7 +1461,7 @@ async function processWebhook(event) {
       
       // Early exit if signature header is missing
       if (!squareSignature) {
-        console.log('Request rejected: Missing Square signature header');
+        console.error(`SQUARE_WEBHOOK_REJECTED: client=${clientId}: missing Square signature header`);
         return {
           statusCode: 401,
           body: JSON.stringify({ message: 'Unauthorized' })
@@ -1424,6 +1486,10 @@ async function processWebhook(event) {
           console.info("Request body authorized: " + requestBody);
           
         } else {
+          // Square doesn't retry this (the forwarder already answered 200),
+          // so a rejected real order needs replaying by hand; the
+          // SQUARE_WEBHOOK_REJECTED alarm makes sure someone notices.
+          console.error(`SQUARE_WEBHOOK_REJECTED: client=${clientId}: signature did not verify against this venue's SQUARE_WEBHOOK_URL and SQUARE_SIGNATURE_KEY`);
           return {
             statusCode: 401,
             body: JSON.stringify({ message: 'Unauthorized square sigKey' })
@@ -1473,6 +1539,20 @@ async function processWebhook(event) {
           })
         };
       }
+      // ---- NO-TICKET ORDER GUARD ----
+      // A sale with no ticketed items (concessions) never gets an Order row,
+      // so the check above can't catch Square's repeat webhooks for it
+      // (~3 per sale, each a new payment version). NoTicketOrder remembers
+      // it instead. A venue whose database predates the table just skips
+      // this check (same behavior as before).
+      if (await isKnownNoTicketOrder(clientPool, earlyOrderId)) {
+        console.log(`Order ${earlyOrderId} already seen with no ticketed items; duplicate webhook event, skipping.`);
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ message: 'No ticketed items in this order; already seen (idempotent no-op)', order_id: earlyOrderId })
+        };
+      }
+      // ---- END NO-TICKET ORDER GUARD ----
       console.log(`Order ${earlyOrderId} not yet in DB; proceeding with full webhook processing.`);
     }
     // ---- end idempotency check --------------------------------------------
@@ -1486,14 +1566,9 @@ async function processWebhook(event) {
     console.log('BigTimeQ2:', JSON.stringify(webhookData));
 
     const paymentId = webhookData.data.object.payment.id;
-    const SQUARE_PAYMENT_API_URL = `${SQUARE_API_BASE}/v2/payments/`;
 // Make a fresh API call to get complete payment data
-const paymentResponse = await fetch(`${SQUARE_PAYMENT_API_URL}${paymentId}`, {
-  method: "GET",
-  headers: {
-    "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-    "Content-Type": "application/json"
-  }
+const paymentResponse = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/payments/${paymentId}`, {
+  method: "GET"
 });
 
 const currentPaymentData = await paymentResponse.json();
@@ -1540,12 +1615,8 @@ console.log('customerId:', customerId);
       console.error("Could not extract order ID", body);
       throw new Error("Invalid body structure: Cannot extract order ID");
     }
-    const response = await fetch(`${SQUARE_API_URL}${orderId}`, {
-      method: "GET",
-      headers: {
-          "Authorization": `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-      }
+    const response = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/orders/${orderId}`, {
+      method: "GET"
     });
 
     if (!response.ok) {
@@ -1577,6 +1648,23 @@ console.log('customerId:', customerId);
 
     let qrCodeItems = getCatalogItemsDetailsForQR(orderDetailsT, catalogItems);
     let finalItemArray = [];
+
+    // ---- NATIVE EVENTS: which IndieTix showing each ticket line is for ----
+    // By the line's showtime modifier id (every Liberty Hall ticket line has
+    // exactly one). Unknown = the ticket is made from the showtime text, as
+    // before; flagged when the item IS one of ours (a showtime added in
+    // Square's dashboard instead of the Showtimes page).
+    const nativeShowings = await lookupShowings(clientPool, qrCodeItems.map(item => ({
+      variationId: item.catalog_object_id,
+      modifierId: item.modifiers?.[0]?.catalog_object_id
+    })));
+    for (const item of qrCodeItems) {
+      const modifierId = item.modifiers?.[0]?.catalog_object_id;
+      if (!nativeShowings.byModifier.has(modifierId) && nativeShowings.knownVariations.has(item.catalog_object_id)) {
+        console.error(`UNMATCHED_SHOWTIME: order ${orderId}, "${item.name}" showtime "${item.modifiers?.[0]?.name}" (${modifierId}) isn't one IndieTix knows. Ticket issued from the showtime text. Add showtimes on the Showtimes page, not in Square.`);
+      }
+    }
+    // ---- END NATIVE EVENTS lookup ----
     console.log("WTF", JSON.stringify(qrCodeItems));
     qrCodeItems.forEach(item => {
       // Process each item based on quantity
@@ -1604,7 +1692,9 @@ console.log('customerId:', customerId);
           // Add the eventTypeInfo if it exists
           eventTypeInfo: item.eventTypeInfo,
           // Generate a unique QR code data string
-          qrCodeData: `${item.name}_${item.variation_name}_${orderId}_${item.uid}_${i}_${Date.now()}`
+          qrCodeData: `${item.name}_${item.variation_name}_${orderId}_${item.uid}_${i}_${Date.now()}`,
+          // NATIVE EVENTS: the IndieTix showing, or undefined
+          showing: nativeShowings.byModifier.get(item.modifiers?.[0]?.catalog_object_id)
         });
         console.log("finalItemArray:", JSON.stringify(finalItemArray));
       }
@@ -1689,6 +1779,7 @@ console.log('customerId:', customerId);
    
       // Process each line item to create tickets
       const ticketResults = [];
+      const soldShowingIds = []; // NATIVE EVENTS: showings that got a ticket, for the capacity check
       const emailAttachments = []; // Array to hold all attachments
       const venueNameForEmail = clientConfig.WEB_HEADER_COMPANY || 'the venue';
       let emailSubject = `Your ${venueNameForEmail} Tickets`;
@@ -1728,8 +1819,10 @@ console.log('customerId:', customerId);
           
           // NEW: Parse itemModifierValues to extract datetime and venue
           const modifierParsed = parseItemModifierValues(lineItem.itemModifierValues);
-          const eventDateTime = modifierParsed.datetime;
-          const eventVenue = modifierParsed.eventVenue;
+          // NATIVE EVENTS: a known showing's own time and room win over the text
+          // (they match it by construction; see QRScanner parseShowtimeLabel).
+          const eventDateTime = lineItem.showing ? lineItem.showing.startsAt : modifierParsed.datetime;
+          const eventVenue = lineItem.showing ? lineItem.showing.venue : modifierParsed.eventVenue;
           
           console.log(`Parsed modifier values for ${itemName}: DateTime: ${eventDateTime}, Venue: ${eventVenue}`);
           
@@ -1768,11 +1861,13 @@ console.log('customerId:', customerId);
               // Only the FIRST ticket in the order (createJunctionAndOrder=true) writes the
               // Order row and consumes the OptInToken; subsequent tickets just get CustomerID.
               optInToken: optInToken,
-              customerId: dbCustomerId
+              customerId: dbCustomerId,
+              showingId: lineItem.showing?.showingId ?? null
             }, 
             createJunctionAndOrder,
             expirationWindow);
             console.log(`QR code saved to database: ${sku}`);
+            if (lineItem.showing) soldShowingIds.push(lineItem.showing.showingId);
           } catch (error) {
             console.error("Failed to save QR code to database:", error);
             return {
@@ -1953,10 +2048,21 @@ console.log('customerId:', customerId);
         }
       }
 
+      // ---- NATIVE EVENTS: stop selling showings this order filled ----
+      // After the tickets and email: it can never delay or fail the order.
+      // Off unless the venue turns on ENFORCE_CAPACITY (Client Settings).
+      const enforceCapacityOn = clientConfig.ENFORCE_CAPACITY === true || clientConfig.ENFORCE_CAPACITY === 'true';
+      let capacityResults = [];
+      if (enforceCapacityOn && soldShowingIds.length > 0) {
+        capacityResults = await enforceCapacity(clientPool, clientConfig.SQUARE_ACCESS_TOKEN, soldShowingIds);
+      }
+      // ---- END NATIVE EVENTS capacity ----
+
       return {
         statusCode: 200,
         body: JSON.stringify({
           message: "PDF tickets with order details sent successfully",
+          sold_out_showings: capacityResults.filter(r => r.soldOut).map(r => r.showingId),
           tickets: ticketResults,
           recipient: recipientEmail,
           ticketCount: emailAttachments.length,
@@ -1975,6 +2081,14 @@ console.log('customerId:', customerId);
         // (that gap crashed the SQS handler and backed up the whole FIFO
         // queue on 2026-10-21).
         console.log(`Order ${orderId} has no ticketed items -- nothing to process.`);
+        // Remember it so Square's repeat webhooks skip straight out (see
+        // NO-TICKET ORDER GUARD). Never after a failed catalog fetch: then
+        // "no tickets" may be wrong, and the next webhook must try again.
+        if (catalogItems.fetchFailed) {
+          console.log(`Catalog fetch failed for order ${orderId}; not recording it as a no-ticket order, so a later webhook retries.`);
+        } else {
+          await rememberNoTicketOrder(clientPool, orderId);
+        }
         return {
           statusCode: 200,
           body: JSON.stringify({ message: 'No ticketed items in this order; nothing to process.' }),

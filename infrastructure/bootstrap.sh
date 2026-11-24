@@ -237,6 +237,40 @@ square_webhook_for() {
     python3 "$SCRIPT_DIR/lib/square-webhook.py" "$1"
 }
 
+# venue_webhook_url <base-url> <client-id> <merchant-id> -- the URL a venue's
+# OWN Square webhook subscription points at. Same as the base URL when the
+# venue's client ID is its Square merchant ID (Liberty Hall's convention);
+# otherwise the base URL + ?client=<client-id>, which getSquareOrders reads
+# to find the venue (Square signs the full URL, query string included, so
+# the ID can't be swapped). Never use it for an app-wide subscription that
+# serves many merchants (Connect Square / SQUARE_APP_ID): that URL must not
+# name one venue. Fails for a client ID that isn't letters and numbers,
+# which is all getSquareOrders accepts in client=.
+venue_webhook_url() {
+  if [ "$2" = "$3" ]; then
+    printf '%s' "$1"
+  elif printf '%s' "$2" | grep -Eq '^[A-Za-z0-9]{1,64}$'; then
+    printf '%s?client=%s' "$1" "$2"
+  else
+    echo "Client ID '$2' differs from its Square merchant ID '$3', so its webhook URL must carry ?client=$2, but only letters and numbers are allowed there. Use the merchant ID as the username, or a letters-and-numbers one." >&2
+    return 1
+  fi
+}
+
+# first_client_webhook_url <base-url> -- the first client's subscription URL
+# (SQUARE_WEBHOOK_AUTO). With SQUARE_APP_ID set the subscription can carry
+# every connected merchant's events, so it stays the bare base URL.
+first_client_webhook_url() {
+  if [ -n "$SQUARE_APP_ID" ]; then
+    if [ "$FIRST_CLIENT_USERNAME" != "$SQUARE_EXPECTED_MERCHANT_ID" ]; then
+      echo "WARNING: FIRST_CLIENT_USERNAME ($FIRST_CLIENT_USERNAME) isn't its Square merchant ID ($SQUARE_EXPECTED_MERCHANT_ID). With SQUARE_APP_ID set its webhook URL can't name the venue, so its orders won't be found. Use the merchant ID as the username." >&2
+    fi
+    printf '%s' "$1"
+  else
+    venue_webhook_url "$1" "$FIRST_CLIENT_USERNAME" "$SQUARE_EXPECTED_MERCHANT_ID"
+  fi
+}
+
 # merge_lambda_env <function> <set-json> [key-to-remove ...] -- sets the
 # variables in <set-json> (a JSON object) and removes the listed keys on one
 # Lambda, keeping every other variable. Not in the SAM templates, because
@@ -557,6 +591,12 @@ sync_stack_source() {
   local stack_dir="$1" repo_key="$2"
   echo "--- Syncing $stack_dir/src from the real $repo_key repo ---"
   stage_source_files "$repo_key" "$SCRIPT_DIR/$stack_dir/src"
+  # Same syntax + local-import check deploy.sh's builds run (2026-11-20: a
+  # new file missing from FILES shipped a QRScanner that couldn't start).
+  if ! lint_build "$repo_key" "$SCRIPT_DIR/$stack_dir/src"; then
+    echo "ERROR: $repo_key's code failed lint (see above); not deploying it. Add any new file to FILES in lib/repo-config.sh." >&2
+    exit 1
+  fi
 }
 
 # publish_layer_sandbox <repo-config-key> -- builds and publishes a new
@@ -598,8 +638,11 @@ publish_layer_sandbox() {
 # TICKET_SMS_FILENAME, same as production's venue-specific templates
 # always worked). Echoes the bucket name.
 seed_ticket_templates_bucket() {
+  # Only the bucket name may reach stdout: the caller captures it. (aws-cli
+  # 2.x head-bucket prints JSON; captured, it made TICKET_TEMPLATES_BUCKET
+  # "{" in indietix-boottest, so onboarding never copied the templates.)
   local bucket="${ENV_PREFIX}-ticket-templates"
-  if ! aws s3api head-bucket --bucket "$bucket" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null; then
+  if ! aws s3api head-bucket --bucket "$bucket" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
     echo "Creating ticket-templates bucket: $bucket" >&2
     if [ "$AWS_REGION" = "us-east-1" ]; then
       aws s3api create-bucket --bucket "$bucket" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >&2
@@ -778,6 +821,7 @@ cmd_up() {
   local webhook_url square_location_id="$FIRST_CLIENT_SQUARE_LOCATION_ID"
   webhook_url="$(stack_output square-queue-forwarder ApiEndpoint)"
   if [ "$SQUARE_WEBHOOK_AUTO" = "true" ]; then
+    webhook_url="$(first_client_webhook_url "$webhook_url")" || exit 1
     echo "=== Square webhook subscription '$SQUARE_WEBHOOK_NAME' ==="
     local webhook_json
     webhook_json="$(square_webhook sync "$webhook_url")"
@@ -787,19 +831,22 @@ cmd_up() {
     echo
   fi
 
-  # 3b. Shared layers (sms-utils, ticket-pdf-lib) -- built and published
-  # fresh into THIS environment, before any of their 3 consumers deploy.
+  # 3b. Shared layers (sms-utils, ticket-pdf-lib, square-api-lib) --
+  # built and published fresh into THIS environment, before any of their
+  # consumers deploy.
   # Several repo-config.sh keys share one underlying LAYER_NAME (e.g.
   # sms-utils-qrscanner / sms-utils-sms-opt-in-opt-out / sms-utils-
   # get-square-orders are all "smsUtils") -- publish each distinct layer
   # exactly once and reuse the ARN, rather than rebuilding/republishing
   # per consumer.
   echo "=== Publishing shared layers for this environment ==="
-  local sms_utils_layer_arn ticket_pdf_lib_layer_arn
+  local sms_utils_layer_arn ticket_pdf_lib_layer_arn square_api_lib_layer_arn
   sms_utils_layer_arn=$(publish_layer_sandbox "sms-utils-qrscanner")
   echo "sms-utils: $sms_utils_layer_arn"
   ticket_pdf_lib_layer_arn=$(publish_layer_sandbox "ticket-pdf-lib")
   echo "ticket-pdf-lib: $ticket_pdf_lib_layer_arn"
+  square_api_lib_layer_arn=$(publish_layer_sandbox "square-api-lib")
+  echo "square-api-lib: $square_api_lib_layer_arn"
   echo
 
   # 4. The 7 VPC-attached Lambdas (need step 1's exports). Each one's
@@ -818,11 +865,13 @@ cmd_up() {
 
   sync_stack_source "get-square-orders" "getSquareOrders"
   deploy_stack "get-square-orders" "get-square-orders" \
-    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}"
+    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}" \
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "qrscanner" "QRScanner"
   deploy_stack "qrscanner" "qrscanner" \
-    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}"
+    "SmsUtilsLayerArn=${sms_utils_layer_arn}" "TicketPdfLibLayerArn=${ticket_pdf_lib_layer_arn}" \
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "client-reporting" "clientReporting"
   deploy_stack "client-reporting" "client-reporting"
@@ -831,14 +880,17 @@ cmd_up() {
   deploy_stack "daily-pg-sftp" "daily-pg-sftp"
 
   sync_stack_source "expire-modifiers" "expireQRCodeSquareModifiers"
-  deploy_stack "expire-modifiers" "expire-modifiers"
+  deploy_stack "expire-modifiers" "expire-modifiers" \
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "square-token-refresher" "squareTokenRefresher"
-  deploy_stack "square-token-refresher" "square-token-refresher"
+  deploy_stack "square-token-refresher" "square-token-refresher" \
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   sync_stack_source "marketing-engine" "marketingEngine"
   deploy_stack "marketing-engine" "marketing-engine" \
-    "EnablePollerSchedule=${ENABLE_MARKETING_POLLER}"
+    "EnablePollerSchedule=${ENABLE_MARKETING_POLLER}" \
+    "SquareApiLibLayerArn=${square_api_lib_layer_arn}"
 
   # 5. Inbound SMS.
   sync_stack_source "sms-inbound" "smsOptInOptOut"
@@ -906,6 +958,8 @@ cmd_up() {
     FIRST_CLIENT_SQUARE_SIGNATURE_KEY="$FIRST_CLIENT_SQUARE_SIGNATURE_KEY" \
     SQUARE_WEBHOOK_URL="$webhook_url" \
     SQUARE_LOCATION_ID="$square_location_id" \
+    SQUARE_MERCHANT_ID="$([ "$SQUARE_WEBHOOK_AUTO" = "true" ] && printf '%s' "$SQUARE_EXPECTED_MERCHANT_ID")" \
+    ENV_TYPE="$([ "$SQUARE_WEBHOOK_AUTO" = "true" ] && echo prod)" \
     FIRST_CLIENT_ADMIN_USERNAME="$FIRST_CLIENT_ADMIN_USERNAME" \
     FIRST_CLIENT_ADMIN_PASSWORD="$FIRST_CLIENT_ADMIN_PASSWORD" \
     FIRST_CLIENT_ADMIN_EMAIL="$FIRST_CLIENT_ADMIN_EMAIL" \
@@ -926,6 +980,13 @@ payload = {
     "square_webhook_url": os.environ.get("SQUARE_WEBHOOK_URL", ""),
     "square_location_id": os.environ.get("SQUARE_LOCATION_ID", ""),
 }
+# With SQUARE_WEBHOOK_AUTO the subscription (and so its signature key and
+# exact URL) was just made for this venue: verify signatures from day one,
+# and record the merchant for the ?client= check.
+if os.environ.get("SQUARE_MERCHANT_ID"):
+    payload["square_merchant_id"] = os.environ["SQUARE_MERCHANT_ID"]
+if os.environ.get("ENV_TYPE"):
+    payload["env_type"] = os.environ["ENV_TYPE"]
 # Optional named admin account -- both-or-neither, matching the
 # handler validation. Omit entirely rather than send blank strings
 # so the handler takes its normal "not provided" path.
@@ -1068,7 +1129,7 @@ print_summary() {
 empty_bucket() {
   local b="$1"
   case "$b" in "${ENV_PREFIX}"-*) ;; *) echo "  refusing to empty $b (not ${ENV_PREFIX}-*)" >&2; return 1 ;; esac
-  if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null; then
+  if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
     echo "Emptying s3://$b"
     aws s3 rm "s3://$b" --recursive --only-show-errors "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION"
   fi
@@ -1196,6 +1257,9 @@ cmd_down() {
     local webhook_url
     webhook_url="$(stack_output square-queue-forwarder ApiEndpoint 2>/dev/null || true)"
     if [ -n "$webhook_url" ] && [ "$webhook_url" != "None" ]; then
+      webhook_url="$(first_client_webhook_url "$webhook_url")" || webhook_url=""
+    fi
+    if [ -n "$webhook_url" ] && [ "$webhook_url" != "None" ]; then
       echo "=== Removing Square webhook subscription '$SQUARE_WEBHOOK_NAME' ==="
       square_webhook remove "$webhook_url" || echo "  (couldn't remove it -- delete it in the Square Developer Dashboard)"
       echo
@@ -1315,7 +1379,7 @@ cmd_down() {
     leftover_buckets="$leftover_buckets ${ENV_PREFIX}-${client_lower} ${ENV_PREFIX}-${client_lower}-bdor"
   done
   for b in $leftover_buckets; do
-    if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" 2>/dev/null; then
+    if aws s3api head-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" >/dev/null 2>&1; then
       empty_bucket "$b" && \
         aws s3api delete-bucket --bucket "$b" "${AWS_ARGS[@]+"${AWS_ARGS[@]}"}" --region "$AWS_REGION" && \
         echo "Deleted bucket $b"
@@ -1460,7 +1524,7 @@ cmd_add_client() {
   client="$(venue check "$file")" || exit 1
   mkdir -p "$STAGING"
 
-  local webhook_url signature_key="" location_id="" already=false
+  local webhook_url signature_key="" location_id="" merchant_id="" already=false
   webhook_url="$(forwarder_webhook_url)"
   if client_in_env "$client"; then
     already=true
@@ -1475,6 +1539,20 @@ cmd_add_client() {
     name="$(venue field "$file" square_webhook.name)"
     name="${name:-${ENV_PREFIX}-${client}}"
     location="$(venue field "$file" square_location_id)"
+    if [ "$client" != "$merchant" ] && [ "$already" = true ]; then
+      # Onboarded before webhook URLs could carry ?client=, so it has never
+      # received orders. Changing the subscription now would break its stored
+      # SQUARE_WEBHOOK_URL / signature key, so say what to do instead.
+      echo "Venue $client isn't its Square merchant ID ($merchant), so its webhook URL needs ?client=$client." >&2
+      echo "Not changing an onboarded venue's subscription. To switch it: point subscription '$name' at" >&2
+      echo "  $(venue_webhook_url "$webhook_url" "$client" "$merchant" || true)" >&2
+      echo "then set its SQUARE_WEBHOOK_URL to exactly that, SQUARE_SIGNATURE_KEY to the subscription's key," >&2
+      echo "SQUARE_MERCHANT_ID to $merchant and ENV_TYPE to prod." >&2
+      unset token
+      return 0
+    fi
+    webhook_url="$(venue_webhook_url "$webhook_url" "$client" "$merchant")" || exit 1
+    merchant_id="$merchant"
     echo "--- Square webhook subscription '$name' ---"
     webhook_json="$(square_webhook_for sync "$webhook_url" "$token" "$merchant" "$name" "$location")" \
       || { echo "Square webhook setup failed -- nothing was onboarded." >&2; exit 1; }
@@ -1490,8 +1568,11 @@ cmd_add_client() {
   local payload_file static_website_url fn_name="${ENV_PREFIX}-client-setup-teardown"
   static_website_url="https://${STATIC_SITE_DOMAIN:-$(stack_output static-site DistributionDomainName)}"
   payload_file="$(umask 077; mktemp "$STAGING/venue-payload.XXXXXX")"
+  # A managed subscription was just made for this venue (exact URL, fresh
+  # key): verify signatures from day one and record the merchant.
   ENV_PREFIX="$ENV_PREFIX" SQUARE_WEBHOOK_URL="$webhook_url" \
     SQUARE_SIGNATURE_KEY="$signature_key" SQUARE_LOCATION_ID="$location_id" \
+    SQUARE_MERCHANT_ID="$merchant_id" ENV_TYPE="$([ -n "$merchant_id" ] && echo prod)" \
     STATIC_WEBSITE_URL="$static_website_url" \
     venue payload "$file" "$payload_file" || { rm -f "$payload_file"; exit 1; }
   unset signature_key
@@ -1563,6 +1644,7 @@ cmd_remove_client() {
     merchant="$(venue field "$file" square_webhook.expected_merchant_id)"
     name="$(venue field "$file" square_webhook.name)"
     name="${name:-${ENV_PREFIX}-${client}}"
+    webhook_url="$(venue_webhook_url "$webhook_url" "$client" "$merchant")" || webhook_url="$(forwarder_webhook_url)"
     echo "=== Removing Square webhook subscription '$name' ==="
     square_webhook_for remove "$webhook_url" "$token" "$merchant" "$name" "" \
       || echo "  (couldn't remove it -- delete it in the Square Developer Dashboard)"

@@ -332,3 +332,80 @@ test('ticket items: ticket types and prices come from the venue\'s settings, els
   }
 });
 
+
+// ---- poster upload (square-api-lib uploadCatalogImage) ----
+// The upload used to go through form-data's raw .submit(), which this
+// harness couldn't intercept, so posters were never tested. It now goes
+// through fetch, so both routes' poster paths are covered here. A data: URL
+// poster keeps it offline (no download).
+const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+function capturePosterUpload() {
+  const captured = { uploads: [], items: [] };
+  squareHandlers.uploadCatalogImage = async (form, headers) => {
+    captured.uploads.push({ form, headers });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ image: { id: 'MOCK_IMAGE_ID' } }) };
+  };
+  const createDefault = squareHandlers.createCatalogObject;
+  squareHandlers.createCatalogObject = async (body) => {
+    if (body.object?.type === 'ITEM') captured.items.push(body.object);
+    return createDefault(body);
+  };
+  return captured;
+}
+
+async function assertPosterUploaded(captured, expectedFilename, expectedCaption) {
+  assert.equal(captured.uploads.length, 1, 'one poster upload');
+  const { form, headers } = captured.uploads[0];
+  assert.match(headers.Authorization, /^Bearer /);
+  assert.equal(headers['Content-Type'], undefined, 'fetch sets the multipart boundary itself');
+  assert.deepEqual([...form.keys()], ['file', 'request']);
+  const file = form.get('file');
+  assert.equal(file.name, expectedFilename);
+  assert.equal(file.type, 'image/jpeg');
+  assert.ok(file.size > 0);
+  const request = JSON.parse(form.get('request'));
+  assert.equal(request.image.type, 'IMAGE');
+  assert.equal(request.image.image_data.caption, expectedCaption);
+  assert.equal(captured.items.length, 1);
+  assert.deepEqual(captured.items[0].item_data.image_ids, ['MOCK_IMAGE_ID'], 'uploaded image attached to the item');
+}
+
+test('POST /api/square/create-movie-item: poster is uploaded to Square and attached to the item', async () => {
+  const captured = capturePosterUpload();
+  const { status, json } = await ctx.request('POST', '/api/square/create-movie-item', {
+    token: ctx.clientToken,
+    body: movieBody({ title: 'The Glass Orchard', posterUrl: TINY_PNG })
+  });
+  assert.equal(status, 200);
+  assert.equal(json.success, true);
+  await assertPosterUploaded(captured, 'the_glass_orchard_poster.jpg', 'The Glass Orchard');
+});
+
+test('POST /api/square/create-event-item: poster is uploaded to Square and attached to the item', async () => {
+  squareHandlers.listCatalogCategories = async () => ({ ok: true, status: 200, json: async () => ({ objects: [{ id: 'MOCK_CAT_EVENTS', category_data: { name: 'Events' } }] }) });
+  const captured = capturePosterUpload();
+  const { status, json } = await ctx.request('POST', '/api/square/create-event-item', {
+    token: ctx.clientToken,
+    body: eventBody({ title: 'Trivia Night', posterUrl: TINY_PNG })
+  });
+  assert.equal(status, 200);
+  assert.equal(json.success, true);
+  await assertPosterUploaded(captured, 'trivia_night_poster.jpg', 'Trivia Night');
+});
+
+test('POST /api/square/create-movie-item: a failed poster upload still creates the item, without an image', async () => {
+  const captured = capturePosterUpload();
+  squareHandlers.uploadCatalogImage = async (form, headers) => {
+    captured.uploads.push({ form, headers });
+    return { ok: false, status: 400, text: async () => '{"errors":[{"code":"INVALID_REQUEST_ERROR"}]}' };
+  };
+  const { status, json } = await ctx.request('POST', '/api/square/create-movie-item', {
+    token: ctx.clientToken,
+    body: movieBody({ posterUrl: TINY_PNG })
+  });
+  assert.equal(status, 200);
+  assert.equal(json.success, true);
+  assert.equal(captured.uploads.length, 1);
+  assert.equal(captured.items[0].item_data.image_ids, undefined);
+});

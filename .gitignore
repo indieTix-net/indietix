@@ -17,3 +17,5 @@ node_modules/
 # Built from support/knowledge by help/build.mjs at deploy time.
 /QRScanner/src/public/help/
 .DS_Store
+NATIVE_EVENTS_PLAN.md
+POS_INTEGRATIONS_PLAN.md

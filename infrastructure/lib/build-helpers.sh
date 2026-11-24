@@ -136,7 +136,12 @@ build_layer_zip() {
 
   local final="$STAGING/layer-final-$repo"
   rm -rf "$final"; mkdir -p "$final/nodejs"
-  mv "$clean/node_modules" "$final/nodejs/node_modules"
+  # A package with no runtime dependencies (square-api-lib) has no node_modules.
+  if [ -d "$clean/node_modules" ]; then
+    mv "$clean/node_modules" "$final/nodejs/node_modules"
+  else
+    mkdir -p "$final/nodejs/node_modules"
+  fi
 
   # sharp pulls in prebuilt binaries for every platform npm knows about, even
   # though --os/--cpu/--libc above pins us to linux/x64/glibc. The musl and

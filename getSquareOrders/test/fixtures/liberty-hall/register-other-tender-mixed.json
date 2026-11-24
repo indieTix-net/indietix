@@ -1,0 +1,900 @@
+{
+  "shape": "register-other-tender-mixed",
+  "description": "Box office register, \"other\" tender, tickets plus non-ticket items.",
+  "recorded": "2026-11-01, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "85f6e865-7635-39ba-af21-a91af2e45021",
+    "created_at": "2026-11-01T02:45:01.829Z",
+    "data": {
+      "type": "payment",
+      "id": "6iHKwUFYBXu7urOLCjXQap2bbIEZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 3593,
+            "currency": "USD"
+          },
+          "application_details": {
+            "square_product": "RETAIL"
+          },
+          "capabilities": [
+            "EDIT_AMOUNT_UP",
+            "EDIT_AMOUNT_DOWN",
+            "EDIT_TIP_AMOUNT_UP",
+            "EDIT_TIP_AMOUNT_DOWN"
+          ],
+          "created_at": "2026-11-01T02:45:00.517Z",
+          "device_details": {
+            "device_id": "fixture-device-01",
+            "device_installation_id": "fixture-device-02",
+            "device_name": "redacted-01"
+          },
+          "employee_id": "FIXTURESTAFF01",
+          "external_details": {
+            "source": "Other Gift Card or Certificate",
+            "type": "OTHER_GIFT_CARD"
+          },
+          "id": "6iHKwUFYBXu7urOLCjXQap2bbIEZY",
+          "location_id": "S3E2Q1EK0466V",
+          "note": "redacted-34",
+          "order_id": "iburZcEac97NmqOuNyvrxVbv60DZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "source_type": "EXTERNAL",
+          "status": "COMPLETED",
+          "team_member_id": "FIXTURESTAFF01",
+          "total_money": {
+            "amount": 3593,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-01T02:45:00.617Z",
+          "version": 1
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "6iHKwUFYBXu7urOLCjXQap2bbIEZY",
+      "created_at": "2026-11-01T02:45:00.517Z",
+      "updated_at": "2026-11-01T02:45:00.617Z",
+      "amount_money": {
+        "amount": 3593,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "source_type": "EXTERNAL",
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "iburZcEac97NmqOuNyvrxVbv60DZY",
+      "note": "redacted-34",
+      "total_money": {
+        "amount": 3593,
+        "currency": "USD"
+      },
+      "employee_id": "FIXTURESTAFF01",
+      "capabilities": [
+        "EDIT_AMOUNT_UP",
+        "EDIT_AMOUNT_DOWN",
+        "EDIT_TIP_AMOUNT_UP",
+        "EDIT_TIP_AMOUNT_DOWN"
+      ],
+      "external_details": {
+        "type": "OTHER_GIFT_CARD",
+        "source": "Other Gift Card or Certificate"
+      },
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "device_details": {
+        "device_id": "fixture-device-01",
+        "device_name": "redacted-01",
+        "device_installation_id": "fixture-device-02"
+      },
+      "team_member_id": "FIXTURESTAFF01",
+      "application_details": {
+        "square_product": "RETAIL"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": null,
+  "order": {
+    "order": {
+      "id": "iburZcEac97NmqOuNyvrxVbv60DZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "cb8ff269-97e1-4add-b92c-46ad8467e318",
+          "catalog_object_id": "RCH2FAPC46SSSGIK42HAZ22W",
+          "catalog_version": 1792167060717,
+          "quantity": "2",
+          "name": "House (1977)",
+          "variation_name": "Adult",
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "ae79a831-4445-4a8f-aac3-e52f3853526e",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Sat 10-31-2026 10:00 PM (Main Auditorium)",
+              "catalog_object_id": "FUOEX7AOREZ3UZ6FV67TI42I",
+              "catalog_version": 1792164438812,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        },
+        {
+          "uid": "1f6372f0-ed36-43b9-9b5f-4f01a4397e13",
+          "catalog_object_id": "JFQT6K3TUSV6ABPYG3M4O5GE",
+          "catalog_version": 1788386622727,
+          "quantity": "5",
+          "name": "Pinback Button",
+          "variation_name": "Regular",
+          "base_price_money": {
+            "amount": 200,
+            "currency": "USD"
+          },
+          "gross_sales_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 93,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 1093,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "applied_taxes": [
+            {
+              "uid": "1f0360df-0d83-46e0-accc-80d677d86cd6",
+              "tax_uid": "1f0360df-0d83-46e0-accc-80d677d86cd6",
+              "applied_money": {
+                "amount": 93,
+                "currency": "USD"
+              },
+              "auto_applied": true
+            }
+          ],
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "taxes": [
+        {
+          "uid": "1f0360df-0d83-46e0-accc-80d677d86cd6",
+          "catalog_object_id": "2YPO65G2UPWBFYQCD2HUYZ72",
+          "catalog_version": 1750287219825,
+          "name": "Sales Tax",
+          "percentage": "9.3",
+          "type": "ADDITIVE",
+          "applied_money": {
+            "amount": 93,
+            "currency": "USD"
+          },
+          "scope": "LINE_ITEM"
+        }
+      ],
+      "created_at": "2026-11-01T02:45:00.309Z",
+      "updated_at": "2026-11-01T02:45:03.000Z",
+      "state": "COMPLETED",
+      "version": 4,
+      "total_tax_money": {
+        "amount": 93,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 3593,
+        "currency": "USD"
+      },
+      "closed_at": "2026-11-01T02:45:00.683Z",
+      "tenders": [
+        {
+          "id": "6iHKwUFYBXu7urOLCjXQap2bbIEZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "iburZcEac97NmqOuNyvrxVbv60DZY",
+          "created_at": "2026-11-01T02:45:00Z",
+          "note": "redacted-34",
+          "amount_money": {
+            "amount": 3593,
+            "currency": "USD"
+          },
+          "type": "OTHER",
+          "payment_id": "6iHKwUFYBXu7urOLCjXQap2bbIEZY",
+          "other_details": {
+            "source": "Other Gift Card or Certificate"
+          }
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 3593,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 93,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {},
+      "ticket_name": "redacted-35",
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF01"
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "RCH2FAPC46SSSGIK42HAZ22W",
+        "updated_at": "2026-10-16T16:11:00.717Z",
+        "created_at": "2026-10-16T15:27:19.551Z",
+        "version": 1792167060717,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "6NK2F54VMHYTVBJBNULSLM6X",
+          "name": "Adult",
+          "ordinal": 1,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ]
+        }
+      },
+      {
+        "type": "ITEM_VARIATION",
+        "id": "JFQT6K3TUSV6ABPYG3M4O5GE",
+        "updated_at": "2026-04-04T22:23:14.761Z",
+        "created_at": "2024-06-07T13:24:23.231Z",
+        "version": 1775341394761,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "absent_at_location_ids": [
+          "00BRK1SM4TN1C",
+          "LGS411XEZCRVF"
+        ],
+        "item_variation_data": {
+          "item_id": "SBRVUCWD7TVNCXS3LMGFKI6W",
+          "name": "Regular",
+          "sku": "9032519",
+          "ordinal": 0,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 200,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": true,
+              "sold_out": true
+            }
+          ],
+          "track_inventory": true,
+          "price_description": "",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "6NK2F54VMHYTVBJBNULSLM6X",
+        "updated_at": "2026-10-16T16:11:00.717Z",
+        "created_at": "2026-10-16T15:27:19.551Z",
+        "version": 1792167060717,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "House (1977)",
+          "description": "Rating: Not Rated\nGenre: Comedy, Horror\nRuntime: 88 min\n\nOshare (Gorgeous) is excited about spending summer vacation with her father, until she finds out that his beautiful, freakishly serene girlfriend Ryouko would be going as well. Oshare decides she will be going to her aunt's house in the country instead. She brings with her her friends from school - Fanta (who likes to take pictures, and daydreams a lot), KunFuu (who has very good reflexes), Gari/Prof (who is a major nerd), Sweet (who likes to clean), Mac (who eats a lot), and Melody (a musician). However, the girls are unaware that the house is actually haunted. When they arrive at the house, crazy events take place and the girls disappear one by one while slowly discovering the secret behind all the madness.\n\nDirector: Nobuhiko Obayashi\nCast: Kimiko Ikegami, Miki Jinbo, Kumiko Ôba",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "GIXBVZUVHRZ5GJ33VRUAZFLW",
+              "min_selected_modifiers": 1,
+              "max_selected_modifiers": 1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "BMWP23PBDZZK7C2UZKE6T2HN",
+              "updated_at": "2026-10-16T16:11:00.717Z",
+              "created_at": "2026-10-16T15:27:19.551Z",
+              "version": 1792167060717,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "6NK2F54VMHYTVBJBNULSLM6X",
+                "name": "Child",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "RCH2FAPC46SSSGIK42HAZ22W",
+              "updated_at": "2026-10-16T16:11:00.717Z",
+              "created_at": "2026-10-16T15:27:19.551Z",
+              "version": 1792167060717,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "6NK2F54VMHYTVBJBNULSLM6X",
+                "name": "Adult",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1250,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "3IAIE3P6ALT2TG2LWA3BJ4WT",
+              "updated_at": "2026-10-16T16:11:00.717Z",
+              "created_at": "2026-10-16T15:27:19.551Z",
+              "version": 1792167060717,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "6NK2F54VMHYTVBJBNULSLM6X",
+                "name": "Senior",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1100,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "ZMHLGOYORLQDF6DXVECIKSG6"
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798572171264
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162605879296
+            }
+          ],
+          "description_html": "<p>Rating: Not Rated</p><p>Genre: Comedy, Horror</p><p>Runtime: 88 min</p><p><br></p><p>Oshare (Gorgeous) is excited about spending summer vacation with her father, until she finds out that his beautiful, freakishly serene girlfriend Ryouko would be going as well. Oshare decides she will be going to her aunt&#39;s house in the country instead. She brings with her her friends from school - Fanta (who likes to take pictures, and daydreams a lot), KunFuu (who has very good reflexes), Gari/Prof (who is a major nerd), Sweet (who likes to clean), Mac (who eats a lot), and Melody (a musician). However, the girls are unaware that the house is actually haunted. When they arrive at the house, crazy events take place and the girls disappear one by one while slowly discovering the secret behind all the madness.</p><p><br></p><p>Director: Nobuhiko Obayashi</p><p>Cast: Kimiko Ikegami, Miki Jinbo, Kumiko Ôba</p>",
+          "description_plaintext": "Rating: Not Rated\nGenre: Comedy, Horror\nRuntime: 88 min\n\nOshare (Gorgeous) is excited about spending summer vacation with her father, until she finds out that his beautiful, freakishly serene girlfriend Ryouko would be going as well. Oshare decides she will be going to her aunt's house in the country instead. She brings with her her friends from school - Fanta (who likes to take pictures, and daydreams a lot), KunFuu (who has very good reflexes), Gari/Prof (who is a major nerd), Sweet (who likes to clean), Mac (who eats a lot), and Melody (a musician). However, the girls are unaware that the house is actually haunted. When they arrive at the house, crazy events take place and the girls disappear one by one while slowly discovering the secret behind all the madness.\n\nDirector: Nobuhiko Obayashi\nCast: Kimiko Ikegami, Miki Jinbo, Kumiko Ôba",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+            "ordinal": -2251798572171264
+          }
+        }
+      },
+      {
+        "type": "ITEM",
+        "id": "SBRVUCWD7TVNCXS3LMGFKI6W",
+        "updated_at": "2026-09-02T22:03:42.727Z",
+        "created_at": "2024-06-07T13:24:23.231Z",
+        "version": 1788386622727,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "absent_at_location_ids": [
+          "00BRK1SM4TN1C",
+          "LGS411XEZCRVF"
+        ],
+        "item_data": {
+          "name": "Pinback Button",
+          "description": "Pinback button (misc designs)\nRoll the dice and see what you get!",
+          "is_taxable": true,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "JFQT6K3TUSV6ABPYG3M4O5GE",
+              "updated_at": "2026-04-04T22:23:14.761Z",
+              "created_at": "2024-06-07T13:24:23.231Z",
+              "version": 1775341394761,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "absent_at_location_ids": [
+                "00BRK1SM4TN1C",
+                "LGS411XEZCRVF"
+              ],
+              "item_variation_data": {
+                "item_id": "SBRVUCWD7TVNCXS3LMGFKI6W",
+                "name": "Regular",
+                "sku": "9032519",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 200,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "sold_out": true
+                  }
+                ],
+                "track_inventory": true,
+                "price_description": "",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": true,
+          "ecom_uri": "https://shop.libertyhall.net/product/pinback-button/187",
+          "ecom_image_uris": [
+            "https://shop.libertyhall.net/uploads/1/3/1/4/131407052/s535774137739568513_p187_i1_w3072.jpeg"
+          ],
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "MHQ7LCSPPCGANKJGAHQRTUFC"
+          ],
+          "categories": [
+            {
+              "id": "HNBQVSJKQ4D35GE7KVJT6FUZ",
+              "ordinal": 110350
+            },
+            {
+              "id": "ILEYI26IQ6NDHDIRV53GSKGT",
+              "ordinal": -2251799746576384
+            }
+          ],
+          "description_html": "<p>Pinback button (misc designs)</p><p>Roll the dice and see what you get!</p>",
+          "description_plaintext": "Pinback button (misc designs)\nRoll the dice and see what you get!",
+          "kitchen_name": "Pinback Button",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "HNBQVSJKQ4D35GE7KVJT6FUZ",
+            "ordinal": 110350
+          },
+          "is_alcoholic": false
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "ZMHLGOYORLQDF6DXVECIKSG6",
+        "updated_at": "2026-10-16T16:10:57.661Z",
+        "created_at": "2026-10-16T16:10:57.698Z",
+        "version": 1792167057661,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "name": "house.jpg",
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/a32383fe70a5bf8e1f36adf5d1f9527705e09023/original.jpeg"
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "MHQ7LCSPPCGANKJGAHQRTUFC",
+        "updated_at": "2024-06-07T13:21:07.298Z",
+        "created_at": "2024-06-07T13:21:07.336Z",
+        "version": 1717766467298,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "name": "20240607_082020.jpg",
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/d766c72d8893c48f7b3066af03a27cee6cd0d83e/original.jpeg"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "WALK-UP",
+      "LastName": "CASH-MASTER",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "House (1977)",
+        "ProductDate": "2026-10-31 22:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sat 10-31-2026 10:00 PM (Main Auditorium)",
+        "ProductPrice": 12.5,
+        "ProductID": "RCH2FAPC46SSSGIK42HAZ22W",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "House (1977)_Adult_iburZcEac97NmqOuNyvrxVbv60DZY_cb8ff269-97e1-4add-b92c-46ad8467e318_",
+        "ProductMetadata": {
+          "uid": "cb8ff269-97e1-4add-b92c-46ad8467e318",
+          "name": "House (1977)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "ae79a831-4445-4a8f-aac3-e52f3853526e",
+              "name": "Sat 10-31-2026 10:00 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1792164438812,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "FUOEX7AOREZ3UZ6FV67TI42I",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1792167060717,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "catalog_object_id": "RCH2FAPC46SSSGIK42HAZ22W",
+          "gross_sales_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798572171264},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162605879296}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2500,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "House (1977)",
+        "ProductDate": "2026-10-31 22:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sat 10-31-2026 10:00 PM (Main Auditorium)",
+        "ProductPrice": 12.5,
+        "ProductID": "RCH2FAPC46SSSGIK42HAZ22W",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "House (1977)_Adult_iburZcEac97NmqOuNyvrxVbv60DZY_cb8ff269-97e1-4add-b92c-46ad8467e318_",
+        "ProductMetadata": {
+          "uid": "cb8ff269-97e1-4add-b92c-46ad8467e318",
+          "name": "House (1977)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "ae79a831-4445-4a8f-aac3-e52f3853526e",
+              "name": "Sat 10-31-2026 10:00 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1792164438812,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "FUOEX7AOREZ3UZ6FV67TI42I",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1792167060717,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "catalog_object_id": "RCH2FAPC46SSSGIK42HAZ22W",
+          "gross_sales_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798572171264},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162605879296}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2500,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

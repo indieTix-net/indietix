@@ -168,6 +168,8 @@ function defaultSquareHandlers() {
       ok: true, status: 200,
       json: async () => ({ customer: { id: customerId, email_address: 'square-customer@example.com', given_name: 'Square', family_name: 'Customer', phone_number: '+15551234567' } })
     }),
+    deleteCatalogObject: async (objectId) => ({ ok: true, status: 200, json: async () => ({ deleted_object_ids: [objectId] }), text: async () => '{}' }),
+    upsertCatalogObject: async (body) => ({ ok: true, status: 200, json: async () => ({ catalog_object: body.object }), text: async () => '{}' }),
     getCatalogObject: async (objectId) => ({
       ok: true, status: 200,
       json: async () => ({ object: { id: objectId, custom_attribute_definition_data: { selection_config: { allowed_selections: [] } } } })
@@ -200,7 +202,16 @@ function patchFetch() {
       return squareHandlers.getCustomer(urlStr.split('/').pop());
     }
     if (urlStr.startsWith('https://connect.squareup.com/v2/catalog/object/')) {
-      return squareHandlers.getCatalogObject(urlStr.split('/').pop());
+      const objectId = new URL(urlStr).pathname.split('/').pop();
+      if (opts.method === 'DELETE') return squareHandlers.deleteCatalogObject(objectId);
+      return squareHandlers.getCatalogObject(objectId);
+    }
+    if (urlStr === 'https://connect.squareup.com/v2/catalog/object' && opts.method === 'POST') {
+      return squareHandlers.upsertCatalogObject(JSON.parse(opts.body));
+    }
+    // Never let a test reach the real Square.
+    if (urlStr.startsWith('https://connect.squareup.com/')) {
+      throw new Error(`Unmocked Square call in a test: ${opts.method || 'GET'} ${urlStr}`);
     }
     return realFetch(url, opts);
   };
@@ -230,12 +241,27 @@ export function buildSqsEvent(records) {
   return { Records: records };
 }
 
-export function buildSqsRecord(squareWebhookPayload, headers = {}) {
+// extra: other forwarded API Gateway fields, e.g. { queryStringParameters:
+// { client: 'abc' } } for a webhook URL that carries the venue's client ID.
+export function buildSqsRecord(squareWebhookPayload, headers = {}, extra = {}) {
   return {
     messageId: `msg-${crypto.randomBytes(8).toString('hex')}`,
     body: JSON.stringify({
       headers,
-      body: JSON.stringify(squareWebhookPayload)
+      body: JSON.stringify(squareWebhookPayload),
+      ...extra
+    })
+  };
+}
+
+// Production's square-queue-forwarder (NODE_ENV=development) wraps the whole
+// API Gateway event as the SQS message's `body`; this builds that shape.
+export function buildWrappedSqsRecord(squareWebhookPayload, headers = {}, extra = {}) {
+  return {
+    messageId: `msg-${crypto.randomBytes(8).toString('hex')}`,
+    body: JSON.stringify({
+      body: { headers, body: JSON.stringify(squareWebhookPayload), ...extra },
+      receivedAt: new Date().toISOString()
     })
   };
 }

@@ -1,18 +1,14 @@
 import { Client } from 'pg';
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import * as squareApi from 'square-api-lib';
+import { syncNativeEvents } from './native-events.mjs';
 
 // Initialize AWS clients
 const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
 
-// Square API URLs
-// ---- SQUARE API BASE ----
-// Square's production API unless SQUARE_API_BASE says otherwise: an
-// environment pointed at Square's sandbox sets it to
-// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
-const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
-// ---- END SQUARE API BASE ----
-const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
-const SQUARE_CATALOG_OBJECT_API_URL = `${SQUARE_API_BASE}/v2/catalog/object`;
+// Square API: every Square call here goes through the shared
+// square-api-lib, which reads SQUARE_API_BASE (Square's sandbox when
+// bootstrap.sh sets SQUARE_ENVIRONMENT) and defaults to production.
 
 // Global variable to store current client configuration
 let currentClientConfig = {};
@@ -38,6 +34,19 @@ async function getDatabaseCredentials(secretName) {
     console.error(`Error retrieving database credentials from ${secretName}:`, error);
     throw error;
   }
+}
+
+// Same rule as clientSetup-Teardown's getAdminDbCredentials: environments
+// built by bootstrap.sh pass their own Aurora cluster's master secret and
+// endpoint (DB_ADMIN_SECRET_ARN / DB_HOST); production keeps its hand-made
+// fixed-name secret. Without this the job could never run in a test
+// environment (no such secret there; found 2026-11-21).
+async function getAdminDbCredentials() {
+  if (process.env.DB_ADMIN_SECRET_ARN && process.env.DB_HOST) {
+    const master = await getDatabaseCredentials(process.env.DB_ADMIN_SECRET_ARN);
+    return { host: process.env.DB_HOST, port: process.env.DB_PORT || '5432', username: master.username, password: master.password, ssl: 'true' };
+  }
+  return getDatabaseCredentials('indieTix/rds/clients/indietix/credentials');
 }
 
 /**
@@ -256,7 +265,7 @@ export const handler = async (event, context) => {
   try {
     // Get indietix superuser credentials from Secrets Manager
     console.log('Retrieving indietix superuser credentials...');
-    const dbCredentials = await getDatabaseCredentials('indieTix/rds/clients/indietix/credentials');
+    const dbCredentials = await getAdminDbCredentials();
     
     // Base database configuration using indietix superuser
     const baseDbConfig = {
@@ -294,6 +303,18 @@ export const handler = async (event, context) => {
     const results = [];
     for (const client of clients) {
       const result = await processClientModifiers(client);
+
+      // ---- NATIVE EVENTS: nightly sync + drift check (after Square's cleanup) ----
+      if (client.configuration?.SQUARE_ACCESS_TOKEN) {
+        try {
+          result.nativeEvents = await syncNativeEvents({ ...baseDbConfig, database: client.clientId }, client.configuration.SQUARE_ACCESS_TOKEN, client.clientId);
+          console.log(`Native events for ${client.clientId}:`, JSON.stringify({ ...result.nativeEvents, drift: result.nativeEvents.drift?.length }));
+        } catch (error) {
+          console.error(`SHOWTIME_DRIFT: ${client.clientId}: the nightly native-events check failed: ${error.message}`);
+          result.nativeEvents = { error: error.message };
+        }
+      }
+      // ---- END NATIVE EVENTS ----
       results.push(result);
       
       // Add a small delay between clients to avoid overwhelming Square API
@@ -368,12 +389,8 @@ async function getAllCategories() {
   try {
     console.log('Getting ALL categories for debugging...');
     
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_types: ['CATEGORY'],
         include_related_objects: false
@@ -464,12 +481,8 @@ async function getItemsByCategoryIds(categoryIds) {
       try {
         console.log(`Searching for items in category ID: ${categoryId}`);
         
-        const categoryResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+        const categoryResponse = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-            "Content-Type": "application/json"
-          },
           body: JSON.stringify({
             object_types: ['ITEM'],
             query: {
@@ -530,12 +543,8 @@ async function getAllCatalogItems() {
   try {
     console.log('Fallback: Getting ALL catalog items...');
     
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareApi.squareFetch(currentClientConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/search', {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         include_related_objects: true
@@ -591,138 +600,28 @@ async function getItemsByCategoryNames(categoryNames = ['Cinema', 'Event']) {
   }
 }
 
-/**
- * Retrieve catalog object
- */
-async function retrieveCatalogObject(objectId) {
-  try {
-    const response = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${objectId}?include_related_objects=true`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to retrieve catalog object ${objectId}: ${response.status} ${errorText}`);
-    }
-
-    const objectData = await response.json();
-    return objectData;
-  } catch (error) {
-    console.error(`Error retrieving catalog object ${objectId}:`, error);
-    throw error;
-  }
+// ---- SQUARE CATALOG HELPERS (shared: square-api-lib) ----
+// These four used to be full fetch implementations here (and
+// retrieveCatalogObject was duplicated in marketingEngine). They now live in
+// the shared square-api-lib layer, which takes the Square token as an
+// argument; these wrappers keep this file's names and call sites unchanged
+// and pass in the current venue's token.
+function retrieveCatalogObject(objectId) {
+  return squareApi.retrieveCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
 
-/**
- * Delete catalog object
- */
-async function deleteCatalogObject(objectId) {
-  try {
-    console.log(`Deleting catalog object: ${objectId}`);
-    
-    const response = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${objectId}`, {
-      method: "DELETE",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to delete catalog object ${objectId}: ${response.status} ${errorText}`);
-    }
-
-    const deleteData = await response.json();
-    console.log(`Successfully deleted catalog object: ${objectId}`);
-    return deleteData;
-  } catch (error) {
-    console.error(`Error deleting catalog object ${objectId}:`, error);
-    throw error;
-  }
+function deleteCatalogObject(objectId) {
+  return squareApi.deleteCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, objectId);
 }
 
-/**
- * Archive item with correct field names for REST API
- */
-async function archiveItem(itemId) {
-  try {
-    console.log(`Archiving item: ${itemId}`);
-    
-    // First get the current item to get the version and data
-    const currentItem = await retrieveCatalogObject(itemId);
-    
-    if (!currentItem.object) {
-      throw new Error(`Could not retrieve item ${itemId} for archiving`);
-    }
-    
-    // Use snake_case for REST API
-    const updatePayload = {
-      idempotency_key: `archive-${itemId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      object: {
-        type: "ITEM",
-        id: itemId,
-        version: currentItem.object.version,
-        item_data: {
-          ...currentItem.object.item_data,
-          is_archived: true
-        }
-      }
-    };
-
-    const response = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(updatePayload)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to archive item ${itemId}: ${response.status} ${errorText}`);
-    }
-
-    const archiveData = await response.json();
-    console.log(`Successfully archived item: ${itemId}`);
-    return archiveData;
-  } catch (error) {
-    console.error(`Error archiving item ${itemId}:`, error);
-    throw error;
-  }
+function archiveItem(itemId) {
+  return squareApi.archiveItem(currentClientConfig.SQUARE_ACCESS_TOKEN, itemId);
 }
 
-/**
- * Update catalog object
- */
-async function updateCatalogObject(catalogObject) {
-  try {
-    const response = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${currentClientConfig.SQUARE_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(catalogObject)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to update catalog object: ${response.status} ${errorText}`);
-    }
-
-    const updateData = await response.json();
-    return updateData;
-  } catch (error) {
-    console.error(`Error updating catalog object:`, error);
-    throw error;
-  }
+function updateCatalogObject(catalogObject) {
+  return squareApi.upsertCatalogObject(currentClientConfig.SQUARE_ACCESS_TOKEN, catalogObject);
 }
+// ---- END SQUARE CATALOG HELPERS ----
 
 /**
  * Filter items by custom attribute

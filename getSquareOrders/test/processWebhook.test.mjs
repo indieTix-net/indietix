@@ -37,6 +37,7 @@ beforeEach(async () => {
   await ctx.pgClient.query(`DELETE FROM "QRCodeProductToOrder"`);
   await ctx.pgClient.query(`DELETE FROM "QRCodeProduct"`);
   await ctx.pgClient.query(`DELETE FROM "Order"`);
+  await ctx.pgClient.query(`DELETE FROM "NoTicketOrder"`);
   await ctx.pgClient.query(`DELETE FROM "Customer"`);
   await ctx.pgClient.query(`DELETE FROM "SmsConsent"`);
 });

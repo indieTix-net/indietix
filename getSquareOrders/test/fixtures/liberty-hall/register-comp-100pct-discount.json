@@ -1,0 +1,492 @@
+{
+  "shape": "register-comp-100pct-discount",
+  "description": "Box office register, quantity 2 with a 100% \"Friends and family\" line-item discount: tickets record $0.",
+  "recorded": "2026-10-19, rebuilt from Liberty Hall production's Order and QRCodeProduct rows (older than the 30-day log window; Square's payment and catalog responses are reconstructed, the order is real; anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "data": {
+      "type": "payment",
+      "id": "gJFs4ejNyu2uT9ibkWw6dHQWJPXZY",
+      "object": {
+        "payment": {
+          "id": "gJFs4ejNyu2uT9ibkWw6dHQWJPXZY",
+          "status": "COMPLETED",
+          "order_id": "oyQN138T6jTIQzToL9umkrVLTXFZY",
+          "location_id": "S3E2Q1EK0466V",
+          "source_type": "CASH"
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "gJFs4ejNyu2uT9ibkWw6dHQWJPXZY",
+      "status": "COMPLETED",
+      "order_id": "oyQN138T6jTIQzToL9umkrVLTXFZY",
+      "location_id": "S3E2Q1EK0466V",
+      "source_type": "CASH"
+    }
+  },
+  "customer": null,
+  "order": {
+    "order": {
+      "id": "oyQN138T6jTIQzToL9umkrVLTXFZY",
+      "state": "COMPLETED",
+      "source": {},
+      "tenders": [
+        {
+          "id": "gJFs4ejNyu2uT9ibkWw6dHQWJPXZY",
+          "type": "CASH",
+          "created_at": "2026-10-19T02:11:31Z",
+          "payment_id": "gJFs4ejNyu2uT9ibkWw6dHQWJPXZY",
+          "location_id": "S3E2Q1EK0466V",
+          "amount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "cash_details": {
+            "change_back_money": {
+              "amount": 0,
+              "currency": "USD"
+            },
+            "buyer_tendered_money": {
+              "amount": 0,
+              "currency": "USD"
+            }
+          },
+          "transaction_id": "oyQN138T6jTIQzToL9umkrVLTXFZY"
+        }
+      ],
+      "version": 4,
+      "closed_at": "2026-10-19T02:11:31.430Z",
+      "discounts": [
+        {
+          "uid": "5fe3d046-e78a-4437-beae-396fb53105e8",
+          "name": "Friends and family",
+          "type": "FIXED_PERCENTAGE",
+          "scope": "LINE_ITEM",
+          "percentage": "100.0",
+          "applied_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "catalog_version": 1590106826023,
+          "catalog_object_id": "YVXJMKKDTBLSHVWDKXFT6SEA"
+        }
+      ],
+      "created_at": "2026-10-19T02:11:31.019Z",
+      "line_items": [
+        {
+          "uid": "d66760bd-667d-4cad-acb6-a62e879e7c83",
+          "name": "The History of Concrete (2026)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "b52aac75-e2a6-4e24-806c-45d9f462fc2c",
+              "name": "Sun 10-18-2026 9:15 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1792291131042,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "JMGWDFD36LT4SGWDHZDW44KR",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1792291131042,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "applied_discounts": [
+            {
+              "uid": "5fe3d046-e78a-4437-beae-396fb53105e8",
+              "discount_uid": "5fe3d046-e78a-4437-beae-396fb53105e8",
+              "applied_money": {
+                "amount": 2200,
+                "currency": "USD"
+              }
+            }
+          ],
+          "catalog_object_id": "AZFR2KZ6GZBYP4VONN54HXKZ",
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798723166208},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162505216000}]",
+          "total_discount_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          }
+        }
+      ],
+      "updated_at": "2026-10-19T02:11:32.000Z",
+      "location_id": "S3E2Q1EK0466V",
+      "net_amounts": {
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "total_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 2200,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "ticket_name": "redacted-38",
+      "total_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 2200,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF01",
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      }
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "AZFR2KZ6GZBYP4VONN54HXKZ"
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "RECON-ITEM-1",
+        "item_data": {
+          "name": "The History of Concrete (2026)",
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "AZFR2KZ6GZBYP4VONN54HXKZ"
+            }
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798723166208
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162505216000
+            }
+          ]
+        },
+        "custom_attribute_values": {
+          "use_qr": {
+            "name": "UseQRCode",
+            "type": "BOOLEAN",
+            "boolean_value": true
+          },
+          "distributor": {
+            "name": "Distributor",
+            "type": "SELECTION",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ]
+          },
+          "eventtype": {
+            "name": "EventType",
+            "type": "SELECTION",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "WALK-UP",
+      "LastName": "CASH-MASTER",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "The History of Concrete (2026)",
+        "ProductDate": "2026-10-18 21:15:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 10-18-2026 9:15 PM (Main Auditorium)",
+        "ProductPrice": 0,
+        "ProductID": "AZFR2KZ6GZBYP4VONN54HXKZ",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Senior",
+        "Status": "valid",
+        "QRCodePrefix": "The History of Concrete (2026)_Senior_oyQN138T6jTIQzToL9umkrVLTXFZY_d66760bd-667d-4cad-acb6-a62e879e7c83_",
+        "ProductMetadata": {
+          "uid": "d66760bd-667d-4cad-acb6-a62e879e7c83",
+          "name": "The History of Concrete (2026)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "b52aac75-e2a6-4e24-806c-45d9f462fc2c",
+              "name": "Sun 10-18-2026 9:15 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1792291131042,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "JMGWDFD36LT4SGWDHZDW44KR",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1792291131042,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "applied_discounts": [
+            {
+              "uid": "5fe3d046-e78a-4437-beae-396fb53105e8",
+              "discount_uid": "5fe3d046-e78a-4437-beae-396fb53105e8",
+              "applied_money": {
+                "amount": 2200,
+                "currency": "USD"
+              }
+            }
+          ],
+          "catalog_object_id": "AZFR2KZ6GZBYP4VONN54HXKZ",
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798723166208},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162505216000}]",
+          "total_discount_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "The History of Concrete (2026)",
+        "ProductDate": "2026-10-18 21:15:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 10-18-2026 9:15 PM (Main Auditorium)",
+        "ProductPrice": 0,
+        "ProductID": "AZFR2KZ6GZBYP4VONN54HXKZ",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Senior",
+        "Status": "valid",
+        "QRCodePrefix": "The History of Concrete (2026)_Senior_oyQN138T6jTIQzToL9umkrVLTXFZY_d66760bd-667d-4cad-acb6-a62e879e7c83_",
+        "ProductMetadata": {
+          "uid": "d66760bd-667d-4cad-acb6-a62e879e7c83",
+          "name": "The History of Concrete (2026)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "b52aac75-e2a6-4e24-806c-45d9f462fc2c",
+              "name": "Sun 10-18-2026 9:15 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1792291131042,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "JMGWDFD36LT4SGWDHZDW44KR",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1792291131042,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "applied_discounts": [
+            {
+              "uid": "5fe3d046-e78a-4437-beae-396fb53105e8",
+              "discount_uid": "5fe3d046-e78a-4437-beae-396fb53105e8",
+              "applied_money": {
+                "amount": 2200,
+                "currency": "USD"
+              }
+            }
+          ],
+          "catalog_object_id": "AZFR2KZ6GZBYP4VONN54HXKZ",
+          "gross_sales_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798723166208},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162505216000}]",
+          "total_discount_money": {
+            "amount": 2200,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2200,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

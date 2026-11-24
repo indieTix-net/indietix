@@ -118,6 +118,96 @@ Resources:
       AlarmActions: [!Ref AlarmTopic]
       OKActions: [!Ref AlarmTopic]
 
+  # A Square webhook getSquareOrders refused: signature didn't verify, a
+  # URL-routed venue (?client=) whose Square account or settings don't
+  # match, or a malformed client=. Square never retries these (the
+  # forwarder already answered 200), so a refused real order has to be
+  # replayed by hand. Also counted by OrderErrorLogAlarm above, but this
+  # one says what happened. Operator email only; not on the status page
+  # (one bogus webhook trips it).
+  WebhookRejectedFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${GetSquareOrdersFunction}'
+      FilterPattern: '"SQUARE_WEBHOOK_REJECTED"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-WebhookRejected'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  WebhookRejectedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${EnvPrefix}-square-webhook-rejected'
+      AlarmDescription: getSquareOrders refused a Square webhook (bad signature, or a ?client= venue whose Square account or settings don't match). Square won't resend it. Search its log for SQUARE_WEBHOOK_REJECTED; if it was a real order, fix the venue's SQUARE_WEBHOOK_URL / SQUARE_SIGNATURE_KEY / SQUARE_MERCHANT_ID and replay the order.
+      Namespace: IndieTix
+      MetricName: !Sub '${GetSquareOrdersFunction}-WebhookRejected'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
+  # NATIVE EVENTS: a sale for one of IndieTix's events whose showtime IndieTix
+  # doesn't know (added in Square's dashboard), or a full showing that
+  # couldn't be taken off sale. Tickets are issued either way.
+  ShowtimeSyncFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${GetSquareOrdersFunction}'
+      FilterPattern: '?"UNMATCHED_SHOWTIME" ?"CAPACITY_ENFORCEMENT_FAILED"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  # Same metric from QRScanner (a refund, cancel or seat change that couldn't
+  # update Square) and the nightly expiry job (showtimes changed in Square by
+  # hand), so one alarm covers all three.
+  ShowtimeSyncQRScannerFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${QRScannerFunction}'
+      FilterPattern: '"SHOWING_SYNC_FAILED"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  ShowtimeSyncExpireFilter:
+    Type: AWS::Logs::MetricFilter
+    Condition: HasExpireModifiers
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ExpireModifiersFunction}'
+      FilterPattern: '"SHOWTIME_DRIFT"'
+      MetricTransformations:
+        - MetricNamespace: IndieTix
+          MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+          MetricValue: '1'
+          DefaultValue: 0
+
+  ShowtimeSyncAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${EnvPrefix}-showtime-out-of-sync'
+      AlarmDescription: A showtime in Square no longer matches IndieTix. Either a ticket sold for a showtime IndieTix doesn't know (added in Square instead of the Showtimes page; tickets were issued), a full or freed-up showtime couldn't be taken off or put back on sale in Square, or the nightly check found showtimes added, removed or renamed in Square by hand. Search the logs of getSquareOrders (UNMATCHED_SHOWTIME, CAPACITY_ENFORCEMENT_FAILED), QRScanner (SHOWING_SYNC_FAILED) and the expiry job (SHOWTIME_DRIFT), then fix the showtime on the Showtimes page or in Square.
+      Namespace: IndieTix
+      MetricName: !Sub '${GetSquareOrdersFunction}-ShowtimeSync'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+      OKActions: [!Ref AlarmTopic]
+
   OrderCrashAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:

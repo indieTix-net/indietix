@@ -1,0 +1,607 @@
+{
+  "shape": "pos-half-price-discount",
+  "description": "Point of Sale app, quantity 3 with a 50% order-level discount: tickets record the discounted $5, not the $10 list price.",
+  "recorded": "2026-09-07, rebuilt from Liberty Hall production's Order and QRCodeProduct rows (older than the 30-day log window; Square's payment and catalog responses are reconstructed, the order is real; anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "data": {
+      "type": "payment",
+      "id": "lITubVEgWDHrWoaARvHdcaCpXPTZY",
+      "object": {
+        "payment": {
+          "id": "lITubVEgWDHrWoaARvHdcaCpXPTZY",
+          "status": "COMPLETED",
+          "order_id": "YcfGXeloYeST4y2JBgNipwE2MXAZY",
+          "location_id": "S3E2Q1EK0466V",
+          "source_type": "CASH"
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "lITubVEgWDHrWoaARvHdcaCpXPTZY",
+      "status": "COMPLETED",
+      "order_id": "YcfGXeloYeST4y2JBgNipwE2MXAZY",
+      "location_id": "S3E2Q1EK0466V",
+      "source_type": "CASH"
+    }
+  },
+  "customer": null,
+  "order": {
+    "order": {
+      "id": "YcfGXeloYeST4y2JBgNipwE2MXAZY",
+      "state": "COMPLETED",
+      "source": {
+        "name": "Point of Sale"
+      },
+      "tenders": [
+        {
+          "id": "lITubVEgWDHrWoaARvHdcaCpXPTZY",
+          "type": "CASH",
+          "created_at": "2026-09-07T01:33:14Z",
+          "payment_id": "lITubVEgWDHrWoaARvHdcaCpXPTZY",
+          "location_id": "S3E2Q1EK0466V",
+          "amount_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "cash_details": {
+            "change_back_money": {
+              "amount": 500,
+              "currency": "USD"
+            },
+            "buyer_tendered_money": {
+              "amount": 2000,
+              "currency": "USD"
+            }
+          },
+          "transaction_id": "YcfGXeloYeST4y2JBgNipwE2MXAZY"
+        }
+      ],
+      "version": 4,
+      "closed_at": "2026-09-07T01:33:14.181Z",
+      "discounts": [
+        {
+          "uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+          "name": "Variable Discount",
+          "type": "VARIABLE_PERCENTAGE",
+          "scope": "ORDER",
+          "percentage": "50",
+          "applied_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "catalog_version": 1748887578958,
+          "catalog_object_id": "KLS4XT47LZ6LCYNMWVZR6KHE"
+        }
+      ],
+      "created_at": "2026-09-07T01:33:13.699Z",
+      "line_items": [
+        {
+          "uid": "17e60015-dc1e-4eed-a373-c61848e2776a",
+          "name": "Jazz Sunday in the Spacement",
+          "quantity": "3",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "a08979e6-5ce3-4784-9e23-02cc0bfe0cd7",
+              "name": "Sun 09-06-2026 7:00 PM (Spacement)",
+              "quantity": "1",
+              "catalog_version": 1788529154142,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "5CXQ5FCI54AAFDYYWUNOUGZJ",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "SFZPKKHQ4LVY23D3WUWTMTJS",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Regular",
+          "catalog_version": 1788529154142,
+          "distributorInfo": {
+            "selectionId": "LNQ6BVK7BHYSJ77VOOJDA45V",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "applied_discounts": [
+            {
+              "uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "discount_uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "applied_money": {
+                "amount": 1500,
+                "currency": "USD"
+              }
+            }
+          ],
+          "catalog_object_id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+          "gross_sales_money": {
+            "amount": 3000,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"W375DTBT5VWI4LALZXMD4KWM\",\"ordinal\":3229865738240},{\"id\":\"BVRXFHLF6SFS6XQ6PJLO3SXI\",\"ordinal\":-2251524851892224},{\"id\":\"YPMWER73XEVFJWEZEXP4B6GS\",\"ordinal\":-2251731060654080}]",
+          "total_discount_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 3000,
+            "currency": "USD"
+          }
+        }
+      ],
+      "updated_at": "2026-09-07T01:33:15.000Z",
+      "location_id": "S3E2Q1EK0466V",
+      "net_amounts": {
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "total_money": {
+          "amount": 1500,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 1500,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "total_money": {
+        "amount": 1500,
+        "currency": "USD"
+      },
+      "fulfillments": [
+        {
+          "uid": "25051b5e-b84a-495c-8421-09d58fafa374",
+          "type": "PICKUP",
+          "state": "COMPLETED",
+          "pickup_details": {
+            "placed_at": "2026-09-07T01:33:14.181Z",
+            "recipient": {},
+            "picked_up_at": "2026-09-07T01:33:14.181Z",
+            "schedule_type": "ASAP"
+          },
+          "line_item_application": "ALL"
+        }
+      ],
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 1500,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF02",
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      }
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "KCWDUVS6RTPQPSTK6BKP4MBV"
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "RECON-ITEM-1",
+        "item_data": {
+          "name": "Jazz Sunday in the Spacement",
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "KCWDUVS6RTPQPSTK6BKP4MBV"
+            }
+          ],
+          "categories": [
+            {
+              "id": "W375DTBT5VWI4LALZXMD4KWM",
+              "ordinal": 3229865738240
+            },
+            {
+              "id": "BVRXFHLF6SFS6XQ6PJLO3SXI",
+              "ordinal": -2251524851892224
+            },
+            {
+              "id": "YPMWER73XEVFJWEZEXP4B6GS",
+              "ordinal": -2251731060654080
+            }
+          ]
+        },
+        "custom_attribute_values": {
+          "use_qr": {
+            "name": "UseQRCode",
+            "type": "BOOLEAN",
+            "boolean_value": true
+          },
+          "distributor": {
+            "name": "Distributor",
+            "type": "SELECTION",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "selection_uid_values": [
+              "LNQ6BVK7BHYSJ77VOOJDA45V"
+            ]
+          },
+          "eventtype": {
+            "name": "EventType",
+            "type": "SELECTION",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "selection_uid_values": [
+              "SFZPKKHQ4LVY23D3WUWTMTJS"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "LNQ6BVK7BHYSJ77VOOJDA45V",
+        "name": "Liberty Hall Events"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "SFZPKKHQ4LVY23D3WUWTMTJS",
+        "name": "Live"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "WALK-UP",
+      "LastName": "CASH-MASTER",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "Jazz Sunday in the Spacement",
+        "ProductDate": "2026-09-06 19:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Live",
+        "ProductDetails": "Sun 09-06-2026 7:00 PM (Spacement)",
+        "ProductPrice": 5,
+        "ProductID": "KCWDUVS6RTPQPSTK6BKP4MBV",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Events",
+        "ProductVenue": "Spacement",
+        "ProductSeatCode": "Regular",
+        "Status": "valid",
+        "QRCodePrefix": "Jazz Sunday in the Spacement_Regular_YcfGXeloYeST4y2JBgNipwE2MXAZY_17e60015-dc1e-4eed-a373-c61848e2776a_",
+        "ProductMetadata": {
+          "uid": "17e60015-dc1e-4eed-a373-c61848e2776a",
+          "name": "Jazz Sunday in the Spacement",
+          "quantity": "3",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "a08979e6-5ce3-4784-9e23-02cc0bfe0cd7",
+              "name": "Sun 09-06-2026 7:00 PM (Spacement)",
+              "quantity": "1",
+              "catalog_version": 1788529154142,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "5CXQ5FCI54AAFDYYWUNOUGZJ",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "SFZPKKHQ4LVY23D3WUWTMTJS",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Regular",
+          "catalog_version": 1788529154142,
+          "distributorInfo": {
+            "selectionId": "LNQ6BVK7BHYSJ77VOOJDA45V",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "applied_discounts": [
+            {
+              "uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "discount_uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "applied_money": {
+                "amount": 1500,
+                "currency": "USD"
+              }
+            }
+          ],
+          "catalog_object_id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+          "gross_sales_money": {
+            "amount": 3000,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"W375DTBT5VWI4LALZXMD4KWM\",\"ordinal\":3229865738240},{\"id\":\"BVRXFHLF6SFS6XQ6PJLO3SXI\",\"ordinal\":-2251524851892224},{\"id\":\"YPMWER73XEVFJWEZEXP4B6GS\",\"ordinal\":-2251731060654080}]",
+          "total_discount_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 3000,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "Jazz Sunday in the Spacement",
+        "ProductDate": "2026-09-06 19:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Live",
+        "ProductDetails": "Sun 09-06-2026 7:00 PM (Spacement)",
+        "ProductPrice": 5,
+        "ProductID": "KCWDUVS6RTPQPSTK6BKP4MBV",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Events",
+        "ProductVenue": "Spacement",
+        "ProductSeatCode": "Regular",
+        "Status": "valid",
+        "QRCodePrefix": "Jazz Sunday in the Spacement_Regular_YcfGXeloYeST4y2JBgNipwE2MXAZY_17e60015-dc1e-4eed-a373-c61848e2776a_",
+        "ProductMetadata": {
+          "uid": "17e60015-dc1e-4eed-a373-c61848e2776a",
+          "name": "Jazz Sunday in the Spacement",
+          "quantity": "3",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "a08979e6-5ce3-4784-9e23-02cc0bfe0cd7",
+              "name": "Sun 09-06-2026 7:00 PM (Spacement)",
+              "quantity": "1",
+              "catalog_version": 1788529154142,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "5CXQ5FCI54AAFDYYWUNOUGZJ",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "SFZPKKHQ4LVY23D3WUWTMTJS",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Regular",
+          "catalog_version": 1788529154142,
+          "distributorInfo": {
+            "selectionId": "LNQ6BVK7BHYSJ77VOOJDA45V",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "applied_discounts": [
+            {
+              "uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "discount_uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "applied_money": {
+                "amount": 1500,
+                "currency": "USD"
+              }
+            }
+          ],
+          "catalog_object_id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+          "gross_sales_money": {
+            "amount": 3000,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"W375DTBT5VWI4LALZXMD4KWM\",\"ordinal\":3229865738240},{\"id\":\"BVRXFHLF6SFS6XQ6PJLO3SXI\",\"ordinal\":-2251524851892224},{\"id\":\"YPMWER73XEVFJWEZEXP4B6GS\",\"ordinal\":-2251731060654080}]",
+          "total_discount_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 3000,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "Jazz Sunday in the Spacement",
+        "ProductDate": "2026-09-06 19:00:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Live",
+        "ProductDetails": "Sun 09-06-2026 7:00 PM (Spacement)",
+        "ProductPrice": 5,
+        "ProductID": "KCWDUVS6RTPQPSTK6BKP4MBV",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Events",
+        "ProductVenue": "Spacement",
+        "ProductSeatCode": "Regular",
+        "Status": "valid",
+        "QRCodePrefix": "Jazz Sunday in the Spacement_Regular_YcfGXeloYeST4y2JBgNipwE2MXAZY_17e60015-dc1e-4eed-a373-c61848e2776a_",
+        "ProductMetadata": {
+          "uid": "17e60015-dc1e-4eed-a373-c61848e2776a",
+          "name": "Jazz Sunday in the Spacement",
+          "quantity": "3",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "a08979e6-5ce3-4784-9e23-02cc0bfe0cd7",
+              "name": "Sun 09-06-2026 7:00 PM (Spacement)",
+              "quantity": "1",
+              "catalog_version": 1788529154142,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "5CXQ5FCI54AAFDYYWUNOUGZJ",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "SFZPKKHQ4LVY23D3WUWTMTJS",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Regular",
+          "catalog_version": 1788529154142,
+          "distributorInfo": {
+            "selectionId": "LNQ6BVK7BHYSJ77VOOJDA45V",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1000,
+            "currency": "USD"
+          },
+          "applied_discounts": [
+            {
+              "uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "discount_uid": "fdbf0f92-d162-465b-a4b4-0fbafcacf893",
+              "applied_money": {
+                "amount": 1500,
+                "currency": "USD"
+              }
+            }
+          ],
+          "catalog_object_id": "KCWDUVS6RTPQPSTK6BKP4MBV",
+          "gross_sales_money": {
+            "amount": 3000,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"W375DTBT5VWI4LALZXMD4KWM\",\"ordinal\":3229865738240},{\"id\":\"BVRXFHLF6SFS6XQ6PJLO3SXI\",\"ordinal\":-2251524851892224},{\"id\":\"YPMWER73XEVFJWEZEXP4B6GS\",\"ordinal\":-2251731060654080}]",
+          "total_discount_money": {
+            "amount": 1500,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 3000,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

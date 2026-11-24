@@ -1,0 +1,962 @@
+{
+  "shape": "register-card-multi-line-tickets",
+  "description": "Box office register, card, two ticket types (Adult + Senior) in one order.",
+  "recorded": "2026-11-08, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "267ba2f0-d4ed-39a9-9e4c-162158445f29",
+    "created_at": "2026-11-08T23:51:59.331Z",
+    "data": {
+      "type": "payment",
+      "id": "EpSz4pmpVwR7bya5P9EgFr4Uc8eZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 3600,
+            "currency": "USD"
+          },
+          "application_details": {
+            "square_product": "RETAIL"
+          },
+          "approved_money": {
+            "amount": 3600,
+            "currency": "USD"
+          },
+          "card_details": {
+            "application_cryptogram": "383475633b8b0734",
+            "application_identifier": "A000000025010801",
+            "application_name": "AMERICAN EXPRESS",
+            "auth_result_code": "819101",
+            "avs_status": "AVS_NOT_CHECKED",
+            "card": {
+              "bin": "000000",
+              "card_brand": "AMERICAN_EXPRESS",
+              "card_type": "CREDIT",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "last_4": "0000",
+              "payment_account_reference": "FIXTUREPAR",
+              "prepaid_type": "NOT_PREPAID"
+            },
+            "card_payment_timeline": {
+              "authorized_at": "2026-11-08T23:51:55.162Z",
+              "captured_at": "2026-11-08T23:51:58.340Z"
+            },
+            "cvv_status": "CVV_NOT_CHECKED",
+            "device_details": {
+              "device_id": "fixture-device-01",
+              "device_installation_id": "fixture-device-02",
+              "device_name": "redacted-01"
+            },
+            "emv_details": {
+              "authorization_response_code": "3030"
+            },
+            "entry_method": "CONTACTLESS",
+            "statement_description": "LIBERTY HALL",
+            "status": "CAPTURED",
+            "verification_method": "NONE",
+            "verification_results": "SUCCESS"
+          },
+          "created_at": "2026-11-08T23:51:54.769Z",
+          "delay_action": "CANCEL",
+          "delay_duration": "PT36H",
+          "delayed_until": "2026-11-10T11:51:54.769Z",
+          "device_details": {
+            "device_id": "fixture-device-01",
+            "device_installation_id": "fixture-device-02",
+            "device_name": "redacted-01"
+          },
+          "employee_id": "FIXTURESTAFF01",
+          "id": "EpSz4pmpVwR7bya5P9EgFr4Uc8eZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "MaR4exIBKp3H8wFTK2LSeni2OucZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "source_type": "CARD",
+          "status": "COMPLETED",
+          "team_member_id": "FIXTURESTAFF01",
+          "total_money": {
+            "amount": 3600,
+            "currency": "USD"
+          },
+          "updated_at": "2026-11-08T23:51:59.323Z",
+          "version": 3
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "EpSz4pmpVwR7bya5P9EgFr4Uc8eZY",
+      "created_at": "2026-11-08T23:51:54.769Z",
+      "updated_at": "2026-11-08T23:51:59.323Z",
+      "amount_money": {
+        "amount": 3600,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "delay_duration": "PT36H",
+      "source_type": "CARD",
+      "card_details": {
+        "status": "CAPTURED",
+        "card": {
+          "card_brand": "AMERICAN_EXPRESS",
+          "last_4": "0000",
+          "exp_month": 12,
+          "exp_year": 2030,
+          "fingerprint": "sq-1-fixture-fingerprint",
+          "card_type": "CREDIT",
+          "prepaid_type": "NOT_PREPAID",
+          "bin": "000000",
+          "payment_account_reference": "FIXTUREPAR"
+        },
+        "entry_method": "CONTACTLESS",
+        "cvv_status": "CVV_NOT_CHECKED",
+        "avs_status": "AVS_NOT_CHECKED",
+        "auth_result_code": "819101",
+        "application_identifier": "A000000025010801",
+        "application_name": "AMERICAN EXPRESS",
+        "application_cryptogram": "383475633b8b0734",
+        "verification_method": "NONE",
+        "verification_results": "SUCCESS",
+        "statement_description": "LIBERTY HALL",
+        "device_details": {
+          "device_id": "fixture-device-01",
+          "device_name": "redacted-01",
+          "device_installation_id": "fixture-device-02"
+        },
+        "card_payment_timeline": {
+          "authorized_at": "2026-11-08T23:51:55.162Z",
+          "captured_at": "2026-11-08T23:51:58.340Z"
+        },
+        "emv_details": {
+          "authorization_response_code": "3030"
+        }
+      },
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "MaR4exIBKp3H8wFTK2LSeni2OucZY",
+      "customer_id": "FIXTURECUSTOMER07",
+      "total_money": {
+        "amount": 3600,
+        "currency": "USD"
+      },
+      "approved_money": {
+        "amount": 3600,
+        "currency": "USD"
+      },
+      "employee_id": "FIXTURESTAFF01",
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "delay_action": "CANCEL",
+      "delayed_until": "2026-11-10T11:51:54.769Z",
+      "device_details": {
+        "device_id": "fixture-device-01",
+        "device_name": "redacted-01",
+        "device_installation_id": "fixture-device-02"
+      },
+      "team_member_id": "FIXTURESTAFF01",
+      "application_details": {
+        "square_product": "RETAIL"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": {
+    "customer": {
+      "id": "FIXTURECUSTOMER07",
+      "created_at": "2024-05-25T00:10:30.183Z",
+      "updated_at": "2024-05-25T00:10:31Z",
+      "given_name": "Given07",
+      "family_name": "Family07",
+      "preferences": {
+        "email_unsubscribed": false
+      },
+      "creation_source": "INSTANT_PROFILE",
+      "segment_ids": [
+        "M5E5N7KAHZA7Q.REACHABLE",
+        "gv2:BEC52WQAD562Q0WDTGXAF15R6W",
+        "gv2:7TP9XAFKP95R55WR8N48BXBH4M"
+      ],
+      "version": 1
+    }
+  },
+  "order": {
+    "order": {
+      "id": "MaR4exIBKp3H8wFTK2LSeni2OucZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "00ed896c-9e33-4706-bc48-0636aeff0129",
+          "catalog_object_id": "GTLARVEALX7CXOXFQPZEBL66",
+          "catalog_version": 1794101931031,
+          "quantity": "2",
+          "name": "Godzilla Minus Zero (2026)",
+          "variation_name": "Adult",
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "2ef571c1-1bc2-48c2-923c-bbfa70a26e7c",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Sun 11-08-2026 5:45 PM (Little Theater)",
+              "catalog_object_id": "W2CDYOZKGAJMSUFTC6LLJYWH",
+              "catalog_version": 1794101931031,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        },
+        {
+          "uid": "7ed93e9f-3c33-4fd4-a196-10225501effe",
+          "catalog_object_id": "PGDZITHTDU5JMAW6AAJ6J2ZI",
+          "catalog_version": 1794101931031,
+          "quantity": "1",
+          "name": "Godzilla Minus Zero (2026)",
+          "variation_name": "Senior",
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "ebf05a74-8c63-4d95-b4e8-df24c8ad1eed",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Sun 11-08-2026 5:45 PM (Little Theater)",
+              "catalog_object_id": "W2CDYOZKGAJMSUFTC6LLJYWH",
+              "catalog_version": 1794101931031,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "created_at": "2026-11-08T23:51:54.495Z",
+      "updated_at": "2026-11-08T23:51:59.246Z",
+      "state": "COMPLETED",
+      "version": 6,
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 3600,
+        "currency": "USD"
+      },
+      "closed_at": "2026-11-08T23:51:56.292Z",
+      "tenders": [
+        {
+          "id": "EpSz4pmpVwR7bya5P9EgFr4Uc8eZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "MaR4exIBKp3H8wFTK2LSeni2OucZY",
+          "created_at": "2026-11-08T23:51:54Z",
+          "amount_money": {
+            "amount": 3600,
+            "currency": "USD"
+          },
+          "type": "CARD",
+          "card_details": {
+            "status": "CAPTURED",
+            "card": {
+              "card_brand": "AMERICAN_EXPRESS",
+              "last_4": "0000",
+              "exp_month": 12,
+              "exp_year": 2030,
+              "fingerprint": "sq-1-fixture-fingerprint",
+              "card_type": "CREDIT",
+              "prepaid_type": "NOT_PREPAID",
+              "bin": "000000"
+            },
+            "entry_method": "CONTACTLESS"
+          },
+          "payment_id": "EpSz4pmpVwR7bya5P9EgFr4Uc8eZY"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 3600,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {},
+      "ticket_name": "redacted-36",
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF01"
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "GTLARVEALX7CXOXFQPZEBL66",
+        "updated_at": "2026-11-02T18:58:06.056Z",
+        "created_at": "2026-11-02T18:55:25.604Z",
+        "version": 1793645886056,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "2JDCMF2LA6WV5EPTBT2PNBML",
+          "name": "Adult",
+          "ordinal": 1,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": true,
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      },
+      {
+        "type": "ITEM_VARIATION",
+        "id": "PGDZITHTDU5JMAW6AAJ6J2ZI",
+        "updated_at": "2026-11-02T18:58:06.056Z",
+        "created_at": "2026-11-02T18:55:25.604Z",
+        "version": 1793645886056,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "2JDCMF2LA6WV5EPTBT2PNBML",
+          "name": "Senior",
+          "ordinal": 2,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "track_inventory": true,
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "2JDCMF2LA6WV5EPTBT2PNBML",
+        "updated_at": "2026-11-08T01:38:51.031Z",
+        "created_at": "2026-11-02T18:55:25.604Z",
+        "version": 1794101931031,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "Godzilla Minus Zero (2026)",
+          "description": "Rating: R\nGenre: Action, Adventure, Drama\nRuntime: 135 min\n\nWar reduced Japan to zero, and Godzilla plunged it into minus. Two years have passed since then, and the country has faced agonizing struggles to achieve recovery and finally reclaim its daily life. Just as humanity managed to cling to a hard-won peace, a new threat strikes, crushing hope in an instant. There is no third time. Everything ends here.\n\nDirector: Takashi Yamazaki\nCast: Ryûnosuke Kamiki, Minami Hamabe, Miou Tanaka",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "W656SBDP34DYGVKJXOZEHEBG",
+              "min_selected_modifiers": 1,
+              "max_selected_modifiers": 1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "BZC72HSAUH7EO3BG7PHFWPHF",
+              "updated_at": "2026-11-02T18:58:06.056Z",
+              "created_at": "2026-11-02T18:55:25.604Z",
+              "version": 1793645886056,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "2JDCMF2LA6WV5EPTBT2PNBML",
+                "name": "Child",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "GTLARVEALX7CXOXFQPZEBL66",
+              "updated_at": "2026-11-02T18:58:06.056Z",
+              "created_at": "2026-11-02T18:55:25.604Z",
+              "version": 1793645886056,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "2JDCMF2LA6WV5EPTBT2PNBML",
+                "name": "Adult",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1250,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "PGDZITHTDU5JMAW6AAJ6J2ZI",
+              "updated_at": "2026-11-02T18:58:06.056Z",
+              "created_at": "2026-11-02T18:55:25.604Z",
+              "version": 1793645886056,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "2JDCMF2LA6WV5EPTBT2PNBML",
+                "name": "Senior",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1100,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "track_inventory": true,
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "URE53R4TDNPAH7OBGSYBPSCQ"
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798505062400
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162706542592
+            }
+          ],
+          "description_html": "<p>Rating: R</p><p>Genre: Action, Adventure, Drama</p><p>Runtime: 135 min</p><p><br></p><p>War reduced Japan to zero, and Godzilla plunged it into minus. Two years have passed since then, and the country has faced agonizing struggles to achieve recovery and finally reclaim its daily life. Just as humanity managed to cling to a hard-won peace, a new threat strikes, crushing hope in an instant. There is no third time. Everything ends here.</p><p><br></p><p>Director: Takashi Yamazaki</p><p>Cast: Ryûnosuke Kamiki, Minami Hamabe, Miou Tanaka</p>",
+          "description_plaintext": "Rating: R\nGenre: Action, Adventure, Drama\nRuntime: 135 min\n\nWar reduced Japan to zero, and Godzilla plunged it into minus. Two years have passed since then, and the country has faced agonizing struggles to achieve recovery and finally reclaim its daily life. Just as humanity managed to cling to a hard-won peace, a new threat strikes, crushing hope in an instant. There is no third time. Everything ends here.\n\nDirector: Takashi Yamazaki\nCast: Ryûnosuke Kamiki, Minami Hamabe, Miou Tanaka",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+            "ordinal": -2251798505062400
+          }
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "URE53R4TDNPAH7OBGSYBPSCQ",
+        "updated_at": "2026-11-02T18:57:56.306Z",
+        "created_at": "2026-11-02T18:57:56.343Z",
+        "version": 1793645876306,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "name": "hSmIJluOJmTWvJs4d7kHRxjc8s8.jpg",
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/3d26906b6c1f1fb517cee91139d3a69cf39983b2/original.jpeg"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "Given07",
+      "LastName": "Family07",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "Godzilla Minus Zero (2026)",
+        "ProductDate": "2026-11-08 17:45:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 11-08-2026 5:45 PM (Little Theater)",
+        "ProductPrice": 12.5,
+        "ProductID": "GTLARVEALX7CXOXFQPZEBL66",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "Given07",
+        "LastName": "Family07",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Little Theater",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "Godzilla Minus Zero (2026)_Adult_MaR4exIBKp3H8wFTK2LSeni2OucZY_00ed896c-9e33-4706-bc48-0636aeff0129_",
+        "ProductMetadata": {
+          "uid": "00ed896c-9e33-4706-bc48-0636aeff0129",
+          "name": "Godzilla Minus Zero (2026)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "2ef571c1-1bc2-48c2-923c-bbfa70a26e7c",
+              "name": "Sun 11-08-2026 5:45 PM (Little Theater)",
+              "quantity": "1",
+              "catalog_version": 1794101931031,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "W2CDYOZKGAJMSUFTC6LLJYWH",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1794101931031,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "catalog_object_id": "GTLARVEALX7CXOXFQPZEBL66",
+          "gross_sales_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798505062400},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162706542592}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2500,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "Godzilla Minus Zero (2026)",
+        "ProductDate": "2026-11-08 17:45:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 11-08-2026 5:45 PM (Little Theater)",
+        "ProductPrice": 12.5,
+        "ProductID": "GTLARVEALX7CXOXFQPZEBL66",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "Given07",
+        "LastName": "Family07",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Little Theater",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "Godzilla Minus Zero (2026)_Adult_MaR4exIBKp3H8wFTK2LSeni2OucZY_00ed896c-9e33-4706-bc48-0636aeff0129_",
+        "ProductMetadata": {
+          "uid": "00ed896c-9e33-4706-bc48-0636aeff0129",
+          "name": "Godzilla Minus Zero (2026)",
+          "quantity": "2",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "2ef571c1-1bc2-48c2-923c-bbfa70a26e7c",
+              "name": "Sun 11-08-2026 5:45 PM (Little Theater)",
+              "quantity": "1",
+              "catalog_version": 1794101931031,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "W2CDYOZKGAJMSUFTC6LLJYWH",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1794101931031,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "catalog_object_id": "GTLARVEALX7CXOXFQPZEBL66",
+          "gross_sales_money": {
+            "amount": 2500,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798505062400},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162706542592}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 2500,
+            "currency": "USD"
+          }
+        }
+      },
+      {
+        "ProductName": "Godzilla Minus Zero (2026)",
+        "ProductDate": "2026-11-08 17:45:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Sun 11-08-2026 5:45 PM (Little Theater)",
+        "ProductPrice": 11,
+        "ProductID": "PGDZITHTDU5JMAW6AAJ6J2ZI",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "Given07",
+        "LastName": "Family07",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Little Theater",
+        "ProductSeatCode": "Senior",
+        "Status": "valid",
+        "QRCodePrefix": "Godzilla Minus Zero (2026)_Senior_MaR4exIBKp3H8wFTK2LSeni2OucZY_7ed93e9f-3c33-4fd4-a196-10225501effe_",
+        "ProductMetadata": {
+          "uid": "7ed93e9f-3c33-4fd4-a196-10225501effe",
+          "name": "Godzilla Minus Zero (2026)",
+          "quantity": "1",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "ebf05a74-8c63-4d95-b4e8-df24c8ad1eed",
+              "name": "Sun 11-08-2026 5:45 PM (Little Theater)",
+              "quantity": "1",
+              "catalog_version": 1794101931031,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "W2CDYOZKGAJMSUFTC6LLJYWH",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Senior",
+          "catalog_version": 1794101931031,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "catalog_object_id": "PGDZITHTDU5JMAW6AAJ6J2ZI",
+          "gross_sales_money": {
+            "amount": 1100,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798505062400},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162706542592}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 1100,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

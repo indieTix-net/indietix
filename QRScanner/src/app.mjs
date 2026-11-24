@@ -27,6 +27,7 @@ import { buildDataFilterWhereClause, normalizeEventType, eventExactPattern, even
 import { LEGAL_PAGES, renderLegalPage } from './utils/legal.mjs';
 import { boxOfficeFileNames, buildRtsCsv, buildEborXml } from './utils/box-office-files.mjs';
 import { buildZip } from './utils/zip.mjs';
+import { parseShowtimeLabel, createDraftEvent, publishEventLinks, discardDraftEvent, validateRoomCapacity, ShowtimeError, listEvents, getEventWithShowings, addShowing, editShowing, setShowingSeats, cancelShowing, importFromSquare, showingsForTickets, syncShowingSales } from './utils/native-events.mjs';
 import { normalizeSubject, findSubjectRecords, previewRecords, exportRecords, redactRecords, subjectFingerprint, summarizeRecords } from './utils/privacy-requests.mjs';
 import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-utils';
 // Shared QR-gen/PDF-overlay logic (see ../../ticket-pdf-lib) -- comes from
@@ -34,26 +35,21 @@ import { sendSms, buildMessageBody, normalizeToE164, maskForDisplay } from 'sms-
 // node_modules. getSquareOrders is NOT touched by this and keeps running
 // its own original copy of this logic for every real order.
 import { generateQRCode, renderTicketPdf } from 'ticket-pdf-lib';
+import * as squareApi from 'square-api-lib';
 
 
 const ses = new AWS.SES();
 const { Pool } = pkg;
-// ---- SQUARE API BASE ----
-// Square's production API unless SQUARE_API_BASE says otherwise: an
-// environment pointed at Square's sandbox sets it to
-// https://connect.squareupsandbox.com (bootstrap.sh, SQUARE_ENVIRONMENT).
-const SQUARE_API_BASE = (process.env.SQUARE_API_BASE || 'https://connect.squareup.com').replace(/\/+$/, '');
-// ---- END SQUARE API BASE ----
-const SQUARE_CATALOG_SEARCH_API_URL = `${SQUARE_API_BASE}/v2/catalog/search`;
-const SQUARE_CATALOG_OBJECT_API_URL = `${SQUARE_API_BASE}/v2/catalog/object`;
-const SQUARE_CATALOG_LIST_API_URL = `${SQUARE_API_BASE}/v2/catalog/list`;
-const SQUARE_INVENTORY_BATCH_CREATE = `${SQUARE_API_BASE}/v2/inventory/changes/batch-create`;
+// ---- SQUARE API ----
+// Every Square API call goes through the shared square-api-lib (squareFetch,
+// uploadCatalogImage). It reads SQUARE_API_BASE: Square's production API
+// unless an environment points it at the sandbox
+// (https://connect.squareupsandbox.com; bootstrap.sh, SQUARE_ENVIRONMENT).
+// ---- END SQUARE API ----
 // The seller dashboard lives on squareupsandbox.com for a sandbox account.
-const SQUARE_ITEM_LIBRARY_URL = SQUARE_API_BASE.includes('squareupsandbox')
+const SQUARE_ITEM_LIBRARY_URL = squareApi.isSquareSandbox()
   ? 'https://squareupsandbox.com/dashboard/items/library'
   : 'https://squareup.com/dashboard/items/library';
-const SQUARE_IMAGE_UPLOAD_URL = new URL(SQUARE_API_BASE).host;
-const SQUARE_REFUND_API_URL = `${SQUARE_API_BASE}/v2/refunds`;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Global configuration that gets populated from client config.
@@ -1772,7 +1768,7 @@ app.get('/api/products', requireAuth, requirePermission(...PERMS_DOOR), async (r
  *
  *      app, requireAuth, createClientDbConnection, getClientConfiguration,
  *      getDatabaseCredentials, initializeModelForClient, Sequelize,
- *      globalConfig, SQUARE_CATALOG_SEARCH_API_URL,
+ *      globalConfig, squareApi (square-api-lib),
  *      parseShowtimeString(), extractRuntime()
  *
  *  parseShowtimeString / extractRuntime are function declarations, so they are
@@ -1847,12 +1843,8 @@ const EXCLUDED_TICKET_STATUSES = ['refunded', 'cancelled', 'canceled', 'transfer
  * which is what a ticket's ProductMetadata.modifiers[].catalog_object_id holds.
  */
 async function getShowtimesForDate(accessToken, dateStr) {
-  const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+  const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
     body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true })
   });
 
@@ -2450,7 +2442,7 @@ const CLIENT_SETTINGS_KEYS = [
   'TICKET_FILENAME', 'SENDER_EMAIL', 'OWNER_BCC_EMAIL', 'WALKUP_PHONE', 'ONE_PER_EMAIL_ITEMS',
   'LEGAL_NAME', 'LEGAL_SHORT_NAME', 'LEGAL_ADDRESS', 'LEGAL_PHONE', 'LEGAL_EMAIL',
   'LEGAL_STATE', 'LEGAL_COURT_COUNTY', 'SALES_TAX_RATE', 'SCREEN_NUMBERS',
-  'MOVIE_TICKET_TYPES', 'EVENT_TICKET_TYPES', 'MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR',
+  'MOVIE_TICKET_TYPES', 'EVENT_TICKET_TYPES', 'MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR', 'ROOM_CAPACITY', 'ENFORCE_CAPACITY',
   'META_PAGE_ACCESS_TOKEN', 'META_PAGE_ID', 'META_IG_BUSINESS_ID', 'TIKTOK_ACCESS_TOKEN',
   'TIKTOK_REFRESH_TOKEN', 'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_PRIVACY_LEVEL'
 ];
@@ -2505,6 +2497,9 @@ function validateReportSettings(configuration) {
       return `${label} ticket types need a name and a price like 12.50 on each row (up to 20, no repeated names)`;
     }
   }
+  // Seats per room for new showings (ROOM CAPACITY in utils/native-events.mjs)
+  const roomCapacityError = validateRoomCapacity(configuration.ROOM_CAPACITY);
+  if (roomCapacityError) return roomCapacityError;
   for (const key of ['MOVIE_DISTRIBUTOR', 'EVENT_DISTRIBUTOR']) {
     if (configuration[key] !== undefined && configuration[key] !== null && String(configuration[key]).length > 255) {
       return 'A distributor name can be up to 255 characters';
@@ -3034,7 +3029,7 @@ app.get('/api/square/oauth/status', requireAuth, requireClientAuth, async (req, 
     res.json({
       success: true,
       available: !!squareOAuthSettings(),
-      sandbox: SQUARE_API_BASE.includes('squareupsandbox'),
+      sandbox: squareApi.isSquareSandbox(),
       mode: config.SQUARE_AUTH_MODE === 'oauth' ? 'oauth' : 'personal',
       revokedAt: config.SQUARE_AUTH_MODE === 'oauth' ? (config.SQUARE_OAUTH_REVOKED_AT || null) : null,
       merchantId: config.SQUARE_MERCHANT_ID || null,
@@ -3064,7 +3059,7 @@ app.get('/api/square/oauth/start', requireAuth, requireClientAuth, async (req, r
       config.JWT_SECRET,
       { expiresIn: '10m' }
     );
-    const url = new URL(`${SQUARE_API_BASE}/oauth2/authorize`);
+    const url = new URL(`${squareApi.squareApiBase()}/oauth2/authorize`);
     url.searchParams.set('client_id', settings.appId);
     url.searchParams.set('scope', SQUARE_OAUTH_SCOPES.join(' '));
     url.searchParams.set('session', 'false');
@@ -3123,9 +3118,8 @@ app.get('/square/oauth/callback', async (req, res) => {
     const clientSecret = appSecret.client_secret;
     if (!clientSecret) throw new Error('Square app secret has no client_secret');
 
-    const tokenResponse = await fetch(`${SQUARE_API_BASE}/oauth2/token`, {
+    const tokenResponse = await squareApi.squareFetch(null, '/oauth2/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id: settings.appId,
         client_secret: clientSecret,
@@ -3161,9 +3155,7 @@ app.get('/square/oauth/callback', async (req, res) => {
     // does for a personal token; with several, they pick in Client Settings.
     if (!config.SQUARE_LOCATION_ID) {
       try {
-        const locationsResponse = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
-          headers: { 'Authorization': `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' }
-        });
+        const locationsResponse = await squareApi.squareFetch(tokens.access_token, '/v2/locations');
         const active = ((await locationsResponse.json()).locations || []).filter(l => l.status === 'ACTIVE');
         if (active.length === 1) update.SQUARE_LOCATION_ID = active[0].id;
       } catch (locationError) {
@@ -3287,7 +3279,7 @@ app.get('/api/public/signup/config', (req, res) => {
   res.json({
     success: true,
     enabled: !!settings,
-    sandbox: SQUARE_API_BASE.includes('squareupsandbox'),
+    sandbox: squareApi.isSquareSandbox(),
     termsUrl: settings ? settings.termsUrl : null,
     privacyUrl: settings ? settings.privacyUrl : null,
     // The optional "your web address" field (VENUE WEB ADDRESS)
@@ -3335,7 +3327,7 @@ app.post('/api/public/signup/start', async (req, res) => {
       signupKey(appSecret),
       SIGNUP_STATE_TTL
     );
-    const url = new URL(`${SQUARE_API_BASE}/oauth2/authorize`);
+    const url = new URL(`${squareApi.squareApiBase()}/oauth2/authorize`);
     url.searchParams.set('client_id', settings.oauth.appId);
     url.searchParams.set('scope', SQUARE_OAUTH_SCOPES.join(' '));
     url.searchParams.set('session', 'false');
@@ -3367,9 +3359,8 @@ async function handleSignupCallback(req, res) {
   if (error || typeof code !== 'string' || !code) return back({ result: 'denied' });
 
   try {
-    const tokenResponse = await fetch(`${SQUARE_API_BASE}/oauth2/token`, {
+    const tokenResponse = await squareApi.squareFetch(null, '/oauth2/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id: settings.oauth.appId,
         client_secret: appSecret.client_secret,
@@ -3407,9 +3398,7 @@ async function handleSignupCallback(req, res) {
 
     let locationId = '';
     try {
-      const locationsResponse = await fetch(`${SQUARE_API_BASE}/v2/locations`, {
-        headers: { 'Authorization': `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' }
-      });
+      const locationsResponse = await squareApi.squareFetch(tokens.access_token, '/v2/locations');
       const active = ((await locationsResponse.json()).locations || []).filter(l => l.status === 'ACTIVE');
       if (active.length === 1) locationId = active[0].id;
     } catch (locationError) {
@@ -3624,7 +3613,7 @@ app.get('/api/public/status', async (req, res) => {
 // GET /api/client (client.configuration) so callers only change the URL.
 // (GET /api/client itself is client-login-only: Client Settings is the
 // master account's page.)
-const UI_CONFIG_KEYS = ['EVENT_LOCATIONS', 'EVENT_DESCRIPTORS', 'SHOWTIME_BUFFER_MINUTES', 'USERS_NAMES'];
+const UI_CONFIG_KEYS = ['EVENT_LOCATIONS', 'EVENT_DESCRIPTORS', 'SHOWTIME_BUFFER_MINUTES', 'USERS_NAMES', 'ROOM_CAPACITY'];
 
 app.get('/api/client/ui-config', requireAuth, requirePermission(...PERMS_DOOR), async (req, res) => {
   try {
@@ -3856,9 +3845,23 @@ app.post('/api/products/:id/refund', requireAuth, requirePermission(...PERMS_DOO
       status: newStatus,
       lastEditedDate: new Date()
     });
+
+    // ---- NATIVE EVENTS: showings follow ticket changes ----
+    let showtimes = [];
+    let syncPool;
+    try {
+      syncPool = await createDbConnection(req.user.dbName);
+      showtimes = await syncShowingsAfterTicketChange(syncPool, { ticketIds: [Number(id)] });
+    } catch (error) {
+      console.error(`SHOWING_SYNC_FAILED: after ticket ${id} changed: ${error.message}`);
+    } finally {
+      if (syncPool) await syncPool.end().catch(() => {});
+    }
+    // ---- END NATIVE EVENTS ----
     
     return res.json({ 
       success: true, 
+      showtimes,
       returnStatus: 'successful_refund_toggle',
       message: `Product status changed to ${newStatus}`,
       newStatus: newStatus,
@@ -4662,12 +4665,8 @@ app.post('/api/orders/:orderId/refund', requireAuth, requirePermission(...PERMS_
       console.log('Fetching original payment from Square to validate refund amount...');
       
       // Fetch the actual payment from Square to verify amount and check for existing refunds
-      const paymentResponse = await fetch(`${SQUARE_API_BASE}/v2/payments/${paymentId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
+      const paymentResponse = await squareApi.squareFetch(accessToken, `/v2/payments/${paymentId}`, {
+        method: 'GET'
       });
       
       if (!paymentResponse.ok) {
@@ -4757,12 +4756,8 @@ app.post('/api/orders/:orderId/refund', requireAuth, requirePermission(...PERMS_
 
       console.log('Calling Square Refund API with payload:', refundPayload);
 
-      const squareResponse = await fetch(SQUARE_REFUND_API_URL, {
+      const squareResponse = await squareApi.squareFetch(accessToken, '/v2/refunds', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(refundPayload)
       });
 
@@ -4834,6 +4829,9 @@ app.post('/api/orders/:orderId/refund', requireAuth, requirePermission(...PERMS_
 
       console.log('OrderMetaData updated with refund information and Status set to Refunded');
 
+      // ---- NATIVE EVENTS: showings follow ticket changes ----
+      const showtimes = await syncShowingsAfterTicketChange(userPool, { ticketIds: updateTicketsResult.rows.map(r => r.ID) });
+
       await userPool.end();
 
       const successResponse = {
@@ -4846,7 +4844,8 @@ app.post('/api/orders/:orderId/refund', requireAuth, requirePermission(...PERMS_
         orderTotal: originalAmount,
         partial: isPartialRefund,
         ticketsInvalidated: ticketsInvalidated,
-        refundedTickets: updateTicketsResult.rows.map(r => r.QRCode)
+        refundedTickets: updateTicketsResult.rows.map(r => r.QRCode),
+        showtimes
       };
 
       console.log('Sending success response:', JSON.stringify(successResponse));
@@ -4974,11 +4973,15 @@ app.post('/api/orders/:orderId/cancel', requireAuth, requirePermission(...PERMS_
          )`,
         [orderId]
       );
+
+      // ---- NATIVE EVENTS: showings follow ticket changes ----
+      const showtimes = await syncShowingsAfterTicketChange(userPool, { orderId });
       
       await userPool.end();
       
       return res.status(200).json({
         success: true,
+        showtimes,
         message: 'Order cancelled successfully',
         orderId: order.OrderID
       });
@@ -5099,11 +5102,15 @@ app.post('/api/orders/:orderId/delete', requireAuth, requirePermission(...PERMS_
          )`,
         [orderId]
       );
+
+      // ---- NATIVE EVENTS: showings follow ticket changes ----
+      const showtimes = await syncShowingsAfterTicketChange(userPool, { orderId });
       
       await userPool.end();
       
       return res.status(200).json({
         success: true,
+        showtimes,
         message: 'Order deleted successfully',
         orderId: order.OrderID
       });
@@ -5137,11 +5144,10 @@ app.post('/api/orders/:orderId/delete', requireAuth, requirePermission(...PERMS_
 // of the category list (the list endpoint is paginated) and matches the
 // name exactly, same as before.
 async function findOrCreateSquareCategory(accessToken, name) {
-  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
   let cursor;
   do {
-    const url = SQUARE_CATALOG_LIST_API_URL + '?types=CATEGORY' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
-    const response = await fetch(url, { method: 'GET', headers });
+    const url = '/v2/catalog/list?types=CATEGORY' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+    const response = await squareApi.squareFetch(accessToken, url, { method: 'GET' });
     const data = await response.json();
     for (const cat of data.objects || []) {
       if (cat.category_data?.name === name) {
@@ -5152,9 +5158,8 @@ async function findOrCreateSquareCategory(accessToken, name) {
     cursor = data.cursor;
   } while (cursor);
 
-  const createResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+  const createResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
     method: 'POST',
-    headers,
     body: JSON.stringify({
       idempotency_key: crypto.randomUUID(),
       object: { type: 'CATEGORY', id: '#new_category', category_data: { name } }
@@ -5254,12 +5259,11 @@ function ticketVariations(itemId, ticketTypes, locationId) {
 // or { error } when UseQRCode itself can't be found or created (an item
 // without it would sell but never make tickets, so don't create one).
 async function ensureTicketAttributes(accessToken, settings) {
-  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
   const definitions = [];
   let cursor;
   do {
-    const url = SQUARE_CATALOG_LIST_API_URL + '?types=CUSTOM_ATTRIBUTE_DEFINITION' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
-    const response = await fetch(url, { method: 'GET', headers });
+    const url = '/v2/catalog/list?types=CUSTOM_ATTRIBUTE_DEFINITION' + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+    const response = await squareApi.squareFetch(accessToken, url, { method: 'GET' });
     if (!response.ok) {
       console.error(`Failed to list Square custom attributes: ${response.status}`);
       return { error: 'Could not read the custom attributes from Square' };
@@ -5280,7 +5284,7 @@ async function ensureTicketAttributes(accessToken, settings) {
     const name = settings.names[spec.role];
     let definition = definitions.find(d => d.custom_attribute_definition_data?.name === name);
     if (!definition) {
-      definition = await createTicketAttribute(headers, name, spec);
+      definition = await createTicketAttribute(accessToken, name, spec);
       if (!definition) {
         if (spec.role === 'useQRCode') return { error: `Could not create the ${name} custom attribute in Square` };
         result.warnings.push(`The ${name} custom attribute couldn't be created in Square, so it isn't set on this item.`);
@@ -5301,7 +5305,7 @@ async function ensureTicketAttributes(accessToken, settings) {
   return result;
 }
 
-async function createTicketAttribute(headers, name, spec) {
+async function createTicketAttribute(accessToken, name, spec) {
   const definitionData = {
     name,
     type: spec.type,
@@ -5316,9 +5320,8 @@ async function createTicketAttribute(headers, name, spec) {
       allowed_selections: spec.choices.map((choice, index) => ({ uid: `#choice_${index}`, name: choice }))
     };
   }
-  const response = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+  const response = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
     method: 'POST',
-    headers,
     body: JSON.stringify({
       idempotency_key: crypto.randomUUID(),
       object: { type: 'CUSTOM_ATTRIBUTE_DEFINITION', id: `#${spec.key}`, custom_attribute_definition_data: definitionData }
@@ -5357,6 +5360,23 @@ async function createTicketAttribute(headers, name, spec) {
  */
 app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit'), async (req, res) => {
   let clientPool;
+  // NATIVE EVENTS: IndieTix's own copy, saved as a draft before Square is touched
+  let nativePool = null;
+  let nativeDraft = null;
+  let nativePublished = false;
+  // A draft whose Square item was never made is removed BEFORE the response
+  // goes out (every early `return res...json()` below passes through here),
+  // so nobody sees a half-made event.
+  let nativeCleanup = null;
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    if (nativeDraft && !nativePublished && !nativeCleanup) {
+      nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+      nativeCleanup.finally(() => sendJson(body));
+      return res;
+    }
+    return sendJson(body);
+  };
   
   try {
     const { movieData } = req.body;
@@ -5387,14 +5407,20 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
         details: 'Please add showtimes before creating the item'
       });
     }
+
+    // ---- NATIVE EVENTS: every showtime must be readable ----
+    const parsedShowings = movieData.showtimes.map(parseShowtimeLabel);
+    const unreadableShowtimes = movieData.showtimes.filter((label, i) => !parsedShowings[i]);
+    if (unreadableShowtimes.length > 0) {
+      return res.status(400).json({
+        error: 'A showtime could not be read',
+        details: `Expected the form "Sun 01-18-2026 7:00 PM (Main Theater)": ${unreadableShowtimes.join('; ')}`
+      });
+    }
     
     // 1. Check if item already exists
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         query: {
@@ -5430,6 +5456,24 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
     const eventTypeMovieSelectionUid = ticketAttributes.eventTypeSelectionUid;
     const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
     
+    // ---- NATIVE EVENTS: save the draft (IndieTix first, then Square) ----
+    nativePool = await createClientDbConnection(req.user.dbName);
+    nativeDraft = await createDraftEvent(nativePool, {
+      kind: 'movie',
+      title: movieData.title,
+      // What the tickets will record: left off when Square has no such choice.
+      eventType: eventTypeMovieSelectionUid ? ticketSettings.eventTypeChoice : null,
+      distributor: distributorSelectionUid ? ticketSettings.distributorChoice : null,
+      imdbID: movieData.imdbID,
+      description: movieData.description,
+      posterUrl: movieData.posterUrl,
+      createdBy: req.user.username,
+      ticketTypes: ticketSettings.ticketTypes,
+      showings: parsedShowings,
+      roomCapacities: globalConfig.ROOM_CAPACITY
+    });
+    // ---- END NATIVE EVENTS draft ----
+
     // 4. Create modifier list with all showtimes
     // Each showtime becomes a modifier option in the list
     const modifiers = movieData.showtimes.map((showtime, index) => ({
@@ -5455,12 +5499,8 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
       present_at_location_ids: [locationId]
     };
     
-    const createModifierResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    const createModifierResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `${movieData.imdbID}-modifier-${Date.now()}`,
         object: modifierListObject
@@ -5501,9 +5541,6 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
         }
 
         if (posterFetchOk && posterBuffer) {
-          const FormData = (await import('form-data')).default;
-          const formData = new FormData();
-
           // Create safer filename
           const safeFilename = movieData.title
             .replace(/[^a-z0-9]/gi, '_')
@@ -5513,11 +5550,6 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
 
           console.log(`Safe filename: ${safeFilename}_poster.jpg`);
 
-          formData.append('file', posterBuffer, {
-            filename: `${safeFilename}_poster.jpg`,
-            contentType: 'image/jpeg'
-          });
-          
           const requestMetadata = {
             idempotency_key: `${movieData.imdbID}-image-${Date.now()}`,
             image: {
@@ -5529,27 +5561,16 @@ app.post('/api/square/create-movie-item', requireAuth, requirePermission('edit')
             }
           };
           
-          formData.append('request', JSON.stringify(requestMetadata));
-          
           console.log('Uploading image to Square...');
           console.log('Request metadata:', JSON.stringify(requestMetadata, null, 2));
 
-          // Alternative approach using streams (more reliable with FormData)
-          const imageResponse = await new Promise((resolve, reject) => {
-            formData.submit({
-              protocol: 'https:',
-              host: SQUARE_IMAGE_UPLOAD_URL,
-              path: '/v2/catalog/images',
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`
-              }
-            }, (err, res) => {
-              if (err) return reject(err);
-              let data = '';
-              res.on('data', chunk => data += chunk);
-              res.on('end', () => resolve({ ok: res.statusCode === 200, status: res.statusCode, text: () => data }));
-            });
+          // Multipart upload via the shared square-api-lib (was a
+          // form-data .submit() copy here and in create-event-item).
+          const imageResponse = await squareApi.uploadCatalogImage(accessToken, {
+            imageBuffer: posterBuffer,
+            filename: `${safeFilename}_poster.jpg`,
+            contentType: 'image/jpeg',
+            request: requestMetadata
           });
           
           const imageResponseText = await imageResponse.text();
@@ -5631,12 +5652,8 @@ console.log('=== CUSTOM ATTRIBUTES BEING SENT ===');
 console.log(JSON.stringify(itemObject.custom_attribute_values, null, 2));
 console.log('=== END CUSTOM ATTRIBUTES ===');
 
-const createItemResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+const createItemResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
   method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json'
-  },
   body: JSON.stringify({
     idempotency_key: `${movieData.imdbID}-${Date.now()}`,
     object: itemObject
@@ -5653,6 +5670,25 @@ const createItemResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
     }
     
     const createItemData = await createItemResponse.json();
+
+    // ---- NATIVE EVENTS: link the draft to what Square created ----
+    let nativeNote = '';
+    if (nativeDraft) {
+      try {
+        await publishEventLinks(nativePool, nativeDraft, {
+          itemId: createItemData.catalog_object.id,
+          modifierListId,
+          imageId,
+          modifiers: modifierData.catalog_object.modifier_list_data?.modifiers,
+          variations: createItemData.catalog_object.item_data?.variations
+        });
+        nativePublished = true;
+      } catch (nativeError) {
+        console.error(`NATIVE_EVENT_LINK_FAILED: "${movieData.title}" was created in Square (${createItemData.catalog_object.id}) but IndieTix could not save its copy:`, nativeError.message);
+        nativeNote = ' IndieTix could not save its own copy of this item (it still sells and makes tickets).';
+      }
+    }
+    // ---- END NATIVE EVENTS link ----
     console.log('=== SQUARE RESPONSE ===');
 console.log(JSON.stringify(createItemData, null, 2));
 console.log('=== END RESPONSE ===');
@@ -5673,12 +5709,8 @@ console.log('=== END RESPONSE ===');
       }
     }));
     
-    await fetch(SQUARE_INVENTORY_BATCH_CREATE, {
+    await squareApi.squareFetch(accessToken, '/v2/inventory/changes/batch-create', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `inventory-${movieData.imdbID}-${Date.now()}`,
         changes: inventoryChanges
@@ -5699,12 +5731,8 @@ if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALE
     let squareItemUrl = null;
     try {
       const itemId = createItemData.catalog_object.id;
-      const itemDetailsResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL+`/${itemId}?include_related_objects=true`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
+      const itemDetailsResponse = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${itemId}?include_related_objects=true`, {
+        method: 'GET'
       });
       
       if (itemDetailsResponse.ok) {
@@ -5822,7 +5850,8 @@ if (shouldCreateCalendarEvents && !isCalendarConfigured(globalConfig.CINEMA_CALE
 res.json({
   success: true,
   itemId: createItemData.catalog_object.id,
-  message: `Successfully created "${movieData.title}" in Square with ${movieData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}`,
+  eventId: nativePublished ? nativeDraft.eventId : null,
+  message: `Successfully created "${movieData.title}" in Square with ${movieData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}${nativeNote}`,
   squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
 });
     
@@ -5830,12 +5859,34 @@ res.json({
     console.error('Error:', error);
     if (clientPool) await clientPool.end();
     res.status(500).json({ error: 'Failed to create item', details: error.message });
+  } finally {
+    // ---- NATIVE EVENTS: a draft whose Square item was never made is removed ----
+    if (nativeDraft && !nativePublished && !nativeCleanup) nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+    if (nativeCleanup) await nativeCleanup;
+    if (nativePool) await nativePool.end().catch(() => {});
   }
 });
 
 // Create Event Item in Square (matches movie endpoint pattern exactly)
 app.post('/api/square/create-event-item', requireAuth, requirePermission('edit'), async (req, res) => {
   let clientPool;
+  // NATIVE EVENTS: IndieTix's own copy, saved as a draft before Square is touched
+  let nativePool = null;
+  let nativeDraft = null;
+  let nativePublished = false;
+  // A draft whose Square item was never made is removed BEFORE the response
+  // goes out (every early `return res...json()` below passes through here),
+  // so nobody sees a half-made event.
+  let nativeCleanup = null;
+  const sendJson = res.json.bind(res);
+  res.json = (body) => {
+    if (nativeDraft && !nativePublished && !nativeCleanup) {
+      nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+      nativeCleanup.finally(() => sendJson(body));
+      return res;
+    }
+    return sendJson(body);
+  };
   
   try {
     const { eventData } = req.body;
@@ -5866,14 +5917,20 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
         details: 'Please add showtimes before creating the item'
       });
     }
+
+    // ---- NATIVE EVENTS: every showtime must be readable ----
+    const parsedShowings = eventData.showtimes.map(parseShowtimeLabel);
+    const unreadableShowtimes = eventData.showtimes.filter((label, i) => !parsedShowings[i]);
+    if (unreadableShowtimes.length > 0) {
+      return res.status(400).json({
+        error: 'A showtime could not be read',
+        details: `Expected the form "Sun 01-18-2026 7:00 PM (Main Theater)": ${unreadableShowtimes.join('; ')}`
+      });
+    }
     
     // 1. Check if item already exists
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         query: {
@@ -5909,6 +5966,24 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     const eventTypeEventSelectionUid = ticketAttributes.eventTypeSelectionUid;
     const ticketWarnings = ticketAttributes.warnings.length ? ' ' + ticketAttributes.warnings.join(' ') : '';
     
+    // ---- NATIVE EVENTS: save the draft (IndieTix first, then Square) ----
+    nativePool = await createClientDbConnection(req.user.dbName);
+    nativeDraft = await createDraftEvent(nativePool, {
+      kind: 'event',
+      title: eventData.title,
+      // What the tickets will record: left off when Square has no such choice.
+      eventType: eventTypeEventSelectionUid ? ticketSettings.eventTypeChoice : null,
+      distributor: distributorSelectionUid ? ticketSettings.distributorChoice : null,
+      imdbID: eventData.imdbID,
+      description: eventData.description,
+      posterUrl: eventData.posterUrl,
+      createdBy: req.user.username,
+      ticketTypes: ticketSettings.ticketTypes,
+      showings: parsedShowings,
+      roomCapacities: globalConfig.ROOM_CAPACITY
+    });
+    // ---- END NATIVE EVENTS draft ----
+
     // 4. Create modifier list with all showtimes (SAME AS MOVIE)
     const modifiers = eventData.showtimes.map((showtime, index) => {
       // Extract just the time for abbreviation (Kitchen Name in Square)
@@ -5941,12 +6016,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       present_at_location_ids: [locationId]
     };
     
-    const createModifierResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    const createModifierResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-modifier-${Date.now()}`,
         object: modifierListObject
@@ -5982,9 +6053,6 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
         const posterBuffer = normalized.buffer;
 
         // Upload to Square
-        const FormData = (await import('form-data')).default;
-        const formData = new FormData();
-        
         const safeFilename = eventData.title
           .replace(/[^a-z0-9]/gi, '_')
           .replace(/_+/g, '_')
@@ -5992,12 +6060,7 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
           .substring(0, 100);
         
         console.log(`Safe filename: ${safeFilename}_poster.jpg`);
-        
-        formData.append('file', posterBuffer, {
-          filename: `${safeFilename}_poster.jpg`,
-          contentType: 'image/jpeg'
-        });
-        
+
         const requestMetadata = {
           idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-image-${Date.now()}`,
           image: {
@@ -6009,25 +6072,14 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
           }
         };
         
-        formData.append('request', JSON.stringify(requestMetadata));
-        
         console.log('Uploading image to Square...');
-        
-        const imageResponse = await new Promise((resolve, reject) => {
-          formData.submit({
-            protocol: 'https:',
-            host: SQUARE_IMAGE_UPLOAD_URL,
-            path: '/v2/catalog/images',
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-            }
-          }, (err, res) => {
-            if (err) return reject(err);
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => resolve({ ok: res.statusCode === 200, status: res.statusCode, text: () => data }));
-          });
+
+        // Multipart upload via the shared square-api-lib.
+        const imageResponse = await squareApi.uploadCatalogImage(accessToken, {
+          imageBuffer: posterBuffer,
+          filename: `${safeFilename}_poster.jpg`,
+          contentType: 'image/jpeg',
+          request: requestMetadata
         });
         
         const imageResponseText = await imageResponse.text();
@@ -6112,12 +6164,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     console.log(`   - Distributor key: ${distributorKey || 'NOT SET'} (UID: ${distributorSelectionUid || 'NOT SET'})`);
     console.log('=== END CUSTOM ATTRIBUTES ===');
 
-    const createItemResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL, {
+    const createItemResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/object', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `${eventData.title.replace(/\s+/g, '-')}-item-${Date.now()}`,
         object: itemObject
@@ -6134,6 +6182,25 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     }
     
     const createItemData = await createItemResponse.json();
+
+    // ---- NATIVE EVENTS: link the draft to what Square created ----
+    let nativeNote = '';
+    if (nativeDraft) {
+      try {
+        await publishEventLinks(nativePool, nativeDraft, {
+          itemId: createItemData.catalog_object.id,
+          modifierListId,
+          imageId,
+          modifiers: modifierData.catalog_object.modifier_list_data?.modifiers,
+          variations: createItemData.catalog_object.item_data?.variations
+        });
+        nativePublished = true;
+      } catch (nativeError) {
+        console.error(`NATIVE_EVENT_LINK_FAILED: "${eventData.title}" was created in Square (${createItemData.catalog_object.id}) but IndieTix could not save its copy:`, nativeError.message);
+        nativeNote = ' IndieTix could not save its own copy of this item (it still sells and makes tickets).';
+      }
+    }
+    // ---- END NATIVE EVENTS link ----
     console.log('=== EVENT SQUARE RESPONSE ===');
     console.log('Item ID:', createItemData.catalog_object.id);
     console.log('Modifier lists in response:', createItemData.catalog_object.item_data?.modifier_list_info?.length || 0);
@@ -6159,12 +6226,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
       }
     }));
     
-    await fetch(SQUARE_INVENTORY_BATCH_CREATE, {
+    await squareApi.squareFetch(accessToken, '/v2/inventory/changes/batch-create', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         idempotency_key: `inventory-${eventData.title.replace(/\s+/g, '-')}-${Date.now()}`,
         changes: inventoryChanges
@@ -6184,12 +6247,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
         let squareItemUrl = null;
         try {
           const itemId = createItemData.catalog_object.id;
-          const itemDetailsResponse = await fetch(SQUARE_CATALOG_OBJECT_API_URL+`/${itemId}?include_related_objects=true`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            }
+          const itemDetailsResponse = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${itemId}?include_related_objects=true`, {
+            method: 'GET'
           });
           
           if (itemDetailsResponse.ok) {
@@ -6320,7 +6379,8 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     res.json({
       success: true,
       itemId: createItemData.catalog_object.id,
-      message: `Successfully created "${eventData.title}" in Square with ${eventData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}`,
+      eventId: nativePublished ? nativeDraft.eventId : null,
+      message: `Successfully created "${eventData.title}" in Square with ${eventData.showtimes.length} showtimes.${calendarNote}${ticketWarnings}${nativeNote}`,
       squareUrl: SQUARE_ITEM_LIBRARY_URL+`/${createItemData.catalog_object.id}`
     });
     
@@ -6328,8 +6388,118 @@ app.post('/api/square/create-event-item', requireAuth, requirePermission('edit')
     console.error('Error:', error);
     if (clientPool) await clientPool.end();
     res.status(500).json({ error: 'Failed to create event item', details: error.message });
+  } finally {
+    // ---- NATIVE EVENTS: a draft whose Square item was never made is removed ----
+    if (nativeDraft && !nativePublished && !nativeCleanup) nativeCleanup = discardDraftEvent(nativePool, nativeDraft);
+    if (nativeCleanup) await nativeCleanup;
+    if (nativePool) await nativePool.end().catch(() => {});
   }
 });
+
+// ---- SHOWTIME MANAGEMENT ROUTES ----
+// The Showtimes page (showtimes.html). Logic and rules live in
+// utils/native-events.mjs (SHOWTIME MANAGEMENT); these only open the venue's
+// database, load its settings and map errors. Same permission as Add Movie.
+// ---- NATIVE EVENTS: showings follow ticket changes ----
+// After a refund, cancel or delete frees seats (or an un-refund takes one),
+// put a sold-out showtime back on sale or sell out a full one. Reads the
+// venue's own config from its database (not globalConfig, which another
+// request may have just replaced). Never throws: the ticket change stands.
+async function syncShowingsAfterTicketChange(pool, { ticketIds, orderId }) {
+  try {
+    let ids = ticketIds;
+    if (!ids) {
+      ids = (await pool.query(`SELECT "QRCodeProductID" FROM "QRCodeProductToOrder" WHERE "OrderID" = $1`, [orderId])).rows.map((r) => r.QRCodeProductID);
+    }
+    const showings = await showingsForTickets(pool, ids);
+    if (showings.length === 0) return [];
+    const config = (await pool.query(`SELECT "configuration" FROM "Client" WHERE "configuration" IS NOT NULL LIMIT 1`)).rows[0]?.configuration || {};
+    return await syncShowingSales(pool, showings, {
+      accessToken: config.SQUARE_ACCESS_TOKEN,
+      enforceCapacity: config.ENFORCE_CAPACITY === true || config.ENFORCE_CAPACITY === 'true'
+    });
+  } catch (error) {
+    if (error.code !== '42P01') console.error(`SHOWING_SYNC_FAILED: after a ticket change: ${error.message}`);
+    return [];
+  }
+}
+// ---- END NATIVE EVENTS: showings follow ticket changes ----
+
+async function withShowtimePool(req, res, work) {
+  let pool;
+  try {
+    pool = await createClientDbConnection(req.user.dbName);
+    await getClientConfiguration(pool, req.user.dbName);
+    const result = await work(pool, globalConfig);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof ShowtimeError) return res.status(error.status).json({ error: error.message });
+    console.error('Showtime management error:', error);
+    res.status(500).json({ error: 'Could not update the showtime', details: error.message });
+  } finally {
+    if (pool) await pool.end().catch(() => {});
+  }
+}
+function showtimeIds(req) {
+  const eventId = Number(req.params.eventId);
+  const showingId = req.params.showingId === undefined ? undefined : Number(req.params.showingId);
+  if (!Number.isInteger(eventId) || eventId < 1 || (showingId !== undefined && (!Number.isInteger(showingId) || showingId < 1))) {
+    throw new ShowtimeError(404, 'Not found');
+  }
+  return { eventId, showingId };
+}
+function requireSquareToken(config) {
+  if (!config.SQUARE_ACCESS_TOKEN) throw new ShowtimeError(500, 'Square API not configured');
+  return config.SQUARE_ACCESS_TOKEN;
+}
+
+app.get('/api/events', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool) => ({ events: await listEvents(pool, { includeArchived: req.query.archived === '1' }) })));
+
+app.get('/api/events/:eventId', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool) => ({ event: await getEventWithShowings(pool, showtimeIds(req).eventId) })));
+
+app.post('/api/events/:eventId/showings', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId } = showtimeIds(req);
+    const { label, capacity, heldSeats } = req.body || {};
+    const added = await addShowing(pool, requireSquareToken(config), eventId, { label, capacity, heldSeats }, { roomCapacities: config.ROOM_CAPACITY });
+    return { success: true, ...added, event: await getEventWithShowings(pool, eventId) };
+  }));
+
+app.put('/api/events/:eventId/showings/:showingId', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId, showingId } = showtimeIds(req);
+    const edited = await editShowing(pool, requireSquareToken(config), eventId, showingId, { label: req.body?.label });
+    return { success: true, ...edited, event: await getEventWithShowings(pool, eventId) };
+  }));
+
+app.put('/api/events/:eventId/showings/:showingId/seats', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId, showingId } = showtimeIds(req);
+    const seats = await setShowingSeats(pool, eventId, showingId, { capacity: req.body?.capacity, heldSeats: req.body?.heldSeats });
+    // More seats can put a sold-out showtime back on sale; fewer can fill it.
+    const [sync] = await syncShowingSales(pool, [{ showingId, eventId }], {
+      accessToken: config.SQUARE_ACCESS_TOKEN,
+      enforceCapacity: config.ENFORCE_CAPACITY === true || config.ENFORCE_CAPACITY === 'true'
+    });
+    return { success: true, ...seats, sync: sync || { action: 'none' }, event: await getEventWithShowings(pool, eventId) };
+  }));
+
+app.post('/api/events/:eventId/showings/:showingId/cancel', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => {
+    const { eventId, showingId } = showtimeIds(req);
+    const cancelled = await cancelShowing(pool, requireSquareToken(config), eventId, showingId);
+    return { success: true, ...cancelled, event: await getEventWithShowings(pool, eventId) };
+  }));
+// Bring the venue's existing Square ticket items into IndieTix (native
+// events step 4). { dryRun: true } (the default) only reports.
+app.post('/api/events/import-from-square', requireAuth, requirePermission('edit'), (req, res) =>
+  withShowtimePool(req, res, async (pool, config) => ({
+    success: true,
+    ...(await importFromSquare(pool, requireSquareToken(config), config, { dryRun: req.body?.dryRun !== false }))
+  })));
+// ---- END SHOWTIME MANAGEMENT ROUTES ----
 
 // app_mjs_insights_endpoint.js
 // Add this endpoint to your app.mjs file
@@ -6909,12 +7079,8 @@ const MARKETING_CHANNELS = ['email', 'facebook', 'instagram', 'tiktok'];
 // Search calls elsewhere (e.g. create-movie-item) rather than sharing a
 // helper, so this matches this file's own existing convention.
 async function searchMarketingCatalogItems(accessToken, targetCategories) {
-  const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+  const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
     body: JSON.stringify({
       object_types: ['ITEM'],
       include_related_objects: false
@@ -6989,12 +7155,8 @@ app.get('/api/marketing/items', requireAuth, requirePermission('marketing'), asy
 // dates next to each day-offset instead of only the abstract "-28 days" --
 // matches the Marquee Engine design doc's "generated preview" decision.
 async function getItemShowtimeWindow(accessToken, squareItemId) {
-  const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+  const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
     body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true })
   });
 
@@ -7240,9 +7402,7 @@ app.post('/api/marketing/posts/:postId/regenerate-caption', requireAuth, require
       return res.status(500).json({ success: false, message: 'Square API not configured' });
     }
 
-    const itemResponse = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${post.SquareItemID}`, {
-      headers: { 'Authorization': `Bearer ${globalConfig.SQUARE_ACCESS_TOKEN}` }
-    });
+    const itemResponse = await squareApi.squareFetch(globalConfig.SQUARE_ACCESS_TOKEN, `/v2/catalog/object/${post.SquareItemID}`);
     if (!itemResponse.ok) {
       await userPool.end();
       return res.status(502).json({ success: false, message: 'Could not fetch the Square item' });
@@ -7321,9 +7481,7 @@ async function resolveItemImageUrl(accessToken, item) {
   const imageId = item.item_data?.image_ids?.[0];
   if (!imageId) return null;
   try {
-    const response = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${imageId}`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
+    const response = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${imageId}`);
     if (!response.ok) return null;
     const data = await response.json();
     return data.object?.image_data?.url || null;
@@ -7539,7 +7697,6 @@ const MARKETING_POST_TABS = {
 };
 const MARKETING_BULK_APPROVE_MAX = 500;
 const MARKETING_POST_CHANNELS = ['email', 'facebook', 'instagram', 'tiktok'];
-const SQUARE_CATALOG_BATCH_RETRIEVE_URL = `${SQUARE_API_BASE}/v2/catalog/batch-retrieve`;
 
 /**
  * Show names for a list of post item IDs: { id: name }. Square first (it
@@ -7556,9 +7713,8 @@ async function marketingItemNames(pool, itemIds) {
   if (remaining.length && globalConfig.SQUARE_ACCESS_TOKEN) {
     try {
       for (let i = 0; i < remaining.length; i += 1000) {
-        const response = await fetch(SQUARE_CATALOG_BATCH_RETRIEVE_URL, {
+        const response = await squareApi.squareFetch(globalConfig.SQUARE_ACCESS_TOKEN, '/v2/catalog/batch-retrieve', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${globalConfig.SQUARE_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ object_ids: remaining.slice(i, i + 1000), include_deleted_objects: true })
         });
         if (!response.ok) throw new Error(`Square catalog batch-retrieve failed: ${response.status}`);
@@ -7752,9 +7908,7 @@ app.post('/api/marketing/posts/:postId/send-now', requireAuth, requirePermission
       // Re-check the source item is still active before firing, same safety
       // net the automatic poller uses (marketingEngine/src/index.mjs
       // sendDuePosts) -- a schedule can outlive the showtime it was built for.
-      const itemResponse = await fetch(`${SQUARE_CATALOG_OBJECT_API_URL}/${post.SquareItemID}`, {
-        headers: { 'Authorization': `Bearer ${clientConfig.SQUARE_ACCESS_TOKEN}` }
-      });
+      const itemResponse = await squareApi.squareFetch(clientConfig.SQUARE_ACCESS_TOKEN, `/v2/catalog/object/${post.SquareItemID}`);
       if (!itemResponse.ok) {
         await userPool.end();
         return res.status(502).json({ success: false, message: 'Could not fetch the Square item' });
@@ -8544,9 +8698,8 @@ async function listCatalogShowtimes(accessToken) {
   const showtimes = [];
   let cursor;
   do {
-    const response = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const response = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true, ...(cursor ? { cursor } : {}) })
     });
     if (!response.ok) throw new Error(`Square catalog search failed: ${response.status}`);
@@ -9036,12 +9189,8 @@ app.get('/api/square/showtimes-for-date', requireAuth, requirePermission('edit')
     console.log(`📅 Fetching showtimes for date: ${date}, location: ${location || 'all'}`);
     
     // Search for all cinema items (using the working query format from index.mjs)
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         object_types: ['ITEM'],
         include_related_objects: true
@@ -9151,12 +9300,8 @@ app.get('/api/square/showtimes-for-date', requireAuth, requirePermission('edit')
   const EXCLUDED_TICKET_STATUSES = ['refunded', 'cancelled', 'canceled', 'transferred'];
 
   async function getShowtimesForDate(accessToken, dateStr) {
-    const searchResponse = await fetch(SQUARE_CATALOG_SEARCH_API_URL, {
+    const searchResponse = await squareApi.squareFetch(accessToken, '/v2/catalog/search', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({ object_types: ['ITEM'], include_related_objects: true })
     });
 

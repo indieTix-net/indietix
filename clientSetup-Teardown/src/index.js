@@ -825,6 +825,85 @@ async function createDatabaseObjects(dbConfig, clientUsername, theaterId, theate
     await pgClient.query(createPrivacyRequestTable);
     console.log('PrivacyRequest table created');
 
+    // 17. NoTicketOrder -- Square orders getSquareOrders already found to
+    // have no ticketed items (concession sales), so Square's repeat
+    // webhooks for them are skipped like a ticket sale's are (via its
+    // Order row). Square IDs only, no personal data; pruned after 90 days.
+    const createNoTicketOrderTable = `
+      CREATE TABLE public."NoTicketOrder" (
+        "OrderID" VARCHAR(255) PRIMARY KEY,
+        "CreatedDate" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await pgClient.query(createNoTicketOrderTable);
+    console.log('NoTicketOrder table created');
+
+    // 18. NATIVE EVENTS -- IndieTix's own record of events, ticket types,
+    // showings and capacity, and which POS objects (Square items,
+    // showtime modifiers, ticket variations) each one is published as.
+    // QRScanner's Add Movie/Event writes these; sales still happen in the
+    // POS. See NATIVE_EVENTS_PLAN.md. No FKs, per convention. StartsAt is
+    // Chicago wall-clock time, like QRCodeProduct.ProductDate.
+    // QRCodeProduct.ShowingID is which showing a ticket is for (filled by
+    // getSquareOrders from native-events step 3 on; NULL before that).
+    await pgClient.query(`CREATE TABLE IF NOT EXISTS public."Event" (
+  "ID" SERIAL PRIMARY KEY,
+  "Kind" VARCHAR(20) NOT NULL CHECK ("Kind" IN ('movie', 'event')),
+  "Title" VARCHAR(255) NOT NULL,
+  "EventType" VARCHAR(50),
+  "Distributor" VARCHAR(255),
+  "ImdbID" VARCHAR(20),
+  "Description" TEXT,
+  "PosterUrl" TEXT,
+  "Status" VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK ("Status" IN ('draft', 'active', 'archived')),
+  "CreatedBy" VARCHAR(100),
+  "CreatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "UpdatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS public."TicketType" (
+  "ID" SERIAL PRIMARY KEY,
+  "EventID" INTEGER NOT NULL,
+  "Name" VARCHAR(100) NOT NULL,
+  "PriceCents" INTEGER NOT NULL CHECK ("PriceCents" >= 0),
+  "SortOrder" INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS "TicketType_EventID_idx" ON public."TicketType" ("EventID");
+
+CREATE TABLE IF NOT EXISTS public."Showing" (
+  "ID" SERIAL PRIMARY KEY,
+  "EventID" INTEGER NOT NULL,
+  "StartsAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  "Venue" VARCHAR(255) NOT NULL,
+  "Descriptors" VARCHAR(255) NOT NULL DEFAULT '',
+  "Label" VARCHAR(255) NOT NULL,
+  "Capacity" INTEGER CHECK ("Capacity" IS NULL OR "Capacity" >= 0),
+  "HeldSeats" INTEGER NOT NULL DEFAULT 0 CHECK ("HeldSeats" >= 0),
+  "Status" VARCHAR(20) NOT NULL DEFAULT 'on_sale' CHECK ("Status" IN ('on_sale', 'sold_out', 'cancelled', 'expired')),
+  "SoldOutAt" TIMESTAMP WITHOUT TIME ZONE,
+  "CreatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "Showing_EventID_idx" ON public."Showing" ("EventID");
+CREATE INDEX IF NOT EXISTS "Showing_StartsAt_idx" ON public."Showing" ("StartsAt");
+
+CREATE TABLE IF NOT EXISTS public."ExternalCatalogLink" (
+  "ID" SERIAL PRIMARY KEY,
+  "EntityType" VARCHAR(20) NOT NULL CHECK ("EntityType" IN ('event', 'showing', 'ticket_type')),
+  "EntityID" INTEGER NOT NULL,
+  "Provider" VARCHAR(30) NOT NULL,
+  "ExternalType" VARCHAR(30) NOT NULL,
+  "ExternalID" VARCHAR(64) NOT NULL,
+  "CreatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "DeletedAt" TIMESTAMP WITHOUT TIME ZONE,
+  "DeletedReason" VARCHAR(20),
+  CONSTRAINT "ExternalCatalogLink_Provider_ExternalID_key" UNIQUE ("Provider", "ExternalID")
+);
+CREATE INDEX IF NOT EXISTS "ExternalCatalogLink_Entity_idx" ON public."ExternalCatalogLink" ("EntityType", "EntityID");
+
+ALTER TABLE public."QRCodeProduct" ADD COLUMN IF NOT EXISTS "ShowingID" INTEGER;
+CREATE INDEX IF NOT EXISTS "QRCodeProduct_ShowingID_idx" ON public."QRCodeProduct" ("ShowingID");`);
+    console.log('Native event tables created');
+
     // ===========================================================
     // FUNCTIONS
     // ===========================================================
@@ -1077,7 +1156,7 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
     
    // Create configuration JSON
     const configuration = {
-      "ENV_TYPE": "dev",
+      "ENV_TYPE": clientData.env_type || "dev",
       "SQUARE_ACCESS_TOKEN": clientData.square_access_token,
       "SQUARE_SIGNATURE_KEY": clientData.square_signature_key,
       "SQUARE_WEBHOOK_URL": clientData.square_webhook_url || "", // this deployment's own webhook endpoint (square-queue-forwarder's ApiEndpoint output); optional at onboarding, bootstrap.sh passes it -- was hardcoded to production's URL, found 2026-10-27 during a real bootstrap verification run
@@ -1089,6 +1168,8 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
       "EVENT_TYPE": "EventType",
       "EVENT_LOCATIONS": ["Main Auditorium"],
       "SALES_TAX_RATE": "",                                   // optional: percent included in ticket prices, split out of Gross in box-office reports (blank = no tax)
+      "ROOM_CAPACITY": {},
+      "ENFORCE_CAPACITY": "false",                            // "true" = getSquareOrders removes a showtime from Square when it's sold out (sold reaches capacity minus held seats). Off until the venue's capacities are set                                    // optional: {"room name": seats}; each new showing starts with its room's seats (blank/missing = no limit). Rooms are EVENT_LOCATIONS
       "SCREEN_NUMBERS": {},                                   // optional: {"text in a ticket's venue": "screen number"} for box-office reports; no match = screen 1
       "MOVIE_TICKET_TYPES": "",                               // optional: JSON [{"name":"Adult","price":"12.50"}] for Add Movie's ticket types (blank = Child 10.00, Adult 12.50, Senior 11.00)
       "EVENT_TICKET_TYPES": "",                               // optional: same for Add Event (blank = Regular 0.00)
@@ -1240,6 +1321,8 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
         "EVENT_LOCATIONS",
         "SALES_TAX_RATE",
         "SCREEN_NUMBERS",
+        "ROOM_CAPACITY",
+        "ENFORCE_CAPACITY",
         "MOVIE_TICKET_TYPES",
         "EVENT_TICKET_TYPES",
         "MOVIE_DISTRIBUTOR",
@@ -1374,6 +1457,11 @@ async function insertClientRecord(dbConfig, clientUsername, clientData) {
     // with Square's sign-in: its access token is square_access_token above,
     // its refresh token is already in Secrets Manager. These keys aren't
     // user-definable, so they can't come in through `settings`.
+    // Personal-token venue whose webhook bootstrap.sh set up: record its
+    // merchant (getSquareOrders checks it for a ?client= webhook URL).
+    if (clientData.square_merchant_id) {
+      configuration.SQUARE_MERCHANT_ID = clientData.square_merchant_id;
+    }
     if (clientData.square_oauth && clientData.square_oauth.merchant_id) {
       configuration.SQUARE_AUTH_MODE = 'oauth';
       configuration.SQUARE_MERCHANT_ID = clientData.square_oauth.merchant_id;
@@ -1927,6 +2015,8 @@ exports.handler = async (event, context) => {
       square_signature_key,
       square_webhook_url,
       square_location_id,
+      square_merchant_id,
+      env_type,
       square_oauth,
       settings,
       sender_email,
@@ -1953,6 +2043,17 @@ exports.handler = async (event, context) => {
             required: ['username', 'clientSecret', 'contactName', 'clientEmail', 'square_access_token', 'square_signature_key']
           })
         };
+      }
+
+      // Optional: bootstrap.sh sends these for a webhook subscription it just
+      // made for this venue (exact URL, fresh signature key), so signature
+      // checking can start on day one, and the merchant is recorded for
+      // getSquareOrders' ?client= check.
+      if (env_type !== undefined && env_type !== 'dev' && env_type !== 'prod') {
+        return { statusCode: 400, body: JSON.stringify({ error: 'env_type must be "dev" or "prod"' }) };
+      }
+      if (square_merchant_id !== undefined && !/^[A-Za-z0-9]{1,64}$/.test(String(square_merchant_id))) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'square_merchant_id must be letters and numbers' }) };
       }
 
       if (settings !== undefined && (settings === null || typeof settings !== 'object' || Array.isArray(settings))) {
@@ -2022,6 +2123,8 @@ exports.handler = async (event, context) => {
       square_signature_key,
       square_webhook_url,
       square_location_id,
+      square_merchant_id,
+      env_type,
       square_oauth,
       settings,
       sender_email: sender_email || `${contactName.replace(/\s+/g, '').toLowerCase()}@indietix.net`,

@@ -42,7 +42,8 @@ test('createDatabaseObjects: creates every table this schema depends on', async 
   const expected = [
     'Client', 'Order', 'QRCodeProduct', 'QRCodeProductToOrder',
     'SkeletonKey', 'SkeletonKeyUsage', 'Users', 'Customer', 'SmsConsent',
-    'SmsOutboundLog', 'MarketingSchedule', 'MarketingPost', 'MarketingEmailContact'
+    'SmsOutboundLog', 'MarketingSchedule', 'MarketingPost', 'MarketingEmailContact',
+    'NoTicketOrder', 'Event', 'TicketType', 'Showing', 'ExternalCatalogLink'
   ];
   for (const name of expected) {
     assert.ok(tableNames.includes(name), `missing table "${name}"`);

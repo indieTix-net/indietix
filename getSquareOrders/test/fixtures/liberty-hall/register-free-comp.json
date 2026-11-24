@@ -1,0 +1,616 @@
+{
+  "shape": "register-free-comp",
+  "description": "Box office register, $0 comp ticket (100% discount), cash tender.",
+  "recorded": "2026-10-29, Liberty Hall production getSquareOrders logs (anonymized)",
+  "webhook": {
+    "merchant_id": "LHFIXTUREMERCHANT",
+    "type": "payment.updated",
+    "event_id": "06ce9499-3cf2-3917-8c67-5b989c19660b",
+    "created_at": "2026-10-29T23:58:31.526Z",
+    "data": {
+      "type": "payment",
+      "id": "qanu2cojP4OiFzLCrmlOfkPgUFZZY",
+      "object": {
+        "payment": {
+          "amount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "application_details": {
+            "square_product": "RETAIL"
+          },
+          "capabilities": [
+            "EDIT_AMOUNT_UP",
+            "EDIT_AMOUNT_DOWN",
+            "EDIT_TIP_AMOUNT_UP",
+            "EDIT_TIP_AMOUNT_DOWN"
+          ],
+          "cash_details": {
+            "buyer_supplied_money": {
+              "amount": 0,
+              "currency": "USD"
+            },
+            "change_back_money": {
+              "amount": 0,
+              "currency": "USD"
+            }
+          },
+          "created_at": "2026-10-29T23:58:30.538Z",
+          "device_details": {
+            "device_id": "fixture-device-01",
+            "device_installation_id": "fixture-device-02",
+            "device_name": "redacted-01"
+          },
+          "employee_id": "FIXTURESTAFF01",
+          "id": "qanu2cojP4OiFzLCrmlOfkPgUFZZY",
+          "location_id": "S3E2Q1EK0466V",
+          "order_id": "y5pLDRLgMPCIvp98ARSO1pT0NrGZY",
+          "receipt_number": "FIXT",
+          "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+          "source_type": "CASH",
+          "status": "COMPLETED",
+          "team_member_id": "FIXTURESTAFF01",
+          "total_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "updated_at": "2026-10-29T23:58:30.631Z",
+          "version": 1
+        }
+      }
+    }
+  },
+  "payment": {
+    "payment": {
+      "id": "qanu2cojP4OiFzLCrmlOfkPgUFZZY",
+      "created_at": "2026-10-29T23:58:30.538Z",
+      "updated_at": "2026-10-29T23:58:30.631Z",
+      "amount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "status": "COMPLETED",
+      "source_type": "CASH",
+      "location_id": "S3E2Q1EK0466V",
+      "order_id": "y5pLDRLgMPCIvp98ARSO1pT0NrGZY",
+      "total_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "employee_id": "FIXTURESTAFF01",
+      "capabilities": [
+        "EDIT_AMOUNT_UP",
+        "EDIT_AMOUNT_DOWN",
+        "EDIT_TIP_AMOUNT_UP",
+        "EDIT_TIP_AMOUNT_DOWN"
+      ],
+      "cash_details": {
+        "buyer_supplied_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "change_back_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "receipt_number": "FIXT",
+      "receipt_url": "https://squareup.com/receipt/preview/FIXTURE",
+      "device_details": {
+        "device_id": "fixture-device-01",
+        "device_name": "redacted-01",
+        "device_installation_id": "fixture-device-02"
+      },
+      "team_member_id": "FIXTURESTAFF01",
+      "application_details": {
+        "square_product": "RETAIL"
+      },
+      "version_token": "fixture-version-token"
+    }
+  },
+  "customer": null,
+  "order": {
+    "order": {
+      "id": "y5pLDRLgMPCIvp98ARSO1pT0NrGZY",
+      "location_id": "S3E2Q1EK0466V",
+      "line_items": [
+        {
+          "uid": "57986028-5479-4f8d-8218-a5ef8cdbf53f",
+          "catalog_object_id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+          "catalog_version": 1792993131187,
+          "quantity": "1",
+          "name": "One Eye Open (2026)",
+          "variation_name": "Adult",
+          "base_price_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "modifiers": [
+            {
+              "uid": "97852c8d-6905-4e59-b2c0-37a1873e0499",
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "name": "Fri 10-30-2026 7:30 PM (Main Auditorium)",
+              "catalog_object_id": "2WWBIRVFXHBYA2VBWD5N57F5",
+              "catalog_version": 1792993131187,
+              "quantity": "1"
+            }
+          ],
+          "gross_sales_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "item_type": "ITEM",
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "created_at": "2026-10-29T23:58:30.309Z",
+      "updated_at": "2026-10-29T23:58:32.000Z",
+      "state": "COMPLETED",
+      "version": 4,
+      "total_tax_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_discount_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_tip_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "closed_at": "2026-10-29T23:58:30.690Z",
+      "tenders": [
+        {
+          "id": "qanu2cojP4OiFzLCrmlOfkPgUFZZY",
+          "location_id": "S3E2Q1EK0466V",
+          "transaction_id": "y5pLDRLgMPCIvp98ARSO1pT0NrGZY",
+          "created_at": "2026-10-29T23:58:30Z",
+          "amount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "type": "CASH",
+          "cash_details": {
+            "buyer_tendered_money": {
+              "amount": 0,
+              "currency": "USD"
+            },
+            "change_back_money": {
+              "amount": 0,
+              "currency": "USD"
+            }
+          },
+          "payment_id": "qanu2cojP4OiFzLCrmlOfkPgUFZZY"
+        }
+      ],
+      "total_service_charge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "net_amounts": {
+        "total_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tax_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "discount_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "tip_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "service_charge_money": {
+          "amount": 0,
+          "currency": "USD"
+        },
+        "card_surcharge_money": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      },
+      "source": {},
+      "ticket_name": "redacted-33",
+      "net_amount_due_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "total_card_surcharge_money": {
+        "amount": 0,
+        "currency": "USD"
+      },
+      "created_by_team_member_id": "FIXTURESTAFF01"
+    }
+  },
+  "catalog": {
+    "objects": [
+      {
+        "type": "ITEM_VARIATION",
+        "id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+        "updated_at": "2026-10-15T18:44:14.723Z",
+        "created_at": "2026-10-15T18:22:18.19Z",
+        "version": 1792089854723,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "item_variation_data": {
+          "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+          "name": "Adult",
+          "ordinal": 1,
+          "pricing_type": "FIXED_PRICING",
+          "price_money": {
+            "amount": 1250,
+            "currency": "USD"
+          },
+          "location_overrides": [
+            {
+              "location_id": "S3E2Q1EK0466V",
+              "inventory_alert_type": "LOW_QUANTITY",
+              "inventory_alert_threshold": 0
+            }
+          ],
+          "track_inventory": true,
+          "inventory_alert_type": "LOW_QUANTITY",
+          "sellable": true,
+          "stockable": true,
+          "channels": [
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+          ]
+        }
+      }
+    ],
+    "related_objects": [
+      {
+        "type": "ITEM",
+        "id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+        "updated_at": "2026-10-26T05:38:51.187Z",
+        "created_at": "2026-10-15T18:22:18.19Z",
+        "version": 1792993131187,
+        "is_deleted": false,
+        "custom_attribute_values": {
+          "Square:20e4d884-d274-4419-9559-84f531795264": {
+            "name": "EventType",
+            "custom_attribute_definition_id": "IT7N7BA67VEY42OEVXBZZLX2",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "UREIT7RSYWKQ5GTNCPYVCNDZ"
+            ],
+            "key": "Square:20e4d884-d274-4419-9559-84f531795264"
+          },
+          "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2": {
+            "name": "Distributor",
+            "custom_attribute_definition_id": "BBQWPL55ZAK6V36GBDYOYL4G",
+            "type": "SELECTION",
+            "selection_uid_values": [
+              "ILX6XI4Y2KE4X2BROULOZWAC"
+            ],
+            "key": "Square:9162ec33-8f63-4e3b-9c72-9c2fdd7280c2"
+          },
+          "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed": {
+            "name": "UseQRCode",
+            "custom_attribute_definition_id": "PZ5UMGJDQZSYTHGOQZ4YK6XY",
+            "type": "BOOLEAN",
+            "boolean_value": true,
+            "key": "Square:9a0f5a8f-2d98-44db-9930-7a28d7c413ed"
+          }
+        },
+        "present_at_all_locations": true,
+        "item_data": {
+          "name": "One Eye Open (2026)",
+          "description": "Rating: N/A\nGenre: Crime, Horror, Thriller\nRuntime: 81 min\n\nA recent college graduate house-sitting for her ailing grandfather finds herself caught in a deadly cat-and-mouse game with thieves who become haunted by something supernatural protecting her in the mysterious mansion.\n\nDirector: Michael D. Coffey\nCast: RJ Mitte, Maximiliano Hernández, Chris Bylsma",
+          "is_taxable": false,
+          "tax_ids": [
+            "2YPO65G2UPWBFYQCD2HUYZ72"
+          ],
+          "modifier_list_info": [
+            {
+              "modifier_list_id": "YO57KJA6BIXNL3D27SZTD4W3",
+              "min_selected_modifiers": 1,
+              "max_selected_modifiers": 1,
+              "enabled": true,
+              "hidden_from_customer": false,
+              "ordinal": 1,
+              "allow_quantities": "NOT_SET",
+              "is_conversational": "NOT_SET",
+              "hidden_from_customer_override": "NOT_SET"
+            }
+          ],
+          "variations": [
+            {
+              "type": "ITEM_VARIATION",
+              "id": "F76PIYC6RLF7X4MCJPKJQ4XL",
+              "updated_at": "2026-10-15T18:44:14.723Z",
+              "created_at": "2026-10-15T18:22:18.19Z",
+              "version": 1792089854723,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+                "name": "Child",
+                "ordinal": 0,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1000,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+              "updated_at": "2026-10-15T18:44:14.723Z",
+              "created_at": "2026-10-15T18:22:18.19Z",
+              "version": 1792089854723,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+                "name": "Adult",
+                "ordinal": 1,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1250,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            },
+            {
+              "type": "ITEM_VARIATION",
+              "id": "2WA3M4RDPA66J2J2URC4USL7",
+              "updated_at": "2026-10-15T18:44:14.723Z",
+              "created_at": "2026-10-15T18:22:18.19Z",
+              "version": 1792089854723,
+              "is_deleted": false,
+              "present_at_all_locations": true,
+              "item_variation_data": {
+                "item_id": "QEB4FP5QMY4LFOXAMMQDQYVU",
+                "name": "Senior",
+                "ordinal": 2,
+                "pricing_type": "FIXED_PRICING",
+                "price_money": {
+                  "amount": 1100,
+                  "currency": "USD"
+                },
+                "location_overrides": [
+                  {
+                    "location_id": "S3E2Q1EK0466V",
+                    "inventory_alert_type": "LOW_QUANTITY",
+                    "inventory_alert_threshold": 0
+                  }
+                ],
+                "track_inventory": true,
+                "inventory_alert_type": "LOW_QUANTITY",
+                "sellable": true,
+                "stockable": true,
+                "channels": [
+                  "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC",
+                  "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o"
+                ]
+              }
+            }
+          ],
+          "product_type": "REGULAR",
+          "skip_modifier_screen": false,
+          "ecom_visibility": "VISIBLE",
+          "image_ids": [
+            "NLWCL4IS4NZ5JCBYQBCES6T3"
+          ],
+          "categories": [
+            {
+              "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+              "ordinal": -2251798605725696
+            },
+            {
+              "id": "AV42ZNP2XL3X2M64LKW65RDW",
+              "ordinal": 3162572324864
+            }
+          ],
+          "description_html": "<p>Rating: N/A</p><p>Genre: Crime, Horror, Thriller</p><p>Runtime: 81 min</p><p><br></p><p>A recent college graduate house-sitting for her ailing grandfather finds herself caught in a deadly cat-and-mouse game with thieves who become haunted by something supernatural protecting her in the mysterious mansion.</p><p><br></p><p>Director: Michael D. Coffey</p><p>Cast: RJ Mitte, Maximiliano Hernández, Chris Bylsma</p>",
+          "description_plaintext": "Rating: N/A\nGenre: Crime, Horror, Thriller\nRuntime: 81 min\n\nA recent college graduate house-sitting for her ailing grandfather finds herself caught in a deadly cat-and-mouse game with thieves who become haunted by something supernatural protecting her in the mysterious mansion.\n\nDirector: Michael D. Coffey\nCast: RJ Mitte, Maximiliano Hernández, Chris Bylsma",
+          "channels": [
+            "CH_NqTX0cy0Q7Ob557vINmQ4OOfhvj9ZhV6rW4N1gM29945o",
+            "CH_oNOvSZlMqIPpFYWA9FcMKYGsx0Zjw39xkCPOYRlQuYC"
+          ],
+          "is_archived": false,
+          "reporting_category": {
+            "id": "GI5RMHOYFN2RMRPOGWMWJH32",
+            "ordinal": -2251798605725696
+          }
+        }
+      },
+      {
+        "type": "IMAGE",
+        "id": "NLWCL4IS4NZ5JCBYQBCES6T3",
+        "updated_at": "2026-10-15T18:28:05.751Z",
+        "created_at": "2026-10-15T18:28:05.807Z",
+        "version": 1792088885751,
+        "is_deleted": false,
+        "present_at_all_locations": true,
+        "image_data": {
+          "name": "jrK4XVJacUzWN9swZR2S5tYLxSi (1).png",
+          "url": "https://items-images-production.s3.us-west-2.amazonaws.com/files/65f447e0c734931aa9c9945934dd220fccbe3201/original.png"
+        }
+      }
+    ]
+  },
+  "selectionDefinitions": {
+    "BBQWPL55ZAK6V36GBDYOYL4G": [
+      {
+        "uid": "ILX6XI4Y2KE4X2BROULOZWAC",
+        "name": "Liberty Hall Cinema"
+      }
+    ],
+    "IT7N7BA67VEY42OEVXBZZLX2": [
+      {
+        "uid": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+        "name": "Movie"
+      }
+    ]
+  },
+  "expected": {
+    "order": {
+      "EmailAddress": "owner@example.com",
+      "FirstName": "WALK-UP",
+      "LastName": "CASH-MASTER",
+      "PhoneNumber": "+15555550100"
+    },
+    "emailRecipient": "owner@example.com",
+    "tickets": [
+      {
+        "ProductName": "One Eye Open (2026)",
+        "ProductDate": "2026-10-30 19:30:00",
+        "ProductLocation": "S3E2Q1EK0466V",
+        "ProductType": "Movie",
+        "ProductDetails": "Fri 10-30-2026 7:30 PM (Main Auditorium)",
+        "ProductPrice": 0,
+        "ProductID": "OKWVKHUVGFCF4TKPXRVU6QPM",
+        "EmailAddress": "owner@example.com",
+        "FirstName": "WALK-UP",
+        "LastName": "CASH-MASTER",
+        "PhoneNumber": "+15555550100",
+        "Distributor": "Liberty Hall Cinema",
+        "ProductVenue": "Main Auditorium",
+        "ProductSeatCode": "Adult",
+        "Status": "valid",
+        "QRCodePrefix": "One Eye Open (2026)_Adult_y5pLDRLgMPCIvp98ARSO1pT0NrGZY_57986028-5479-4f8d-8218-a5ef8cdbf53f_",
+        "ProductMetadata": {
+          "uid": "57986028-5479-4f8d-8218-a5ef8cdbf53f",
+          "name": "One Eye Open (2026)",
+          "quantity": "1",
+          "item_type": "ITEM",
+          "modifiers": [
+            {
+              "uid": "97852c8d-6905-4e59-b2c0-37a1873e0499",
+              "name": "Fri 10-30-2026 7:30 PM (Main Auditorium)",
+              "quantity": "1",
+              "catalog_version": 1792993131187,
+              "base_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              },
+              "catalog_object_id": "2WWBIRVFXHBYA2VBWD5N57F5",
+              "total_price_money": {
+                "amount": 0,
+                "currency": "USD"
+              }
+            }
+          ],
+          "location_id": "S3E2Q1EK0466V",
+          "total_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "eventTypeInfo": {
+            "selectionId": "UREIT7RSYWKQ5GTNCPYVCNDZ",
+            "definitionId": "IT7N7BA67VEY42OEVXBZZLX2"
+          },
+          "variation_name": "Adult",
+          "catalog_version": 1792993131187,
+          "distributorInfo": {
+            "selectionId": "ILX6XI4Y2KE4X2BROULOZWAC",
+            "definitionId": "BBQWPL55ZAK6V36GBDYOYL4G"
+          },
+          "total_tax_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "base_price_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "catalog_object_id": "OKWVKHUVGFCF4TKPXRVU6QPM",
+          "gross_sales_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "reportingCategories": "[{\"id\":\"GI5RMHOYFN2RMRPOGWMWJH32\",\"ordinal\":-2251798605725696},{\"id\":\"AV42ZNP2XL3X2M64LKW65RDW\",\"ordinal\":3162572324864}]",
+          "total_discount_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_card_surcharge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "total_service_charge_money": {
+            "amount": 0,
+            "currency": "USD"
+          },
+          "variation_total_price_money": {
+            "amount": 0,
+            "currency": "USD"
+          }
+        }
+      }
+    ]
+  }
+}
