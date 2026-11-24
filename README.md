@@ -1,6 +1,8 @@
 # IndieTix
 
-A Square-integrated ticketing platform for independent venues and promoters... built to run your own box office without handing a cut of every ticket to a company that had nothing to do with the show.
+A Square-integrated ticketing platform for independent venues and promoters... built to run your own box office without handing a cut of every ticket to a company that had nothing to do with the show.  
+
+Update Nov 23 2026 - "Native" events in the indietix db.  allowing for capacity per showing and improved reporting.  
 
 ## Why IndieTix Exists
 
