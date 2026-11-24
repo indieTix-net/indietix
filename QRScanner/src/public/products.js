@@ -32,11 +32,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function escapeLinkText(value) {
         return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
+    // Square order IDs are 25+ characters that can't wrap, which squeezed
+    // every other column, so the cell shows the last 8 (the full ID is in
+    // the tooltip, in search, and on the Orders page).
     function orderCell(order) {
         if (!order) return '<span class="text-muted">None</span>';
-        const number = escapeLinkText(order.number || order.id);
+        const full = String(order.number || order.id);
+        const short = full.length > 10 ? `…${full.slice(-8)}` : full;
         const canOpen = !window.HeaderLoader?.canAccessPage || window.HeaderLoader.canAccessPage('/order.html');
-        return canOpen ? `<a href="order.html?order=${encodeURIComponent(order.id)}" title="Open this order">${number}</a>` : number;
+        const title = escapeLinkText(`Order ${full}${canOpen ? ' (open it)' : ''}`);
+        return canOpen
+            ? `<a href="order.html?order=${encodeURIComponent(order.id)}" title="${title}" class="order-number-link">${escapeLinkText(short)}</a>`
+            : `<span title="${title}">${escapeLinkText(short)}</span>`;
     }
     // ---- END ORDER <-> TICKET LINKS ----
 
