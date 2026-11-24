@@ -9505,6 +9505,234 @@ app.post('/api/public/opt-in', async (req, res) => {
   }
   // ---- END DASHBOARD WITHOUT SQUARE ----
 
+  // ---- DASHBOARD FROM INDIETIX'S OWN SHOWINGS (native events) ----
+  // The day's Showing rows, which are never deleted (past ones are marked
+  // expired), so any date works: past, today or future. Counts are the
+  // showing's tickets by ShowingID, or by the showtime modifier id older
+  // tickets store. Cancelled showings are left out. Capacity and seats left
+  // come along unless a staff data filter applies (then the counts are only
+  // that login's tickets, so seats left would be wrong). Returns null when
+  // the venue has no showings that day, or no native event tables.
+  async function dashboardFromShowings(req, todayStr) {
+    const dbCredentials = await getDatabaseCredentials(req.user.dbName);
+    const { QRCodeProduct } = await initializeModelForClient(req.user.dbName, dbCredentials);
+    const sequelize = QRCodeProduct.sequelize;
+    const replacements = { today: todayStr };
+    const statusPlaceholders = EXCLUDED_TICKET_STATUSES.map((status, i) => {
+      replacements[`exc${i}`] = status;
+      return `:exc${i}`;
+    });
+    const { filterSql, filterApplied } = dataFilterSql(req, replacements);
+    let rows;
+    try {
+      rows = await sequelize.query(`
+        WITH day AS (
+          SELECT s."ID", s."EventID", s."StartsAt", s."Venue", s."Descriptors", s."Capacity", s."HeldSeats", s."Status",
+                 e."Title", e."Description"
+          FROM "Showing" s JOIN "Event" e ON e."ID" = s."EventID"
+          WHERE s."StartsAt" >= CAST(:today AS date) AND s."StartsAt" < (CAST(:today AS date) + INTERVAL '1 day')
+            AND s."Status" <> 'cancelled' AND e."Status" <> 'draft'
+        ),
+        mods AS (
+          SELECT l."EntityID" AS "ShowingID", l."ExternalID", l."ID" AS "LinkID" FROM "ExternalCatalogLink" l
+          WHERE l."EntityType" = 'showing' AND l."ExternalType" = 'MODIFIER' AND l."EntityID" IN (SELECT "ID" FROM day)
+        ),
+        sold AS (
+          SELECT d."ID" AS "ShowingID", q."ID" AS "TicketID", q."CheckedIn"
+          FROM day d JOIN "QRCodeProduct" q
+            ON q."ShowingID" = d."ID"
+            OR EXISTS (SELECT 1 FROM mods m WHERE m."ShowingID" = d."ID"
+                       AND q."ProductMetadata" @> jsonb_build_object('modifiers', jsonb_build_array(jsonb_build_object('catalog_object_id', m."ExternalID"))))
+          WHERE q."ProductDate" >= (CAST(:today AS date) - INTERVAL '1 day')
+            AND q."ProductDate" <  (CAST(:today AS date) + INTERVAL '2 days')
+            AND LOWER(COALESCE(q."Status", '')) NOT IN (${statusPlaceholders.join(', ')})
+            ${filterSql}
+        )
+        SELECT d.*, to_char(d."StartsAt", 'FMHH12:MI AM') AS "displayTime",
+               (EXTRACT(HOUR FROM d."StartsAt") * 60 + EXTRACT(MINUTE FROM d."StartsAt"))::int AS "sortKey",
+               COUNT(DISTINCT sold."TicketID")::int AS "ticketsSold",
+               (COUNT(DISTINCT sold."TicketID") FILTER (WHERE sold."CheckedIn"))::int AS "checkedIn",
+               (SELECT l."ExternalID" FROM "ExternalCatalogLink" l WHERE l."EntityType" = 'event' AND l."EntityID" = d."EventID" AND l."ExternalType" = 'ITEM' ORDER BY l."ID" DESC LIMIT 1) AS "itemId",
+               (SELECT m."ExternalID" FROM mods m WHERE m."ShowingID" = d."ID" ORDER BY m."LinkID" DESC LIMIT 1) AS "modifierId",
+               (SELECT array_agg(m."ExternalID") FROM mods m WHERE m."ShowingID" = d."ID") AS "modifierIds"
+        FROM day d LEFT JOIN sold ON sold."ShowingID" = d."ID"
+        GROUP BY d."ID", d."EventID", d."StartsAt", d."Venue", d."Descriptors", d."Capacity", d."HeldSeats", d."Status", d."Title", d."Description"
+        ORDER BY d."StartsAt", d."Title"
+      `, { replacements, type: sequelize.QueryTypes.SELECT });
+    } catch (error) {
+      if (error.original?.code === '42P01' || error.parent?.code === '42P01') return null; // no native event tables yet
+      throw error;
+    }
+    if (rows.length === 0) return null;
+    const knownModifierIds = new Set(rows.flatMap(r => r.modifierIds || []));
+    const events = rows
+      // Same rule as the Square path: a filtered login sees a showing only if it has some of its tickets.
+      .filter(r => !filterApplied || r.ticketsSold > 0)
+      .map(r => ({
+        title:       r.Title,
+        location:    r.Venue,
+        displayTime: r.displayTime,
+        runtime:     extractRuntime(r.Description || ''),
+        descriptors: String(r.Descriptors || '').split(',').map(d => d.trim()).filter(Boolean),
+        itemId:      r.itemId,
+        modifierId:  r.modifierId,
+        ticketsSold: r.ticketsSold,
+        checkedIn:   r.checkedIn,
+        matchedBy:   'showing',
+        sortKey:     r.sortKey,
+        showingId:   r.ID,
+        status:      r.Status,
+        ...(filterApplied ? {} : {
+          capacity:  r.Capacity,
+          heldSeats: r.HeldSeats,
+          available: r.Capacity === null ? null : Math.max(0, r.Capacity - r.HeldSeats - r.ticketsSold)
+        })
+      }));
+    return { events, filterApplied, knownModifierIds };
+  }
+  // ---- END DASHBOARD FROM SHOWINGS ----
+
+  // ---- DASHBOARD FROM SQUARE'S CATALOG ----
+  // Square's showtime modifiers for the day, matched to tickets by modifier
+  // id (else by title). What the dashboard used for every day before native
+  // events; now only for today and later, and only for showtimes IndieTix
+  // doesn't have its own copy of (an item never brought in).
+  async function squareShowtimeCards(req, showtimes, todayStr, debug, dbg) {
+    // ----- Ticket query --------------------------------------------------
+    const dbCredentials = await getDatabaseCredentials(req.user.dbName);
+    const { QRCodeProduct } = await initializeModelForClient(req.user.dbName, dbCredentials);
+    const sequelize = QRCodeProduct.sequelize;
+
+    // Explicit scalar placeholders for the status exclusion — NO array
+    // binding. Each excluded status gets its own :excN replacement.
+    const replacements = { today: todayStr };
+    const statusPlaceholders = EXCLUDED_TICKET_STATUSES.map((status, i) => {
+      replacements[`exc${i}`] = status;
+      return `:exc${i}`;
+    });
+
+    // Sub-user data filter -> optional AND( OR(...) ) block.
+    const { filterSql, filterApplied } = dataFilterSql(req, replacements);
+
+    // ProductDate is `timestamp without time zone`. Bracket today +/- 1 day
+    // by casting the bound date string; this is timezone-safe regardless of
+    // the Lambda's own clock.
+    const sql = `
+      SELECT "CheckedIn", "ProductName", "ProductDate", "Status", "ProductMetadata"
+      FROM "QRCodeProduct"
+      WHERE "ProductDate" >= (CAST(:today AS date) - INTERVAL '1 day')
+        AND "ProductDate" <  (CAST(:today AS date) + INTERVAL '2 days')
+        AND LOWER(COALESCE("Status", '')) NOT IN (${statusPlaceholders.join(', ')})
+        ${filterSql}
+    `;
+
+    let ticketRows;
+    try {
+      ticketRows = await sequelize.query(sql, {
+        replacements,
+        type: sequelize.QueryTypes.SELECT
+      });
+    } catch (queryError) {
+      console.error('[dashboard] Ticket query failed:', queryError);
+      if (debug) Object.assign(dbg, { sql: sql.trim(), replacements });
+      throw new Error(`Ticket query failed: ${queryError.message}`);
+    }
+
+    console.log(`[dashboard] ${ticketRows.length} ticket row(s) returned`
+      + (filterApplied ? ' (filtered)' : ' (unfiltered)') + '.');
+
+    if (debug) {
+      dbg.filterApplied = filterApplied;
+      dbg.ticketRowCount = ticketRows.length;
+      dbg.sampleTicket = ticketRows[0]
+        ? {
+            ProductName: ticketRows[0].ProductName,
+            ProductDate: ticketRows[0].ProductDate,
+            Status: ticketRows[0].Status,
+            CheckedIn: ticketRows[0].CheckedIn,
+            metadataType: typeof ticketRows[0].ProductMetadata,
+            modifierIds: extractTicketModifiers(ticketRows[0].ProductMetadata)
+              .map(m => m && m.catalog_object_id)
+          }
+        : null;
+    }
+
+    // ----- Aggregate -----------------------------------------------------
+    const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const byModifierId = {};
+    const byTitle = {};
+
+    for (const row of ticketRows) {
+      const isCheckedIn = row.CheckedIn === true;
+      const modifiers = extractTicketModifiers(row.ProductMetadata);
+
+      let attributed = false;
+      for (const mod of modifiers) {
+        const modId = mod && mod.catalog_object_id;
+        if (!modId) continue;
+        if (!byModifierId[modId]) byModifierId[modId] = { sold: 0, checkedIn: 0 };
+        byModifierId[modId].sold += 1;
+        if (isCheckedIn) byModifierId[modId].checkedIn += 1;
+        attributed = true;
+      }
+      if (!attributed) {
+        const key = norm(row.ProductName);
+        if (!byTitle[key]) byTitle[key] = [];
+        byTitle[key].push({ sold: 1, checkedIn: isCheckedIn ? 1 : 0 });
+      }
+    }
+
+    if (debug) {
+      dbg.distinctTicketModifierIds = Object.keys(byModifierId);
+      dbg.titleFallbackKeys = Object.keys(byTitle);
+    }
+
+    const usedTitle = {};
+    const events = [];
+
+    for (const st of showtimes) {
+      let sold = 0, checkedIn = 0, matchedBy = 'none';
+
+      const exact = byModifierId[st.modifierId];
+      if (exact) {
+        sold = exact.sold;
+        checkedIn = exact.checkedIn;
+        matchedBy = 'modifier_id';
+      } else {
+        const key = norm(st.title);
+        const bucket = byTitle[key];
+        if (bucket && bucket.length) {
+          const idx = usedTitle[key] || 0;
+          if (idx < bucket.length) {
+            sold = bucket[idx].sold;
+            checkedIn = bucket[idx].checkedIn;
+            matchedBy = 'title';
+          }
+          usedTitle[key] = idx + 1;
+        }
+      }
+
+      if (filterApplied && matchedBy === 'none') continue;
+
+      events.push({
+        title:       st.title,
+        location:    st.location,
+        displayTime: st.displayTime,
+        runtime:     st.runtime,
+        descriptors: st.descriptors,
+        itemId:      st.itemId,
+        modifierId:  st.modifierId,
+        ticketsSold: sold,
+        checkedIn:   checkedIn,
+        matchedBy,
+        sortKey:     st.sortKey
+      });
+    }
+
+    return { events, filterApplied };
+  }
+  // ---- END DASHBOARD FROM SQUARE ----
+
   app.get('/api/dashboard/today', requireAuth, requirePermission(...PERMS_DOOR), async (req, res) => {
     const debug = req.query.debug === '1' || req.query.debug === 'true';
     const dbg = {};
@@ -9519,10 +9747,9 @@ app.post('/api/public/opt-in', async (req, res) => {
       const tz = globalConfig.VENUE_TIMEZONE || VENUE_TZ_FALLBACK;
 
       // Optional ?date=YYYY-MM-DD to view a day other than today (dashboard's
-      // calendar picker) -- defaults to today in the venue's own timezone,
-      // exactly as before this was added. Kept as a plain calendar-date
-      // string, never parsed into a Date object for actual use, so it flows
-      // into the same CAST(:today AS date) SQL bracket below with no
+      // calendar picker) -- defaults to today in the venue's own timezone.
+      // Kept as a plain calendar-date string, never parsed into a Date object
+      // for actual use, so it flows into CAST(:today AS date) SQL with no
       // timezone conversion either way.
       const requestedDate = typeof req.query.date === 'string' ? req.query.date.trim() : '';
       // Date.parse('2026-02-30') doesn't reject an impossible day-of-month --
@@ -9533,180 +9760,55 @@ app.post('/api/public/opt-in', async (req, res) => {
       const parsedMs = dateMatch ? Date.parse(requestedDate) : NaN;
       const isValidDateStr = !!dateMatch && !isNaN(parsedMs) &&
         new Date(parsedMs).toISOString().slice(0, 10) === requestedDate;
-      const todayStr = isValidDateStr
-        ? requestedDate
-        : new Intl.DateTimeFormat('en-CA', {
-            timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
-          }).format(new Date());
+      const venueToday = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+      const todayStr = isValidDateStr ? requestedDate : venueToday;
+      const isPastDay = todayStr < venueToday;
 
       console.log(`[dashboard] Building ${isValidDateStr ? 'requested' : 'today'} view for ${todayStr} (${tz})`);
 
-      // No Square connection (a demo or self-hosted venue without a token):
-      // the day's shows come from the venue's own tickets instead.
-      if (!accessToken) {
-        return res.json(await dashboardFromTickets(req, todayStr, tz));
-      }
+      // 1. IndieTix's own showings: any date.
+      const native = await dashboardFromShowings(req, todayStr);
+      if (debug) dbg.showings = native ? native.events.length : 0;
 
-      const showtimes = await getShowtimesForDate(accessToken, todayStr);
-      console.log(`[dashboard] ${showtimes.length} showtime(s) found.`);
-      if (debug) {
-        dbg.date = todayStr;
-        dbg.showtimeCount = showtimes.length;
-        dbg.showtimeModifierIds = showtimes.map(s => s.modifierId);
-      }
-
-      if (showtimes.length === 0) {
-        return res.json({
-          date: todayStr, timezone: tz,
-          generatedAt: new Date().toISOString(),
-          filtered: false, eventCount: 0, events: [],
-          ...(debug ? { _debug: dbg } : {})
-        });
-      }
-
-      // ----- Ticket query --------------------------------------------------
-      const dbCredentials = await getDatabaseCredentials(req.user.dbName);
-      const { QRCodeProduct } = await initializeModelForClient(req.user.dbName, dbCredentials);
-      const sequelize = QRCodeProduct.sequelize;
-
-      // Explicit scalar placeholders for the status exclusion — NO array
-      // binding. Each excluded status gets its own :excN replacement.
-      const replacements = { today: todayStr };
-      const statusPlaceholders = EXCLUDED_TICKET_STATUSES.map((status, i) => {
-        replacements[`exc${i}`] = status;
-        return `:exc${i}`;
-      });
-
-      // Sub-user data filter -> optional AND( OR(...) ) block.
-      const { filterSql, filterApplied } = dataFilterSql(req, replacements);
-
-      // ProductDate is `timestamp without time zone`. Bracket today +/- 1 day
-      // by casting the bound date string; this is timezone-safe regardless of
-      // the Lambda's own clock.
-      const sql = `
-        SELECT "CheckedIn", "ProductName", "ProductDate", "Status", "ProductMetadata"
-        FROM "QRCodeProduct"
-        WHERE "ProductDate" >= (CAST(:today AS date) - INTERVAL '1 day')
-          AND "ProductDate" <  (CAST(:today AS date) + INTERVAL '2 days')
-          AND LOWER(COALESCE("Status", '')) NOT IN (${statusPlaceholders.join(', ')})
-          ${filterSql}
-      `;
-
-      let ticketRows;
-      try {
-        ticketRows = await sequelize.query(sql, {
-          replacements,
-          type: sequelize.QueryTypes.SELECT
-        });
-      } catch (queryError) {
-        // Surface the DB error as JSON instead of letting it 502.
-        console.error('[dashboard] Ticket query failed:', queryError);
-        return res.status(500).json({
-          error: 'Ticket query failed',
-          details: queryError.message,
-          ...(debug ? { _debug: { ...dbg, sql: sql.trim(), replacements } } : {})
-        });
-      }
-
-      console.log(`[dashboard] ${ticketRows.length} ticket row(s) returned`
-        + (filterApplied ? ' (filtered)' : ' (unfiltered)') + '.');
-
-      if (debug) {
-        dbg.filterApplied = filterApplied;
-        dbg.ticketRowCount = ticketRows.length;
-        dbg.sampleTicket = ticketRows[0]
-          ? {
-              ProductName: ticketRows[0].ProductName,
-              ProductDate: ticketRows[0].ProductDate,
-              Status: ticketRows[0].Status,
-              CheckedIn: ticketRows[0].CheckedIn,
-              metadataType: typeof ticketRows[0].ProductMetadata,
-              modifierIds: extractTicketModifiers(ticketRows[0].ProductMetadata)
-                .map(m => m && m.catalog_object_id)
-            }
-          : null;
-      }
-
-      // ----- Aggregate -----------------------------------------------------
-      const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const byModifierId = {};
-      const byTitle = {};
-
-      for (const row of ticketRows) {
-        const isCheckedIn = row.CheckedIn === true;
-        const modifiers = extractTicketModifiers(row.ProductMetadata);
-
-        let attributed = false;
-        for (const mod of modifiers) {
-          const modId = mod && mod.catalog_object_id;
-          if (!modId) continue;
-          if (!byModifierId[modId]) byModifierId[modId] = { sold: 0, checkedIn: 0 };
-          byModifierId[modId].sold += 1;
-          if (isCheckedIn) byModifierId[modId].checkedIn += 1;
-          attributed = true;
+      // 2. Square's catalog: today and later only (past showtimes are gone
+      //    from Square), and only showtimes IndieTix doesn't have.
+      let square = null;
+      if (accessToken && !isPastDay) {
+        let showtimes = await getShowtimesForDate(accessToken, todayStr);
+        if (native) showtimes = showtimes.filter(st => !native.knownModifierIds.has(st.modifierId));
+        if (showtimes.length && !native) {
+          // A showtime linked to some other IndieTix showing (cancelled, or moved to another day) isn't new either.
+          showtimes = await withoutLinkedShowtimes(req, showtimes);
         }
-        if (!attributed) {
-          const key = norm(row.ProductName);
-          if (!byTitle[key]) byTitle[key] = [];
-          byTitle[key].push({ sold: 1, checkedIn: isCheckedIn ? 1 : 0 });
+        console.log(`[dashboard] ${showtimes.length} Square showtime(s) not in IndieTix's own showings.`);
+        if (debug) {
+          dbg.date = todayStr;
+          dbg.showtimeCount = showtimes.length;
+          dbg.showtimeModifierIds = showtimes.map(s => s.modifierId);
         }
+        if (showtimes.length) square = await squareShowtimeCards(req, showtimes, todayStr, debug, dbg);
       }
 
-      if (debug) {
-        dbg.distinctTicketModifierIds = Object.keys(byModifierId);
-        dbg.titleFallbackKeys = Object.keys(byTitle);
+      // 3. Neither: the day's tickets (a venue without Square, or a day from
+      //    before the venue had its own showings).
+      if (!native && !(square && square.events.length)) {
+        return res.json({ ...(await dashboardFromTickets(req, todayStr, tz)), ...(debug ? { _debug: dbg } : {}) });
       }
 
-      const usedTitle = {};
-      const events = [];
-
-      for (const st of showtimes) {
-        let sold = 0, checkedIn = 0, matchedBy = 'none';
-
-        const exact = byModifierId[st.modifierId];
-        if (exact) {
-          sold = exact.sold;
-          checkedIn = exact.checkedIn;
-          matchedBy = 'modifier_id';
-        } else {
-          const key = norm(st.title);
-          const bucket = byTitle[key];
-          if (bucket && bucket.length) {
-            const idx = usedTitle[key] || 0;
-            if (idx < bucket.length) {
-              sold = bucket[idx].sold;
-              checkedIn = bucket[idx].checkedIn;
-              matchedBy = 'title';
-            }
-            usedTitle[key] = idx + 1;
-          }
-        }
-
-        if (filterApplied && matchedBy === 'none') continue;
-
-        events.push({
-          title:       st.title,
-          location:    st.location,
-          displayTime: st.displayTime,
-          runtime:     st.runtime,
-          descriptors: st.descriptors,
-          itemId:      st.itemId,
-          modifierId:  st.modifierId,
-          ticketsSold: sold,
-          checkedIn:   checkedIn,
-          matchedBy
-        });
-      }
-
-      const trimmed = events.slice(0, 12);
+      const events = [...(native ? native.events : []), ...(square ? square.events : [])]
+        .sort((a, b) => (a.sortKey ?? 0) - (b.sortKey ?? 0) || String(a.title).localeCompare(String(b.title)))
+        .slice(0, 12);
 
       return res.json({
         date:        todayStr,
         timezone:    tz,
         generatedAt: new Date().toISOString(),
-        filtered:    filterApplied,
-        eventCount:  trimmed.length,
-        events:      trimmed,
+        filtered:    Boolean(native?.filterApplied || square?.filterApplied),
+        eventCount:  events.length,
+        events,
+        source:      native && square ? 'showings+square' : native ? 'showings' : 'square',
         ...(debug ? { _debug: dbg } : {})
       });
 
@@ -9719,6 +9821,23 @@ app.post('/api/public/opt-in', async (req, res) => {
       });
     }
   });
+
+  // Square showtimes whose modifier is linked to any IndieTix showing are
+  // IndieTix's; a venue without the tables keeps them all.
+  async function withoutLinkedShowtimes(req, showtimes) {
+    const dbCredentials = await getDatabaseCredentials(req.user.dbName);
+    const { QRCodeProduct } = await initializeModelForClient(req.user.dbName, dbCredentials);
+    try {
+      const linked = await QRCodeProduct.sequelize.query(
+        `SELECT "ExternalID" FROM "ExternalCatalogLink" WHERE "EntityType" = 'showing' AND "ExternalType" = 'MODIFIER' AND "ExternalID" IN (:ids)`,
+        { replacements: { ids: showtimes.map(s => s.modifierId) }, type: QRCodeProduct.sequelize.QueryTypes.SELECT });
+      const known = new Set(linked.map(r => r.ExternalID));
+      return showtimes.filter(st => !known.has(st.modifierId));
+    } catch (error) {
+      if (error.original?.code === '42P01' || error.parent?.code === '42P01') return showtimes;
+      throw error;
+    }
+  }
 
 })();
 

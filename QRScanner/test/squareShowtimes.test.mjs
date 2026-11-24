@@ -76,7 +76,12 @@ test('GET /api/square/showtimes-for-date: a Square search failure surfaces as a 
 
 // ---- /api/dashboard/today ----
 
-async function insertDashboardTicket({ qrCode, productName = 'Test Movie', productDate = '2026-01-04 14:30:00', checkedIn = false, status = 'valid', productMetadata = null }) {
+// The dashboard only asks Square about today and later (past showtimes are
+// gone from Square), so its Square tests use a date that stays in the future.
+const DASH_DATE = '2030-01-06';
+const DASH_LABEL = 'Sun 01-06-2030 2:30 PM (Main Theater)';
+
+async function insertDashboardTicket({ qrCode, productName = 'Test Movie', productDate = '2030-01-06 14:30:00', checkedIn = false, status = 'valid', productMetadata = null }) {
   await ctx.pgClient.query(
     `INSERT INTO "QRCodeProduct" ("QRCode", "ExpirationDate", "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductID", "CheckedIn", "Status", "ProductMetadata")
      VALUES ($1, '2099-01-01', $2, $3, 'Main', 'Movie', 'details', 'ITEM', $4, $5, $6)`,
@@ -85,11 +90,11 @@ async function insertDashboardTicket({ qrCode, productName = 'Test Movie', produ
 }
 
 test('GET /api/dashboard/today: with ?date=, aggregates ticket counts per showtime by modifier id', async () => {
-  squareHandlers.searchCatalog = async () => ({ ok: true, status: 200, json: async () => catalogWithShowtime({ modifierId: 'MOD-DASH-1' }) });
+  squareHandlers.searchCatalog = async () => ({ ok: true, status: 200, json: async () => catalogWithShowtime({ showtimeStr: DASH_LABEL, modifierId: 'MOD-DASH-1' }) });
   await insertDashboardTicket({ qrCode: 'QR-DASH-1', productMetadata: { modifiers: [{ catalog_object_id: 'MOD-DASH-1' }] } });
   await insertDashboardTicket({ qrCode: 'QR-DASH-2', checkedIn: true, productMetadata: { modifiers: [{ catalog_object_id: 'MOD-DASH-1' }] } });
 
-  const { status, json } = await ctx.request('GET', '/api/dashboard/today?date=2026-01-04', { token: ctx.clientToken });
+  const { status, json } = await ctx.request('GET', `/api/dashboard/today?date=${DASH_DATE}`, { token: ctx.clientToken });
   assert.equal(status, 200);
   assert.equal(json.eventCount, 1);
   assert.equal(json.events[0].ticketsSold, 2);
@@ -98,28 +103,28 @@ test('GET /api/dashboard/today: with ?date=, aggregates ticket counts per showti
 });
 
 test('GET /api/dashboard/today: falls back to title matching when a ticket has no modifiers array', async () => {
-  squareHandlers.searchCatalog = async () => ({ ok: true, status: 200, json: async () => catalogWithShowtime({ title: 'Legacy Movie' }) });
+  squareHandlers.searchCatalog = async () => ({ ok: true, status: 200, json: async () => catalogWithShowtime({ showtimeStr: DASH_LABEL, title: 'Legacy Movie' }) });
   await insertDashboardTicket({ qrCode: 'QR-DASH-3', productName: 'Legacy Movie', productMetadata: null });
 
-  const { status, json } = await ctx.request('GET', '/api/dashboard/today?date=2026-01-04', { token: ctx.clientToken });
+  const { status, json } = await ctx.request('GET', `/api/dashboard/today?date=${DASH_DATE}`, { token: ctx.clientToken });
   assert.equal(status, 200);
   assert.equal(json.events[0].ticketsSold, 1);
   assert.equal(json.events[0].matchedBy, 'title');
 });
 
 test('GET /api/dashboard/today: refunded/cancelled/transferred tickets are excluded from counts', async () => {
-  squareHandlers.searchCatalog = async () => ({ ok: true, status: 200, json: async () => catalogWithShowtime({ modifierId: 'MOD-DASH-EXCL' }) });
+  squareHandlers.searchCatalog = async () => ({ ok: true, status: 200, json: async () => catalogWithShowtime({ showtimeStr: DASH_LABEL, modifierId: 'MOD-DASH-EXCL' }) });
   await insertDashboardTicket({ qrCode: 'QR-DASH-4', status: 'valid', productMetadata: { modifiers: [{ catalog_object_id: 'MOD-DASH-EXCL' }] } });
   await insertDashboardTicket({ qrCode: 'QR-DASH-5', status: 'refunded', productMetadata: { modifiers: [{ catalog_object_id: 'MOD-DASH-EXCL' }] } });
   await insertDashboardTicket({ qrCode: 'QR-DASH-6', status: 'transferred', productMetadata: { modifiers: [{ catalog_object_id: 'MOD-DASH-EXCL' }] } });
 
-  const { json } = await ctx.request('GET', '/api/dashboard/today?date=2026-01-04', { token: ctx.clientToken });
+  const { json } = await ctx.request('GET', `/api/dashboard/today?date=${DASH_DATE}`, { token: ctx.clientToken });
   assert.equal(json.events[0].ticketsSold, 1);
 });
 
 test('GET /api/dashboard/today: no showtimes at all for the date returns an empty event list, not an error', async () => {
   squareHandlers.searchCatalog = async () => ({ ok: true, status: 200, json: async () => ({ objects: [] }) });
-  const { status, json } = await ctx.request('GET', '/api/dashboard/today?date=2026-01-04', { token: ctx.clientToken });
+  const { status, json } = await ctx.request('GET', `/api/dashboard/today?date=${DASH_DATE}`, { token: ctx.clientToken });
   assert.equal(status, 200);
   assert.equal(json.eventCount, 0);
   assert.deepEqual(json.events, []);
@@ -141,8 +146,8 @@ test('GET /api/dashboard/today: a sub-user with an event-name data filter only s
         { type: 'ITEM', id: 'ITEM-B', item_data: { name: 'Other Movie', description: '', modifier_list_info: [{ modifier_list_id: 'ML-B' }] } }
       ],
       related_objects: [
-        { type: 'MODIFIER_LIST', id: 'ML-A', modifier_list_data: { modifiers: [{ id: 'MOD-A', modifier_data: { name: 'Sun 01-04-2026 2:30 PM (Main)' } }] } },
-        { type: 'MODIFIER_LIST', id: 'ML-B', modifier_list_data: { modifiers: [{ id: 'MOD-B', modifier_data: { name: 'Sun 01-04-2026 4:30 PM (Main)' } }] } }
+        { type: 'MODIFIER_LIST', id: 'ML-A', modifier_list_data: { modifiers: [{ id: 'MOD-A', modifier_data: { name: 'Sun 01-06-2030 2:30 PM (Main)' } }] } },
+        { type: 'MODIFIER_LIST', id: 'ML-B', modifier_list_data: { modifiers: [{ id: 'MOD-B', modifier_data: { name: 'Sun 01-06-2030 4:30 PM (Main)' } }] } }
       ]
     })
   });
@@ -153,11 +158,12 @@ test('GET /api/dashboard/today: a sub-user with an event-name data filter only s
     username: 'dashboardfiltered',
     dataFilter: { datafilters: [{ event: 'Wanted Movie' }] }
   });
-  const { status, json } = await ctx.request('GET', '/api/dashboard/today?date=2026-01-04', { token });
+  const { status, json } = await ctx.request('GET', `/api/dashboard/today?date=${DASH_DATE}`, { token });
   assert.equal(status, 200);
   assert.equal(json.filtered, true);
   assert.equal(json.eventCount, 1);
   assert.equal(json.events[0].title, 'Wanted Movie');
+  assert.equal(json.events[0].matchedBy, 'modifier_id', 'matched to Square\'s showtime, not the ticket fallback');
 });
 
 // Same two-item catalog as above; the filters below should each keep only "Wanted Movie".
@@ -174,8 +180,8 @@ for (const [label, datafilters] of [
           { type: 'ITEM', id: 'ITEM-B', item_data: { name: 'Other Movie', description: '', modifier_list_info: [{ modifier_list_id: 'ML-B' }] } }
         ],
         related_objects: [
-          { type: 'MODIFIER_LIST', id: 'ML-A', modifier_list_data: { modifiers: [{ id: 'MOD-A', modifier_data: { name: 'Sun 01-04-2026 2:30 PM (Main)' } }] } },
-          { type: 'MODIFIER_LIST', id: 'ML-B', modifier_list_data: { modifiers: [{ id: 'MOD-B', modifier_data: { name: 'Sun 01-04-2026 4:30 PM (Main)' } }] } }
+          { type: 'MODIFIER_LIST', id: 'ML-A', modifier_list_data: { modifiers: [{ id: 'MOD-A', modifier_data: { name: 'Sun 01-06-2030 2:30 PM (Main)' } }] } },
+          { type: 'MODIFIER_LIST', id: 'ML-B', modifier_list_data: { modifiers: [{ id: 'MOD-B', modifier_data: { name: 'Sun 01-06-2030 4:30 PM (Main)' } }] } }
         ]
       })
     });
@@ -183,7 +189,7 @@ for (const [label, datafilters] of [
     await insertDashboardTicket({ qrCode: `QR-DC-B-${label}`, productName: 'Other Movie', productMetadata: { modifiers: [{ catalog_object_id: 'MOD-B' }] } });
 
     const { token } = await ctx.insertUser({ username: `dash-${label.replace(/\W/g, '')}`, dataFilter: { datafilters } });
-    const { status, json } = await ctx.request('GET', '/api/dashboard/today?date=2026-01-04', { token });
+    const { status, json } = await ctx.request('GET', `/api/dashboard/today?date=${DASH_DATE}`, { token });
     assert.equal(status, 200);
     assert.equal(json.eventCount, 1);
     assert.equal(json.events[0].title, 'Wanted Movie');

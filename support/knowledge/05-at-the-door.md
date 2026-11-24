@@ -33,7 +33,7 @@ The same menu can **Check Out** a ticket checked in by mistake, **Transfer Ticke
 
 ![Today's Dashboard](images/dashboard.webp)
 
-**Today's Dashboard** shows each of today's shows with tickets sold and checked in so far, for whoever's running the door. It refreshes on its own. Choose a date to look at another day; **Today** comes back to today.
+**Today's Dashboard** shows each of today's shows with tickets sold and checked in so far, for whoever's running the door, plus **Seats Left** when the showtime has a capacity and a **Sold out** badge when it's full. It refreshes on its own. Choose a date to look at another day, past or future; **Today** comes back to today. Past days show every showtime from the [Showtimes page](04-adding-movies-and-events.md#the-showtimes-page), including ones that sold nothing; days from before a show was on the Showtimes page show the shows that sold tickets.
 
 ## Extra staff on a busy night
 
