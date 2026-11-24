@@ -45,7 +45,8 @@ export function parseShowtimeLabel(label) {
   if (ampm === 'PM' && hour !== 12) hour += 12;
   if (ampm === 'AM' && hour === 12) hour = 0;
   const parts = (inParens ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const extras = (after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  // Add Event joins several extras with " - " ("(Spacement) - All Ages - 21+").
+  const extras = (after ?? '').split(/,| - /).map((s) => s.trim()).filter(Boolean);
   const pad = (n) => String(n).padStart(2, '0');
   return {
     startsAt: `${yyyy}-${pad(month)}-${pad(date)} ${pad(hour)}:${pad(minute)}:00`,
@@ -91,10 +92,12 @@ export async function createDraftEvent(pool, e) {
       ticketTypeIds.push(row.rows[0].ID);
     }
     const showingIds = [];
-    for (const s of e.showings) {
+    for (const [i, s] of e.showings.entries()) {
+      // Seats typed on Add Movie/Event (already checked by readShowtimeSeats), else the room's.
+      const seats = e.seats?.[i] || { capacity: roomCapacity(e.roomCapacities, s.venue), heldSeats: 0 };
       const row = await client.query(
-        `INSERT INTO "Showing" ("EventID", "StartsAt", "Venue", "Descriptors", "Label", "Capacity") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "ID"`,
-        [eventId, s.startsAt, s.venue, s.descriptors.join(', '), s.label, roomCapacity(e.roomCapacities, s.venue)]
+        `INSERT INTO "Showing" ("EventID", "StartsAt", "Venue", "Descriptors", "Label", "Capacity", "HeldSeats") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING "ID"`,
+        [eventId, s.startsAt, s.venue, s.descriptors.join(', '), s.label, seats.capacity, seats.heldSeats]
       );
       showingIds.push(row.rows[0].ID);
     }
@@ -267,8 +270,11 @@ export async function getEventWithShowings(pool, eventId) {
       FROM "Showing" s LEFT JOIN (${SOLD_SQL}) sold ON sold."ShowingID" = s."ID"
       WHERE s."EventID" = $1 ORDER BY s."StartsAt", s."ID"`, [eventId, NOT_SOLD]);
     const e = event.rows[0];
+    // Every ticket ever, refunded or not: decides whether Delete deletes or ends it.
+    const ever = await pool.query(`SELECT COALESCE(SUM("Sold"), 0)::int AS n FROM (${SOLD_SQL}) x`, [eventId, []]);
     return {
       id: e.ID, kind: e.Kind, title: e.Title, eventType: e.EventType, distributor: e.Distributor, status: e.Status,
+      description: e.Description || '', posterUrl: e.PosterUrl || null, ticketsEver: ever.rows[0].n,
       showings: showings.rows.map((s) => ({
         id: s.ID, label: s.Label, startsAt: s.StartsAtText, venue: s.Venue, descriptors: s.Descriptors,
         status: s.Status, capacity: s.Capacity, heldSeats: s.HeldSeats, sold: s.Sold, isPast: s.IsPast,
@@ -276,6 +282,24 @@ export async function getEventWithShowings(pool, eventId) {
       }))
     };
   } catch (error) { throw wrapMissingTables(error); }
+}
+
+/**
+ * Add Movie / Add Event's optional seats, one entry per showtime (the shared
+ * showtime form sends them). Missing = the room's seats. Same rules as the
+ * Showtimes page. Throws ShowtimeError(400) naming the showtime.
+ */
+export function readShowtimeSeats(seats, labels) {
+  if (seats === undefined || seats === null) return undefined;
+  if (!Array.isArray(seats) || seats.length !== labels.length) throw new ShowtimeError(400, 'Seats must be given for every showtime, or for none');
+  return seats.map((s, i) => {
+    if (s === null || s === undefined) return undefined;
+    try {
+      return readSeats(s);
+    } catch (error) {
+      throw new ShowtimeError(400, `${labels[i]}: ${error.message}`);
+    }
+  });
 }
 
 // Capacity / held seats as typed: '' or null capacity = no limit.
@@ -466,17 +490,7 @@ export async function cancelShowing(pool, accessToken, eventId, showingId) {
     if (showing.Status === 'cancelled') throw new ShowtimeError(409, 'That showtime is already cancelled');
     const sold = await soldFor(client, eventId, showingId);
     await client.query(`UPDATE "Showing" SET "Status" = 'cancelled' WHERE "ID" = $1`, [showingId]);
-    const modifierId = await activeModifierId(client, showingId);
-    if (modifierId) {
-      const response = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${modifierId}`, { method: 'DELETE' });
-      // 404: already gone from Square (e.g. the nightly expiry job removed it).
-      if (!response.ok && response.status !== 404) {
-        throw new Error(`Square could not remove the showtime: ${response.status} ${await response.text()}`);
-      }
-      await client.query(
-        `UPDATE "ExternalCatalogLink" SET "DeletedAt" = CURRENT_TIMESTAMP, "DeletedReason" = 'cancelled' WHERE "EntityType" = 'showing' AND "EntityID" = $1 AND "ExternalID" = $2`,
-        [showingId, modifierId]);
-    }
+    await removeShowtimeFromSquare(client, accessToken, showingId);
     const remaining = await client.query(
       `SELECT COUNT(*)::int AS n FROM "Showing" WHERE "EventID" = $1 AND "Status" IN ('on_sale', 'sold_out') AND "StartsAt" >= ${CHICAGO_NOW}`, [eventId]);
     await client.query(`UPDATE "Event" SET "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
@@ -498,6 +512,269 @@ export async function cancelShowing(pool, accessToken, eventId, showingId) {
   }
   return { soldTickets: outcome.sold, archived, archiveError };
 }
+
+// Delete a showing's modifier from Square (off sale online and at the
+// register) and close its link. Used by cancelShowing and deleteEvent.
+async function removeShowtimeFromSquare(client, accessToken, showingId) {
+  const modifierId = await activeModifierId(client, showingId);
+  if (!modifierId) return;
+  const response = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${modifierId}`, { method: 'DELETE' });
+  // 404: already gone from Square (e.g. the nightly expiry job removed it).
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Square could not remove the showtime: ${response.status} ${await response.text()}`);
+  }
+  await client.query(
+    `UPDATE "ExternalCatalogLink" SET "DeletedAt" = CURRENT_TIMESTAMP, "DeletedReason" = 'cancelled' WHERE "EntityType" = 'showing' AND "EntityID" = $1 AND "ExternalID" = $2`,
+    [showingId, modifierId]);
+}
+
+// ---- EVENT DETAILS (edit / delete) ----
+// The Showtimes page's Event details panel (2026-11-23). Name, description
+// and poster are changed here and on the Square item together, so staff
+// don't edit half in Square and half in IndieTix. Ticket types and prices
+// are still changed in Square. The nightly expiry job reports name,
+// description and poster changed in Square by hand (SHOWTIME_DRIFT).
+
+const MAX_TITLE = 255;
+const MAX_DESCRIPTION = 4000; // Square allows 4096
+
+/** What customers see as the item's description. */
+export function squareItemDescription(itemData) {
+  return itemData?.description_plaintext ?? itemData?.description ?? '';
+}
+
+/** Same text, ignoring how whitespace and line breaks came back. */
+export function sameText(a, b) {
+  const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  return norm(a) === norm(b);
+}
+
+function readEventDetails({ title, description }) {
+  const out = {};
+  if (title !== undefined && title !== null) {
+    if (typeof title !== 'string' || !title.trim()) throw new ShowtimeError(400, 'The event needs a name');
+    if (title.trim().length > MAX_TITLE) throw new ShowtimeError(400, `The name can be at most ${MAX_TITLE} characters`);
+    out.title = title.trim();
+  }
+  if (description !== undefined && description !== null) {
+    if (typeof description !== 'string') throw new ShowtimeError(400, 'Description not understood');
+    if (description.trim().length > MAX_DESCRIPTION) throw new ShowtimeError(400, `The description can be at most ${MAX_DESCRIPTION} characters`);
+    out.description = description.trim();
+  }
+  return out;
+}
+
+async function eventLinks(db, eventId) {
+  const rows = await db.query(
+    `SELECT "ExternalType", "ExternalID" FROM "ExternalCatalogLink" WHERE "EntityType" = 'event' AND "EntityID" = $1 AND "Provider" = 'square' AND "DeletedAt" IS NULL`, [eventId]);
+  return Object.fromEntries(rows.rows.map((r) => [r.ExternalType, r.ExternalID]));
+}
+
+/**
+ * The name, description and poster customers see now (read from Square),
+ * for the edit form. Falls back to IndieTix's copy, with squareError set,
+ * when Square can't be read.
+ */
+export async function getEventDetails(pool, accessToken, eventId) {
+  try {
+    const event = await pool.query(`SELECT * FROM "Event" WHERE "ID" = $1 AND "Status" <> 'draft'`, [eventId]);
+    if (event.rows.length === 0) throw new ShowtimeError(404, 'Event not found');
+    const e = event.rows[0];
+    const mine = { title: e.Title, description: e.Description || '', imageUrl: e.PosterUrl || null };
+    const link = await eventLinks(pool, eventId);
+    if (!link.ITEM) return { ...mine, squareError: 'This event isn\'t linked to a Square item' };
+    let current;
+    try {
+      current = await squareApi.retrieveCatalogObject(accessToken, link.ITEM);
+    } catch (error) {
+      return { ...mine, squareError: 'Square couldn\'t be read just now, so this shows IndieTix\'s copy' };
+    }
+    const item = current.object;
+    if (!item || item.is_deleted) return { ...mine, squareError: 'This event\'s item is no longer in Square' };
+    const imageId = item.item_data?.image_ids?.[0];
+    const image = (current.related_objects || []).find((o) => o.id === imageId && o.type === 'IMAGE');
+    return {
+      title: item.item_data?.name || e.Title,
+      description: squareItemDescription(item.item_data),
+      imageUrl: image?.image_data?.url || mine.imageUrl
+    };
+  } catch (error) { throw wrapMissingTables(error); }
+}
+
+async function uploadPoster(accessToken, poster, title, eventId) {
+  const safe = String(title).replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_').toLowerCase().substring(0, 100) || 'event';
+  const response = await squareApi.uploadCatalogImage(accessToken, {
+    imageBuffer: poster.buffer,
+    filename: `${safe}_poster.jpg`,
+    contentType: 'image/jpeg',
+    request: {
+      idempotency_key: `indietix-event-poster-${eventId}-${Date.now()}`,
+      image: { id: '#event_poster', type: 'IMAGE', image_data: { caption: title } }
+    }
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Square could not take the poster: ${response.status} ${text}`);
+  const imageId = JSON.parse(text).image?.id;
+  if (!imageId) throw new Error('Square did not return the poster\'s id');
+  return imageId;
+}
+
+/**
+ * Change an event's name, description and/or poster, on the Square item and
+ * here. Fields left undefined are unchanged. Saving a field also corrects it
+ * where Square and IndieTix had drifted apart.
+ * @param {object} changes { title?, description?, poster?: { buffer (square JPEG), sourceUrl } }
+ * @returns {Promise<{ changed: string[] }>} e.g. ['name', 'poster']
+ */
+export async function editEventDetails(pool, accessToken, eventId, { title, description, poster } = {}) {
+  const wanted = readEventDetails({ title, description });
+  if (wanted.title === undefined && wanted.description === undefined && !poster) throw new ShowtimeError(400, 'Nothing to change');
+  let uploadedImageId = null;
+  let squareSaved = false;
+  try {
+    return await inEventTransaction(pool, eventId, async (client, event, link) => {
+      let current;
+      try {
+        current = await squareApi.retrieveCatalogObject(accessToken, link.ITEM);
+      } catch (error) {
+        throw new ShowtimeError(409, 'This event\'s Square item couldn\'t be read (was it deleted in Square?)');
+      }
+      const item = current.object;
+      if (!item || item.type !== 'ITEM' || item.is_deleted) throw new ShowtimeError(409, 'This event\'s item is no longer in Square');
+      const itemData = { ...item.item_data };
+      const customAttributes = item.custom_attribute_values ? { ...item.custom_attribute_values } : null;
+      const changed = [];
+
+      if (wanted.title !== undefined && (wanted.title !== event.Title || wanted.title !== itemData.name)) {
+        // Add Movie/Event repeats the title in the online display name attribute.
+        for (const [key, value] of Object.entries(customAttributes || {})) {
+          if (typeof value?.string_value === 'string' && value.string_value === itemData.name) customAttributes[key] = { ...value, string_value: wanted.title };
+        }
+        itemData.name = wanted.title;
+        changed.push('name');
+      }
+      if (wanted.description !== undefined &&
+          (!sameText(wanted.description, event.Description) || !sameText(wanted.description, squareItemDescription(itemData)))) {
+        // Square makes the HTML and plain-text copies from this.
+        delete itemData.description_html;
+        delete itemData.description_plaintext;
+        itemData.description = wanted.description;
+        changed.push('description');
+      }
+      if (poster) {
+        uploadedImageId = await uploadPoster(accessToken, poster, itemData.name, eventId);
+        itemData.image_ids = [uploadedImageId];
+        changed.push('poster');
+      }
+      if (changed.length === 0) return { changed };
+
+      await squareApi.upsertCatalogObject(accessToken, {
+        idempotency_key: `indietix-event-edit-${eventId}-${Date.now()}`,
+        object: { ...item, item_data: itemData, ...(customAttributes ? { custom_attribute_values: customAttributes } : {}) }
+      });
+      squareSaved = true;
+
+      await client.query(
+        `UPDATE "Event" SET "Title" = $2, "Description" = $3, "PosterUrl" = CASE WHEN $4 THEN $5 ELSE "PosterUrl" END, "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`,
+        [eventId,
+          changed.includes('name') ? wanted.title : event.Title,
+          changed.includes('description') ? wanted.description : event.Description,
+          Boolean(poster), poster ? storablePosterUrl(poster.sourceUrl) : null]);
+      if (poster) {
+        await client.query(
+          `UPDATE "ExternalCatalogLink" SET "DeletedAt" = CURRENT_TIMESTAMP, "DeletedReason" = 'replaced' WHERE "EntityType" = 'event' AND "EntityID" = $1 AND "ExternalType" = 'IMAGE' AND "Provider" = 'square' AND "DeletedAt" IS NULL`,
+          [eventId]);
+        await client.query(
+          `INSERT INTO "ExternalCatalogLink" ("EntityType", "EntityID", "Provider", "ExternalType", "ExternalID") VALUES ('event', $1, 'square', 'IMAGE', $2)`,
+          [eventId, uploadedImageId]);
+      }
+      return { changed };
+    });
+  } catch (error) {
+    // The item never pointed at the new poster; don't leave it in Square's library.
+    if (uploadedImageId && !squareSaved) {
+      await squareApi.deleteCatalogObject(accessToken, uploadedImageId).catch((e) => console.error(`Could not remove unused poster ${uploadedImageId} from Square:`, e.message));
+    }
+    throw error;
+  }
+}
+
+// Every ticket ever made for this event, refunded or not: by showing, by
+// showtime modifier, or by ticket variation (a showtime the import couldn't read).
+async function ticketsEverSold(client, eventId) {
+  const r = await client.query(`
+    WITH ids AS (
+      SELECT l."ExternalID" FROM "ExternalCatalogLink" l
+      WHERE l."Provider" = 'square' AND (
+        (l."EntityType" = 'showing' AND l."EntityID" IN (SELECT "ID" FROM "Showing" WHERE "EventID" = $1)) OR
+        (l."EntityType" = 'ticket_type' AND l."EntityID" IN (SELECT "ID" FROM "TicketType" WHERE "EventID" = $1)))
+    )
+    SELECT COUNT(*)::int AS n FROM "QRCodeProduct" q
+    WHERE q."ShowingID" IN (SELECT "ID" FROM "Showing" WHERE "EventID" = $1)
+       OR EXISTS (SELECT 1 FROM ids WHERE
+            q."ProductMetadata" @> jsonb_build_object('modifiers', jsonb_build_array(jsonb_build_object('catalog_object_id', ids."ExternalID")))
+         OR q."ProductMetadata" @> jsonb_build_object('catalog_object_id', ids."ExternalID"))`, [eventId]);
+  return r.rows[0].n;
+}
+
+async function deleteFromSquare(accessToken, objectId) {
+  const response = await squareApi.squareFetch(accessToken, `/v2/catalog/object/${objectId}`, { method: 'DELETE' });
+  if (!response.ok && response.status !== 404) throw new Error(`Square could not delete ${objectId}: ${response.status} ${await response.text()}`);
+}
+
+/**
+ * Delete an event (the Showtimes page's Delete event).
+ *  - No ticket ever made for it: deleted outright, in Square (item, showtime
+ *    list, poster) and in IndieTix.
+ *  - Tickets made: ended instead, so sales history and box-office reports
+ *    keep their event. Every upcoming showtime is cancelled (removed from
+ *    Square) and the item archived. Nothing is refunded; the number of
+ *    tickets for the cancelled showtimes is returned so staff can refund.
+ * @returns {Promise<{ action: 'deleted' } | { action: 'ended', cancelledShowtimes, ticketsToRefund, archived, archiveError }>}
+ */
+export async function deleteEvent(pool, accessToken, eventId) {
+  const outcome = await inEventTransaction(pool, eventId, async (client, event, link) => {
+    if (await ticketsEverSold(client, eventId) === 0) {
+      await deleteFromSquare(accessToken, link.ITEM); // its variations go with it
+      for (const extra of [link.MODIFIER_LIST, link.IMAGE].filter(Boolean)) {
+        await deleteFromSquare(accessToken, extra).catch((e) => console.error(`Event ${eventId} deleted, but ${extra} was left in Square:`, e.message));
+      }
+      await client.query(`DELETE FROM "ExternalCatalogLink" WHERE "EntityType" = 'showing' AND "EntityID" IN (SELECT "ID" FROM "Showing" WHERE "EventID" = $1)`, [eventId]);
+      await client.query(`DELETE FROM "ExternalCatalogLink" WHERE "EntityType" = 'ticket_type' AND "EntityID" IN (SELECT "ID" FROM "TicketType" WHERE "EventID" = $1)`, [eventId]);
+      await client.query(`DELETE FROM "ExternalCatalogLink" WHERE "EntityType" = 'event' AND "EntityID" = $1`, [eventId]);
+      await client.query(`DELETE FROM "Showing" WHERE "EventID" = $1`, [eventId]);
+      await client.query(`DELETE FROM "TicketType" WHERE "EventID" = $1`, [eventId]);
+      await client.query(`DELETE FROM "Event" WHERE "ID" = $1`, [eventId]);
+      console.log(`Event ${eventId} "${event.Title}" deleted (no tickets); Square item ${link.ITEM} deleted`);
+      return { deleted: true };
+    }
+    const upcoming = await client.query(
+      `SELECT "ID" FROM "Showing" WHERE "EventID" = $1 AND "Status" IN ('on_sale', 'sold_out') AND "StartsAt" >= ${CHICAGO_NOW} ORDER BY "StartsAt"`, [eventId]);
+    let ticketsToRefund = 0;
+    for (const { ID } of upcoming.rows) {
+      ticketsToRefund += await soldFor(client, eventId, ID);
+      await client.query(`UPDATE "Showing" SET "Status" = 'cancelled' WHERE "ID" = $1`, [ID]);
+      await removeShowtimeFromSquare(client, accessToken, ID);
+    }
+    await client.query(`UPDATE "Event" SET "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
+    console.log(`Event ${eventId} "${event.Title}" ended: ${upcoming.rows.length} upcoming showtimes cancelled, ${ticketsToRefund} tickets for them not refunded`);
+    return { deleted: false, cancelledShowtimes: upcoming.rows.length, ticketsToRefund, itemId: link.ITEM };
+  });
+  if (outcome.deleted) return { action: 'deleted' };
+  // After the commit, as in cancelShowing: the showtimes are already off sale.
+  let archived = false;
+  let archiveError = null;
+  try {
+    await squareApi.archiveItem(accessToken, outcome.itemId);
+    await pool.query(`UPDATE "Event" SET "Status" = 'archived', "UpdatedAt" = CURRENT_TIMESTAMP WHERE "ID" = $1`, [eventId]);
+    archived = true;
+  } catch (error) {
+    console.error(`Event ${eventId} ended, but archiving Square item ${outcome.itemId} failed:`, error.message);
+    archiveError = 'Its showtimes are off sale, but the item could not be archived in Square; archive it there.';
+  }
+  return { action: 'ended', cancelledShowtimes: outcome.cancelledShowtimes, ticketsToRefund: outcome.ticketsToRefund, archived, archiveError };
+}
+// ---- END EVENT DETAILS ----
 
 // ---- SHOWING SALES SYNC ----
 // Keeps a showing's on-sale state in line with its sold count after anything
@@ -732,7 +1009,9 @@ export async function importFromSquare(pool, accessToken, config, { dryRun = tru
       ticketTypes: variations.map((v) => ({ name: v.item_variation_data?.name || 'Ticket', price: (v.item_variation_data?.price_money?.amount ?? 0) / 100, variationId: v.id })),
       showings,
       itemId: item.id,
-      modifierListId: showtimeList.id
+      modifierListId: showtimeList.id,
+      // So the nightly drift check can tell when the poster is changed in Square.
+      imageId: item.item_data?.image_ids?.[0] || null
     };
     // Showtimes whose tickets already fill their room's seats.
     const full = await fullShowtimes(pool, showings, config.ROOM_CAPACITY);
@@ -785,6 +1064,7 @@ async function saveImportedEvent(pool, plan, roomCapacities) {
       `INSERT INTO "ExternalCatalogLink" ("EntityType", "EntityID", "Provider", "ExternalType", "ExternalID") VALUES ($1, $2, 'square', $3, $4)`, [type, id, extType, extId]);
     await link('event', eventId, 'ITEM', plan.itemId);
     await link('event', eventId, 'MODIFIER_LIST', plan.modifierListId);
+    if (plan.imageId) await link('event', eventId, 'IMAGE', plan.imageId);
     for (const [i, t] of plan.ticketTypes.entries()) {
       const id = (await client.query(`INSERT INTO "TicketType" ("EventID", "Name", "PriceCents", "SortOrder") VALUES ($1, $2, $3, $4) RETURNING "ID"`,
         [eventId, t.name, Math.round(t.price * 100), i])).rows[0].ID;

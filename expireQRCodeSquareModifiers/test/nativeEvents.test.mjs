@@ -36,12 +36,13 @@ after(async () => {
   await stopPostgresContainer(containerName);
 });
 
-const item = (id, archived = false) => ({ type: 'ITEM', id, item_data: { name: id, is_archived: archived } });
+const item = (id, archived, name, extra = {}) => ({ type: 'ITEM', id, item_data: { name, is_archived: archived, ...extra } });
 const list = (id, modifiers) => ({ type: 'MODIFIER_LIST', id, modifier_list_data: { name: 'Show Time', modifiers: modifiers.map(([mid, name]) => ({ type: 'MODIFIER', id: mid, modifier_data: { name } })) } });
 
-async function event(title, status, itemId, listId) {
-  const id = (await db.query(`INSERT INTO "Event" ("Kind", "Title", "Status") VALUES ('movie', $1, $2) RETURNING "ID"`, [title, status])).rows[0].ID;
+async function event(title, status, itemId, listId, { description = null, imageId = null } = {}) {
+  const id = (await db.query(`INSERT INTO "Event" ("Kind", "Title", "Status", "Description") VALUES ('movie', $1, $2, $3) RETURNING "ID"`, [title, status, description])).rows[0].ID;
   await db.query(`INSERT INTO "ExternalCatalogLink" ("EntityType", "EntityID", "Provider", "ExternalType", "ExternalID") VALUES ('event', $1, 'square', 'ITEM', $2), ('event', $1, 'square', 'MODIFIER_LIST', $3)`, [id, itemId, listId]);
+  if (imageId) await db.query(`INSERT INTO "ExternalCatalogLink" ("EntityType", "EntityID", "Provider", "ExternalType", "ExternalID") VALUES ('event', $1, 'square', 'IMAGE', $2)`, [id, imageId]);
   return id;
 }
 async function showing(eventId, label, startsAt, status, modifierId, { linkDeleted = false } = {}) {
@@ -71,7 +72,7 @@ test('past showtimes are marked expired and their links closed once Square no lo
   const past = await showing(e, 'Fri 01-03-2020 7:00 PM (Main)', '2020-01-03 19:00', 'on_sale', 'MOD-PAST');
   const pastSoldOut = await showing(e, 'Sat 01-04-2020 7:00 PM (Main)', '2020-01-04 19:00', 'sold_out', 'MOD-PAST-SOLD', { linkDeleted: true });
   const upcoming = await showing(e, 'Fri 06-07-2030 7:00 PM (Main)', '2030-06-07 19:00', 'on_sale', 'MOD-UP');
-  squareObjects = { 'ITEM-A': item('ITEM-A'), 'LIST-A': list('LIST-A', [['MOD-UP', 'Fri 06-07-2030 7:00 PM (Main)']]) };
+  squareObjects = { 'ITEM-A': item('ITEM-A', false, 'Old Run'), 'LIST-A': list('LIST-A', [['MOD-UP', 'Fri 06-07-2030 7:00 PM (Main)']]) };
 
   const { result, logged } = await quietly(() => syncNativeEvents(venueConfig, 'token', 'venue_sync'));
   assert.deepEqual([result.showingsExpired, result.linksClosed, result.eventsArchived, result.drift], [2, 1, 0, []]);
@@ -87,7 +88,7 @@ test('past showtimes are marked expired and their links closed once Square no lo
 
 test('an event whose Square item was archived (by the expiry job or by hand) is archived in IndieTix', async () => {
   const e = await event('Finished', 'active', 'ITEM-B', 'LIST-B');
-  squareObjects = { 'ITEM-B': item('ITEM-B', true), 'LIST-B': list('LIST-B', [['MOD-LEFTOVER', 'Fri 06-07-2030 7:00 PM (Main)']]) };
+  squareObjects = { 'ITEM-B': item('ITEM-B', true, 'Finished'), 'LIST-B': list('LIST-B', [['MOD-LEFTOVER', 'Fri 06-07-2030 7:00 PM (Main)']]) };
   const { result, logged } = await quietly(() => syncNativeEvents(venueConfig, 'token', 'venue_sync'));
   assert.equal(result.eventsArchived, 1);
   assert.equal(await statusOf('Event', e), 'archived');
@@ -103,9 +104,9 @@ test('drift: showtimes added, removed or renamed in Square, and items deleted or
   const deleted = await event('Deleted In Square', 'active', 'ITEM-DELETED', 'LIST-DELETED');
   const unarchived = await event('Unarchived In Square', 'archived', 'ITEM-E', 'LIST-E');
   squareObjects = {
-    'ITEM-C': item('ITEM-C'),
+    'ITEM-C': item('ITEM-C', false, 'Hand Edited'),
     'LIST-C': list('LIST-C', [['MOD-OK', 'Fri 06-07-2030 7:00 PM (Main)'], ['MOD-RENAMED', 'Sun 06-09-2030 8:00 PM (Main)'], ['MOD-HAND', 'Tue 06-11-2030 7:00 PM (Main)']]),
-    'ITEM-E': item('ITEM-E'), 'LIST-E': list('LIST-E', [])
+    'ITEM-E': item('ITEM-E', false, 'Unarchived In Square'), 'LIST-E': list('LIST-E', [])
   };
 
   const { result, logged } = await quietly(() => syncNativeEvents(venueConfig, 'token', 'venue_sync'));
@@ -122,6 +123,29 @@ test('drift: showtimes added, removed or renamed in Square, and items deleted or
   assert.equal(await linkClosed('MOD-GONE'), null);
   assert.equal(await statusOf('Event', deleted), 'active');
   assert.equal(await statusOf('Event', unarchived), 'archived');
+});
+
+test('drift: a name, description or poster changed in Square is reported; matching text and an unknown poster are not', async () => {
+  await event('Same Everywhere', 'active', 'ITEM-F', 'LIST-F', { description: 'Rating: R\n\nA plot.', imageId: 'IMG-F' });
+  await event('Changed By Hand', 'active', 'ITEM-G', 'LIST-G', { description: 'Our text.', imageId: 'IMG-G' });
+  await event('Imported', 'active', 'ITEM-H', 'LIST-H');
+  squareObjects = {
+    // Square's plain-text copy, with its own line breaks: the same text.
+    'ITEM-F': item('ITEM-F', false, 'Same Everywhere', { description_plaintext: 'Rating: R\nA plot. ', image_ids: ['IMG-F'] }),
+    'LIST-F': list('LIST-F', []),
+    'ITEM-G': item('ITEM-G', false, 'Renamed By Hand', { description_plaintext: 'Their text.', image_ids: ['IMG-OTHER'] }),
+    'LIST-G': list('LIST-G', []),
+    // No IMAGE link (imported before 2026-11-23): its poster isn't checked.
+    'ITEM-H': item('ITEM-H', false, 'Imported', { image_ids: ['IMG-H'] }),
+    'LIST-H': list('LIST-H', [])
+  };
+  const { result } = await quietly(() => syncNativeEvents(venueConfig, 'token', 'venue_details'));
+  assert.deepEqual(result.drift.sort(), [
+    '"Changed By Hand": its description was changed in Square',
+    '"Changed By Hand": its name was changed in Square to "Renamed By Hand"',
+    '"Changed By Hand": its poster was changed in Square'
+  ]);
+  assert.equal(fetchCalls.length, 1, 'reported, not fixed');
 });
 
 test('a venue database without the native event tables is skipped quietly, with no Square calls', async () => {

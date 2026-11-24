@@ -40,6 +40,7 @@ The user deploys exclusively via the AWS Console/CLI by hand, never `serverless 
 | `lint-static` | Just the static-site half of `lint` — verifies every local `<script src>`/`<link href>` in `QRScanner/src/public/*.html` resolves to a file that exists. |
 | `static-push <filename>` | Pushes one specific static file to S3 (correct `Content-Type` inferred from extension) and invalidates its CloudFront path. |
 | `invalidate [path...] [--wait]` | CloudFront-only cache clear (no S3 upload). Defaults to `/*`. `--wait` blocks until the invalidation actually completes instead of just kicking it off. |
+| `static-cache-headers [dist-id] [--yes]` | One-time: attaches CloudFront response headers policy `indietix-static-no-cache` (`Cache-Control: no-cache`) to every cache behavior of `DISTRIBUTION_ID` (or `dist-id`), creating the policy if the account lacks it. Browsers then revalidate pages and scripts on each load (a 304 when unchanged) instead of running a stale script after a deploy (seen 2026-11-22: Chrome kept an old `order.js`). Refuses to replace a different headers policy. Bootstrap environments get the same from `static-site/template.yaml`. |
 
 ## Known gotchas already hit once (fixed in the script, but worth knowing why)
 

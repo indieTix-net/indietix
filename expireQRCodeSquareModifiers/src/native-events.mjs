@@ -16,6 +16,9 @@
 //  - a showtime renamed in Square
 //  - an item deleted from Square, or unarchived there while IndieTix has it
 //    archived
+//  - the item's name, description or poster changed in Square (2026-11-23;
+//    the Showtimes page edits them in both places). The poster is only
+//    checked once IndieTix knows which image it is (an IMAGE link).
 // A venue database without the tables is skipped quietly.
 import pg from 'pg';
 import * as squareApi from 'square-api-lib';
@@ -39,6 +42,25 @@ async function batchRetrieve(accessToken, ids) {
   return objects;
 }
 
+// Same text, ignoring how whitespace and line breaks came back (as in
+// QRScanner's native-events.mjs sameText).
+function sameText(a, b) {
+  const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  return norm(a) === norm(b);
+}
+
+/** Name, description and poster changed on the Square item by hand. */
+export function detailsDrift(event, itemData) {
+  const found = [];
+  if (itemData.name !== undefined && itemData.name !== event.Title) {
+    found.push(`its name was changed in Square to "${itemData.name}"`);
+  }
+  const description = itemData.description_plaintext ?? itemData.description ?? '';
+  if (!sameText(description, event.Description)) found.push('its description was changed in Square');
+  if (event.ImageID && (itemData.image_ids?.[0] || null) !== event.ImageID) found.push('its poster was changed in Square');
+  return found;
+}
+
 /**
  * @param {object} dbConfig connection settings for the venue's own database
  * @param {string} accessToken the venue's Square token
@@ -53,9 +75,10 @@ export async function syncNativeEvents(dbConfig, accessToken, clientId) {
     let events;
     try {
       events = (await db.query(`
-        SELECT e."ID", e."Title", e."Status",
+        SELECT e."ID", e."Title", e."Status", e."Description",
                MAX(l."ExternalID") FILTER (WHERE l."ExternalType" = 'ITEM') AS "ItemID",
-               MAX(l."ExternalID") FILTER (WHERE l."ExternalType" = 'MODIFIER_LIST') AS "ListID"
+               MAX(l."ExternalID") FILTER (WHERE l."ExternalType" = 'MODIFIER_LIST') AS "ListID",
+               MAX(l."ExternalID") FILTER (WHERE l."ExternalType" = 'IMAGE') AS "ImageID"
         FROM "Event" e
         JOIN "ExternalCatalogLink" l ON l."EntityType" = 'event' AND l."EntityID" = e."ID" AND l."Provider" = 'square' AND l."DeletedAt" IS NULL
         WHERE e."Status" IN ('active', 'archived')
@@ -95,6 +118,9 @@ export async function syncNativeEvents(dbConfig, accessToken, clientId) {
         summary.eventsArchived += 1;
       } else if (!archivedInSquare && event.Status === 'archived') {
         drift('its Square item was unarchived in Square, but IndieTix has it archived');
+      }
+      if (item) {
+        for (const message of detailsDrift(event, item.item_data || {})) drift(message);
       }
 
       const list = event.ListID ? square.get(event.ListID) : null;

@@ -409,3 +409,41 @@ test('POST /api/square/create-movie-item: a failed poster upload still creates t
   assert.equal(captured.uploads.length, 1);
   assert.equal(captured.items[0].item_data.image_ids, undefined);
 });
+
+// ---- one handler, two kinds (CREATE TICKET ITEM, 2026-11-22) ----
+// Movies and events share createTicketItem. These are the only ways the two
+// may differ; anything else showing up here is a regression.
+
+test('movie vs event: only the category, the showtimes\' kitchen names and the ids differ', async () => {
+  const showtimes = ['Sun 01-18-2026 7:00 PM (Main Theater)', 'Sun 01-18-2026 9:30 PM (Main Theater)'];
+  squareHandlers.listCatalogCategories = async () => ({ ok: true, status: 200, json: async () => ({ objects: [] }) });
+  const movieCreated = recordCatalogCreates();
+  assert.equal((await ctx.request('POST', '/api/square/create-movie-item', { token: ctx.clientToken, body: movieBody({ showtimes }) })).status, 200);
+  resetSquareHandlers();
+  squareHandlers.listCatalogCategories = async () => ({ ok: true, status: 200, json: async () => ({ objects: [] }) });
+  const eventCreated = recordCatalogCreates();
+  assert.equal((await ctx.request('POST', '/api/square/create-event-item', { token: ctx.clientToken, body: eventBody({ showtimes }) })).status, 200);
+
+  const pick = (created, type) => created.find((o) => o.type === type);
+  // Category
+  assert.equal(pick(movieCreated, 'CATEGORY').category_data.name, 'Cinema');
+  assert.equal(pick(eventCreated, 'CATEGORY').category_data.name, 'Events');
+  // Showtimes: same text and order; events also get the time as Square's kitchen name
+  const mods = (created) => pick(created, 'MODIFIER_LIST').modifier_list_data.modifiers.map((m) => m.modifier_data);
+  assert.deepEqual(mods(movieCreated).map((m) => [m.name, m.ordinal, m.abbreviation]), [[showtimes[0], 1, undefined], [showtimes[1], 2, undefined]]);
+  assert.deepEqual(mods(eventCreated).map((m) => [m.name, m.ordinal, m.abbreviation]), [[showtimes[0], 1, '7:00 PM'], [showtimes[1], 2, '9:30 PM']]);
+  // The item itself is built the same way
+  const shape = (item) => {
+    const d = item.item_data;
+    return { product_type: d.product_type, available_online: d.available_online, available_for_pickup: d.available_for_pickup, is_taxable: d.is_taxable,
+      modifier_list_info: d.modifier_list_info.map(({ min_selected_modifiers, max_selected_modifiers, enabled }) => ({ min_selected_modifiers, max_selected_modifiers, enabled })),
+      present_at_location_ids: item.present_at_location_ids };
+  };
+  assert.deepEqual(shape(pick(eventCreated, 'ITEM')), shape(pick(movieCreated, 'ITEM')));
+  assert.deepEqual([pick(movieCreated, 'ITEM').id, pick(eventCreated, 'ITEM').id], ['#movie_item', '#event_item']);
+});
+
+test('create without its data object (movieData / eventData) is a 400, not a crash', async () => {
+  assert.equal((await ctx.request('POST', '/api/square/create-movie-item', { token: ctx.clientToken, body: { eventData: {} } })).status, 400);
+  assert.equal((await ctx.request('POST', '/api/square/create-event-item', { token: ctx.clientToken, body: {} })).status, 400);
+});

@@ -94,6 +94,14 @@ read-only.
                                 diff vs. live and asks. 'static-push' refuses
                                 those two files: the repo's copies are
                                 placeholders.
+  static-cache-headers [dist-id] [--yes]
+                               One-time: make browsers check back before
+                                reusing the static site's pages and scripts
+                                (Cache-Control: no-cache) so deploys show up
+                                on the next load. Attaches CloudFront policy
+                                indietix-static-no-cache to every behavior of
+                                DISTRIBUTION_ID (or dist-id). Shows what
+                                changes and asks.
   static-push-help             Build the help pages from the guide
                                 (support/knowledge, via help/build.mjs) and
                                 publish them to /help/ on the static site,
@@ -631,6 +639,81 @@ cmd_static_push_legal() {
 }
 # ---- END LEGAL PAGES ----
 
+# ---- STATIC CACHE HEADERS ----
+# static-cache-headers [distribution-id] [--yes] -- make browsers check back
+# before reusing the static site's pages and scripts (Cache-Control:
+# no-cache, a cheap 304 when unchanged), so a deploy is picked up on the next
+# load. Production's distribution was made by hand; bootstrap environments
+# get the same policy from static-site/template.yaml. Creates the policy
+# "indietix-static-no-cache" if this account doesn't have it, then attaches
+# it to every cache behavior (the default plus /privacy.html and /terms.html
+# in production). Refuses to replace a different response headers policy.
+# Defaults to DISTRIBUTION_ID; AWS_PROFILE picks the account as usual.
+cmd_static_cache_headers() {
+  local dist="$DISTRIBUTION_ID" yes_flag="" name="indietix-static-no-cache" arg
+  for arg in "$@"; do
+    case "$arg" in
+      --yes|-y) yes_flag="--yes" ;;
+      *) dist="$arg" ;;
+    esac
+  done
+  local work; work=$(mktemp -d)
+
+  local policy_id
+  policy_id=$(aws cloudfront list-response-headers-policies --type custom \
+    --query "ResponseHeadersPolicyList.Items[?ResponseHeadersPolicy.ResponseHeadersPolicyConfig.Name=='$name'].ResponseHeadersPolicy.Id | [0]" --output text)
+  if [ -z "$policy_id" ] || [ "$policy_id" = "None" ]; then
+    policy_id=""
+    echo "Response headers policy $name: not in this account yet; it will be created."
+  else
+    echo "Response headers policy $name: $policy_id"
+  fi
+
+  aws cloudfront get-distribution-config --id "$dist" --output json > "$work/current.json" || { rm -rf "$work"; return 1; }
+  # Which behaviors change; refuse if one has some other headers policy.
+  if ! python3 - "$work/current.json" "${policy_id:-NEW}" <<'PY'
+import json, sys
+cfg = json.load(open(sys.argv[1]))["DistributionConfig"]
+want = sys.argv[2]
+behaviors = [("(default)", cfg["DefaultCacheBehavior"])] + [(b["PathPattern"], b) for b in cfg.get("CacheBehaviors", {}).get("Items", [])]
+bad = False
+for path, b in behaviors:
+    have = b.get("ResponseHeadersPolicyId") or ""
+    if have and have != want:
+        print(f"  {path}: already has response headers policy {have}; not replacing it. Stop.")
+        bad = True
+    else:
+        print(f"  {path}: {'already set' if have == want else 'will get Cache-Control: no-cache'}")
+sys.exit(1 if bad else 0)
+PY
+  then rm -rf "$work"; return 1; fi
+
+  confirm "Apply to CloudFront distribution $dist?" "$yes_flag" || { echo "Cancelled."; rm -rf "$work"; return 1; }
+
+  if [ -z "$policy_id" ]; then
+    policy_id=$(aws cloudfront create-response-headers-policy --response-headers-policy-config \
+      "{\"Name\":\"$name\",\"Comment\":\"Browsers revalidate static pages and scripts on every load\",\"CustomHeadersConfig\":{\"Quantity\":1,\"Items\":[{\"Header\":\"Cache-Control\",\"Value\":\"no-cache\",\"Override\":true}]}}" \
+      --query 'ResponseHeadersPolicy.Id' --output text) || { rm -rf "$work"; return 1; }
+    echo "Created response headers policy $name: $policy_id"
+  fi
+
+  local etag
+  etag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["ETag"])' "$work/current.json")
+  python3 - "$work/current.json" "$policy_id" > "$work/new.json" <<'PY'
+import json, sys
+cfg = json.load(open(sys.argv[1]))["DistributionConfig"]
+cfg["DefaultCacheBehavior"]["ResponseHeadersPolicyId"] = sys.argv[2]
+for b in cfg.get("CacheBehaviors", {}).get("Items", []):
+    b["ResponseHeadersPolicyId"] = sys.argv[2]
+print(json.dumps(cfg))
+PY
+  aws cloudfront update-distribution --id "$dist" --if-match "$etag" \
+    --distribution-config "file://$work/new.json" --query 'Distribution.Status' --output text \
+    && echo "Done. CloudFront takes a few minutes to roll it out; check with: curl -sI https://<site>/index.html | grep -i cache-control"
+  rm -rf "$work"
+}
+# ---- END STATIC CACHE HEADERS ----
+
 cmd_invalidate() {
   # cmd_invalidate [--wait] [path...] -- defaults to "/*" (everything) if no
   # paths given. Doesn't touch S3 at all -- just clears CloudFront's cache,
@@ -692,5 +775,6 @@ case "${1:-}" in
   invalidate) cmd_invalidate "${@:2}" ;;
   static-push-legal) cmd_static_push_legal "${2:-}" ;;
   static-push-help) cmd_static_push_help ;;
+  static-cache-headers) cmd_static_cache_headers "${@:2}" ;;
   *) usage; exit 1 ;;
 esac

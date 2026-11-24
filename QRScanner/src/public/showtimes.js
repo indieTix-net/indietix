@@ -6,8 +6,6 @@
 (function () {
     const API_URL = window.INDIETIX_API_URL;
     let rooms = [];
-    let descriptors = [];
-    let roomCapacity = {};
     let currentEvent = null;
     let editingShowingId = null;
 
@@ -36,58 +34,15 @@
         return node;
     }
 
-    // Same text Add Movie / Add Event make: "Sun 01-18-2026 7:00 PM (Room, extra)"
-    function formatShowtime(dateString, timeString, location, extras) {
-        const date = new Date(`${dateString}T${timeString}`);
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        let hours = date.getHours();
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        const place = extras.length ? `${location}, ${extras.join(', ')}` : location;
-        return `${days[date.getDay()]} ${month}-${day}-${date.getFullYear()} ${hours}:${minutes} ${ampm} (${place})`;
-    }
-
     // "2026-11-21 21:30:00" -> { date: "2026-11-21", time: "21:30" }
     function splitStartsAt(startsAt) {
         return { date: startsAt.slice(0, 10), time: startsAt.slice(11, 16) };
     }
 
-    function seatsForRoom(room) {
-        const key = Object.keys(roomCapacity).find((r) => r.trim().toLowerCase() === String(room).trim().toLowerCase());
-        const seats = key === undefined ? '' : roomCapacity[key];
-        return seats === null || seats === undefined ? '' : String(seats);
-    }
-
+    // Rooms, extras and room seats come from the shared showtime form
+    // (showtime-form.js), the same one Add Movie and Add Event use.
     async function loadSettings() {
-        try {
-            const data = await api('GET', '/api/client/ui-config');
-            const config = data.client?.configuration || {};
-            rooms = Array.isArray(config.EVENT_LOCATIONS) && config.EVENT_LOCATIONS.length ? config.EVENT_LOCATIONS : ['Main Auditorium'];
-            descriptors = Array.isArray(config.EVENT_DESCRIPTORS) ? config.EVENT_DESCRIPTORS : [];
-            roomCapacity = config.ROOM_CAPACITY && typeof config.ROOM_CAPACITY === 'object' ? config.ROOM_CAPACITY : {};
-        } catch (error) {
-            rooms = ['Main Auditorium'];
-        }
-        const select = $('showtime-location');
-        select.replaceChildren(el('option', null, 'Choose a room...'));
-        select.firstChild.value = '';
-        rooms.forEach((room) => { const o = el('option', null, room); o.value = room; select.appendChild(o); });
-        const box = $('descriptors-checkboxes');
-        box.replaceChildren();
-        descriptors.forEach((d, i) => {
-            const wrap = el('span', 'descriptor-checkbox');
-            const input = el('input');
-            input.type = 'checkbox'; input.id = `descriptor-${i}`; input.value = d;
-            input.addEventListener('change', updatePreview);
-            const label = el('label', null, d);
-            label.htmlFor = input.id;
-            wrap.append(input, label);
-            box.appendChild(wrap);
-        });
-        $('descriptors-row').style.display = descriptors.length ? 'block' : 'none';
+        rooms = (await ShowtimeForm.load({ onChange: updatePreview })).rooms;
     }
 
     async function loadEvents(selectId) {
@@ -118,6 +73,7 @@
 
     async function showEvent(eventId) {
         stopEditing();
+        closeDetails();
         if (!eventId) { currentEvent = null; $('event-panel').style.display = 'none'; return; }
         try {
             const data = await api('GET', `/api/events/${eventId}`);
@@ -139,13 +95,132 @@
         $('event-panel').style.display = 'block';
         $('event-title').textContent = event.title;
         $('event-meta').textContent = [event.kind === 'movie' ? 'Movie' : 'Event', event.eventType, event.distributor, event.status === 'archived' ? 'Archived in Square (add a showtime to put it back on sale)' : null]
-            .filter(Boolean).join(' · ');
+            .filter((part, i, all) => part && all.findIndex((p) => String(p).toLowerCase() === String(part).toLowerCase()) === i) // no "Movie · Movie"
+            .join(' · ');
         const body = $('showings-body');
         body.replaceChildren();
         if (event.showings.length === 0) {
             const tr = el('tr'); const td = el('td', 'text-muted', 'No showtimes'); td.colSpan = 7; tr.appendChild(td); body.appendChild(tr);
         }
         event.showings.forEach((s) => body.appendChild(showingRow(s)));
+        // Delete deletes an event nothing was sold for; otherwise it ends it.
+        const upcoming = upcomingShowings(event).length;
+        const del = $('delete-event-btn');
+        del.textContent = event.ticketsEver > 0 ? 'End event' : 'Delete event';
+        del.style.display = event.ticketsEver > 0 && upcoming === 0 && event.status === 'archived' ? 'none' : '';
+    }
+
+    function upcomingShowings(event) {
+        return event.showings.filter((s) => !s.isPast && (s.status === 'on_sale' || s.status === 'sold_out'));
+    }
+
+    // ---- Event details: name, description, poster (here and in Square) ----
+    const MAX_POSTER_BYTES = 4 * 1024 * 1024; // the request limit is 6 MB, and base64 adds a third
+
+    function closeDetails() {
+        $('details-form').style.display = 'none';
+        $('details-poster').value = '';
+    }
+
+    function showPoster(url) {
+        $('details-poster-img').style.display = url ? '' : 'none';
+        $('details-no-poster').style.display = url ? 'none' : '';
+        if (url) $('details-poster-img').src = url; else $('details-poster-img').removeAttribute('src');
+    }
+
+    async function openDetails() {
+        if (!currentEvent) return;
+        const form = $('details-form');
+        const note = $('details-note');
+        // IndieTix's copy straight away; Square's (what customers see) once it loads.
+        $('details-title').value = currentEvent.title;
+        $('details-description').value = currentEvent.description || '';
+        showPoster(currentEvent.posterUrl);
+        $('details-poster').value = '';
+        note.style.display = 'none';
+        form.style.display = 'block';
+        $('details-title').focus();
+        const eventId = currentEvent.id;
+        try {
+            const { details } = await api('GET', `/api/events/${eventId}/details`);
+            if (!currentEvent || currentEvent.id !== eventId) return;
+            $('details-title').value = details.title;
+            $('details-description').value = details.description || '';
+            showPoster(details.imageUrl);
+            if (details.squareError) { note.textContent = details.squareError; note.style.display = 'block'; }
+        } catch (error) {
+            note.textContent = `Couldn't read Square just now (${error.message}); showing IndieTix's copy.`;
+            note.style.display = 'block';
+        }
+    }
+
+    function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('Could not read that file'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function saveDetails(e) {
+        e.preventDefault();
+        const title = $('details-title').value.trim();
+        if (!title) { UIDialogs.fieldError($('details-title'), 'The event needs a name'); return; }
+        UIDialogs.clearFieldError($('details-title'));
+        const body = { title, description: $('details-description').value };
+        const file = $('details-poster').files[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) { await UIDialogs.showMessage({ type: 'error', title: 'Not an image', message: 'Choose a JPEG or PNG for the poster.' }); return; }
+            if (file.size > MAX_POSTER_BYTES) { await UIDialogs.showMessage({ type: 'error', title: 'Poster too large', message: 'Choose an image under 4 MB.' }); return; }
+            body.posterDataUrl = await readFileAsDataUrl(file);
+        }
+        const button = $('details-save');
+        button.disabled = true;
+        try {
+            const data = await api('PUT', `/api/events/${currentEvent.id}`, body);
+            renderEvent(data.event);
+            closeDetails();
+            const what = data.changed.length ? `Updated in IndieTix and Square: ${data.changed.join(', ')}.` : 'Nothing had changed.';
+            await UIDialogs.showMessage({ type: 'success', title: 'Event saved', message: what });
+            if (data.changed.includes('name')) loadEvents(currentEvent.id);
+        } catch (error) {
+            await UIDialogs.showMessage({ type: 'error', title: 'Event not saved', message: error.message, details: error.details });
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async function deleteCurrentEvent() {
+        const event = currentEvent;
+        if (!event) return;
+        const upcoming = upcomingShowings(event);
+        const sold = upcoming.reduce((n, s) => n + s.sold, 0);
+        const ending = event.ticketsEver > 0;
+        const message = ending
+            ? `Tickets have been sold for "${event.title}", so it's ended rather than deleted, keeping its sales history and reports. ` +
+              `${upcoming.length ? `Its ${upcoming.length} upcoming showtime${upcoming.length === 1 ? '' : 's'} come${upcoming.length === 1 ? 's' : ''} off sale, and ` : ''}the item is archived in Square.` +
+              (sold > 0 ? ` ${sold} ticket${sold === 1 ? ' was' : 's were'} sold for upcoming showtimes and ${sold === 1 ? 'is' : 'are'} NOT refunded; refund ${sold === 1 ? 'it' : 'them'} from the Tickets page.` : '')
+            : `"${event.title}" has no tickets, so it's deleted completely: from IndieTix, and its item, showtimes and poster from Square. This can't be undone.`;
+        const ok = await UIDialogs.showConfirm({ title: ending ? 'End this event?' : 'Delete this event?', message, confirmText: ending ? 'End event' : 'Delete event', danger: true });
+        if (!ok) return;
+        try {
+            const data = await api('DELETE', `/api/events/${event.id}`);
+            if (data.action === 'deleted') {
+                await UIDialogs.showMessage({ type: 'success', title: 'Event deleted', message: `"${event.title}" is deleted here and in Square.` });
+                loadEvents();
+                return;
+            }
+            renderEvent(data.event);
+            const notes = [`${data.cancelledShowtimes} upcoming showtime${data.cancelledShowtimes === 1 ? '' : 's'} cancelled.`];
+            if (data.ticketsToRefund > 0) notes.push(`${data.ticketsToRefund} ticket${data.ticketsToRefund === 1 ? '' : 's'} for them still need${data.ticketsToRefund === 1 ? 's' : ''} a refund.`);
+            if (data.archived) notes.push('The item is archived in Square.');
+            if (data.archiveError) notes.push(data.archiveError);
+            await UIDialogs.showMessage({ type: data.archiveError ? 'warning' : 'success', title: 'Event ended', message: notes.join(' ') });
+            loadEvents(event.id);
+        } catch (error) {
+            await UIDialogs.showMessage({ type: 'error', title: ending ? 'Event not ended' : 'Event not deleted', message: error.message, details: error.details });
+        }
     }
 
     function showingRow(s) {
@@ -209,13 +284,9 @@
         cap.focus();
     }
 
-    function selectedExtras() {
-        return Array.from(document.querySelectorAll('#descriptors-checkboxes input:checked')).map((i) => i.value);
-    }
-
+    // The item's own style: extras inside the brackets for movies, after a dash for events.
     function currentLabel() {
-        const date = $('showtime-date').value; const time = $('showtime-time').value; const room = $('showtime-location').value;
-        return date && time && room ? formatShowtime(date, time, room, selectedExtras()) : '';
+        return ShowtimeForm.currentLabel(currentEvent?.kind);
     }
 
     function updatePreview() {
@@ -256,10 +327,9 @@
     async function submitForm(event) {
         event.preventDefault();
         if (!currentEvent) return;
-        if (!$('showtime-date').value) return UIDialogs.fieldError($('showtime-date'), 'Choose a date.');
-        if (!$('showtime-time').value) return UIDialogs.fieldError($('showtime-time'), 'Choose a time.');
-        if (!$('showtime-location').value) return UIDialogs.fieldError($('showtime-location'), 'Choose a room.');
-        const label = currentLabel();
+        const form = ShowtimeForm.read(currentEvent.kind);
+        if (!form) return;
+        const label = form.label;
         const button = $('form-submit');
         button.disabled = true;
         try {
@@ -267,7 +337,7 @@
             if (editingShowingId) {
                 data = await api('PUT', `/api/events/${currentEvent.id}/showings/${editingShowingId}`, { label });
             } else {
-                data = await api('POST', `/api/events/${currentEvent.id}/showings`, { label, capacity: $('showtime-capacity').value.trim(), heldSeats: $('showtime-held').value.trim() });
+                data = await api('POST', `/api/events/${currentEvent.id}/showings`, { label, capacity: form.capacity === null ? '' : String(form.capacity), heldSeats: String(form.heldSeats) });
             }
             stopEditing();
             renderEvent(data.event);
@@ -362,15 +432,16 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
         $('import-btn').addEventListener('click', runImport);
+        $('edit-details-btn').addEventListener('click', openDetails);
+        $('details-close').addEventListener('click', closeDetails);
+        $('details-form').addEventListener('submit', saveDetails);
+        $('delete-event-btn').addEventListener('click', deleteCurrentEvent);
         $('event-select').addEventListener('change', (e) => showEvent(e.target.value));
         $('show-archived').addEventListener('change', () => loadEvents($('event-select').value));
         $('showtime-form').addEventListener('submit', submitForm);
         $('form-cancel-edit').addEventListener('click', stopEditing);
         ['showtime-date', 'showtime-time'].forEach((id) => $(id).addEventListener('input', updatePreview));
-        $('showtime-location').addEventListener('change', () => {
-            if (!editingShowingId) $('showtime-capacity').value = seatsForRoom($('showtime-location').value);
-            updatePreview();
-        });
+        $('showtime-location').addEventListener('change', updatePreview); // seats follow the room in showtime-form.js
         await loadSettings();
         await loadEvents(new URLSearchParams(location.search).get('event'));
     });
