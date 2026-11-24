@@ -6,6 +6,13 @@ Finding an order, resending tickets, fixing contact details, refunds, cancellati
 
 **List Orders** shows every order, newest first: who bought, when, the total and its status, a page at a time (**Previous** and **Next**, and how many per page). Search by name, email, phone or order ID, filter by date (**Today Only**, **This Week**, or a range), and open **Order Details** to see the tickets on it. You need view or edit permission.
 
+## From a ticket to its order, and back
+
+- On **Manual Checkin / List Tickets**, the **Order** column links each ticket to its order on List Orders.
+- On **List Orders**, the order number links to all of that order's tickets.
+
+Either way a banner says what's shown; choose **Show all orders** or **Show all tickets** to go back to the full list.
+
 ![An order's Actions menu](images/order-actions.webp)
 
 ## Resend a ticket email
@@ -27,6 +34,7 @@ Only the buyer's name, email and phone can be changed on an order. Price and sho
 5. Choose **Process Refund**. Square returns the money to the buyer's card, the refunded tickets are refused at the door straight away, and the order shows who refunded it and why.
 
 - An order can only be refunded once.
+- Refunding, cancelling or deleting an order frees its seats. A showtime that had sold out goes back on sale (see [Seats and selling out](04-adding-movies-and-events.md#seats-and-selling-out)).
 - **Refund through IndieTix, not in Square's own dashboard or app.** A refund made in Square returns the money but doesn't stop the tickets working.
 
 ## Cancel or delete an order

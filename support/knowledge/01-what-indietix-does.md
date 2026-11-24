@@ -17,7 +17,7 @@ IndieTix is ticketing for independent cinemas, venues and promoters, built on Sq
 
 ## A night at the box office, start to finish
 
-1. **Add the show.** Staff add a movie or event once, with its showtimes ([Adding movies and events](04-adding-movies-and-events.md)). IndieTix creates the Square item.
+1. **Add the show.** Staff add a movie or event once, with its showtimes ([Adding movies and events](04-adding-movies-and-events.md)). IndieTix creates the Square item, and later changes happen on the [Showtimes page](04-adding-movies-and-events.md#the-showtimes-page).
 2. **Sell it.** Buyers pay through Square: online, at the register, or anywhere Square sells ([Selling tickets](03-selling-tickets.md)).
 3. **Deliver the ticket.** Within a minute or so the buyer gets a QR-code ticket by email, or by text if they've opted in.
 4. **Check people in.** Door staff scan tickets on a phone ([At the door](05-at-the-door.md)); [Today's Dashboard](05-at-the-door.md#todays-dashboard) shows sold and checked-in counts for each show.
@@ -37,6 +37,7 @@ IndieTix is ticketing for independent cinemas, venues and promoters, built on Sq
 | Insights | Questions about your sales in plain English | Admin permission |
 | Movie Info Lookup | Add a movie and its showtimes | Edit permission |
 | Event Info Entry | Add a live event and its showtimes | Edit permission |
+| Showtimes | Add, change, re-seat or cancel showtimes; edit or end a show | Edit permission |
 | Marketing Schedule | Plan and approve social and email posts | Marketing permission |
 | Email List | Marketing email subscribers | Marketing permission |
 | User Management | Staff accounts and permissions | Main login only |

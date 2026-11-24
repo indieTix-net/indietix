@@ -1,6 +1,6 @@
 # demo-data
 
-A made-up venue, **The Marquee** (a cinema with a live music room in fictional Riverton, KS), for showing IndieTix to people or trying it out: orders, tickets, customers, text opt-ins and sent-text logs, marketing posts, staff logins and box-office report data. By default it has 18 months of history, about 7,600 tickets, 4,400 orders and 2,150 customers, at least as busy as a real single-venue cinema. The size and kind of venue can be changed (below).
+A made-up venue, **The Marquee** (a cinema with a live music room in fictional Riverton, KS), for showing IndieTix to people or trying it out: orders, tickets, customers, text opt-ins and sent-text logs, marketing posts, staff logins, box-office report data, and the Showtimes page's shows (each title with its ticket types and showtimes, room seats, held seats and sold counts). By default it has 18 months of history, about 7,600 tickets, 4,400 orders and 2,150 customers, at least as busy as a real single-venue cinema. The size and kind of venue can be changed (below).
 
 Everyone in it is invented. Emails use the reserved `example.com`/`.org`/`.net` domains, phone numbers sit in the 555-0100 to 555-0199 range set aside for fiction, and IP addresses come from the documentation ranges, so nothing can reach a real inbox or phone. Repertory titles are public-domain films; the new releases, live acts and distributors are invented. The tests check all of this.
 

@@ -100,6 +100,37 @@ test('loading again resets the venue (a guest\'s changes are gone)', async () =>
   assert.equal(next.rows[0].ID, demo.tables.Order.length + 1);
 });
 
+test('the Showtimes page has the venue\'s shows: every ticket on a real showing, sold counts and seats add up', async () => {
+  await load(demo);
+  const { Event, Showing, ExternalCatalogLink, QRCodeProduct } = demo.tables;
+  const showingIds = new Set(Showing.map((s) => s.ID));
+  assert.ok(QRCodeProduct.every((t) => showingIds.has(t.ShowingID)), 'every ticket has its showing');
+  const external = ExternalCatalogLink.map((l) => l.ExternalID);
+  assert.equal(new Set(external).size, external.length, 'each Square id is linked once (the table requires it)');
+  // The label format QRScanner's parseShowtimeLabel reads: "Fri 11-13-2026 7:00 PM (Main Auditorium)".
+  for (const s of Showing) {
+    const m = /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat) (\d{2})-(\d{2})-(\d{4}) (\d{1,2}):(\d{2}) (AM|PM) \(([^()]+)\)$/.exec(s.Label);
+    assert.ok(m, `label "${s.Label}"`);
+    const hour = (Number(m[5]) % 12) + (m[7] === 'PM' ? 12 : 0);
+    assert.equal(`${m[4]}-${m[2]}-${m[3]} ${String(hour).padStart(2, '0')}:${m[6]}:00`, s.StartsAt);
+    assert.equal(m[8], s.Venue);
+  }
+  const nowWall = '2026-11-08 12:00:00'; // NOW in Chicago
+  const upcoming = Showing.filter((s) => s.StartsAt > nowWall);
+  assert.ok(upcoming.length > 5 && upcoming.every((s) => ['on_sale', 'sold_out'].includes(s.Status)));
+  assert.ok(Showing.filter((s) => s.StartsAt < nowWall).every((s) => s.Status === 'expired'));
+  const activeIds = new Set(upcoming.map((s) => s.EventID));
+  assert.ok(Event.every((e) => (e.Status === 'active') === activeIds.has(e.ID)), 'titles with upcoming showtimes are active, the rest archived');
+  // In the database: sold never exceeds what's for sale, and each ticket's stored showtime modifier is its showing's.
+  const db = await client.query(`
+    SELECT
+      (SELECT count(*)::int FROM "Showing" s WHERE s."Capacity" - s."HeldSeats" < (SELECT count(*) FROM "QRCodeProduct" q WHERE q."ShowingID" = s."ID" AND q."Status" = 'valid') AND s."Status" <> 'expired') AS oversold,
+      (SELECT count(*)::int FROM "QRCodeProduct" q JOIN "ExternalCatalogLink" l ON l."EntityType" = 'showing' AND l."EntityID" = q."ShowingID"
+        WHERE NOT q."ProductMetadata" @> jsonb_build_object('modifiers', jsonb_build_array(jsonb_build_object('catalog_object_id', l."ExternalID")))) AS mismatched`);
+  assert.deepEqual(db.rows[0], { oversold: 0, mismatched: 0 });
+  assert.equal(demo.settings.ROOM_CAPACITY['Main Auditorium'], 220);
+});
+
 test('a venue missing a newer table (onboarded by older code) still loads', async () => {
   await client.query('DROP TABLE "PrivacyRequest"');
   await load(demo);
