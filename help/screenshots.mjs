@@ -61,6 +61,20 @@ async function openFirstActions(page) {
   await pause(600);
 }
 
+// The Showtimes page with a show picked: the first one with upcoming
+// showtimes in the Main Auditorium (the demo's busiest room), else the first.
+async function pickShow(page) {
+  await page.waitForFunction(() => document.querySelectorAll('#event-select option').length > 1, { timeout: 20000 });
+  const value = await page.evaluate(() => {
+    const options = [...document.querySelectorAll('#event-select option')].filter(o => o.value);
+    return (options.find(o => !/\(0 upcoming/.test(o.textContent) && /Main Auditorium/.test(o.textContent)) || options.find(o => !/\(0 upcoming/.test(o.textContent)) || options[0]).value;
+  });
+  await page.select('#event-select', value);
+  await page.waitForFunction(() => document.querySelectorAll('#showings-body tr').length > 0 && document.getElementById('event-panel').offsetParent, { timeout: 20000 });
+  await settle(page);
+}
+const showtimesPanel = (page) => page.$('#event-panel .showtimes-panel');
+
 // name -> how to get there. Names match the images the guide uses.
 const SHOTS = [
   { name: 'login', login: null, url: '/login.html', before: async (p) => {
@@ -87,6 +101,15 @@ const SHOTS = [
   { name: 'insights', login: 'venue', url: '/insights.html' },
   { name: 'movie-lookup', login: 'venue', url: '/getMovieInfo.html' },
   { name: 'event-entry', login: 'venue', url: '/getEventInfo.html' },
+  { name: 'showtimes', login: 'venue', url: '/showtimes.html', before: pickShow, element: showtimesPanel },
+  { name: 'event-details', login: 'venue', url: '/showtimes.html', element: showtimesPanel, before: async (p) => {
+    await pickShow(p);
+    await p.click('#edit-details-btn');
+    await p.waitForSelector('#details-form', { visible: true });
+    await settle(p);
+    // The demo venue isn't connected to Square, so the form notes it's showing IndieTix's copy; a real venue sees Square's.
+    await p.evaluate(() => { document.getElementById('details-note').style.display = 'none'; });
+  } },
   { name: 'marketing', login: 'venue', url: '/marketing.html' },
   { name: 'user-management', login: 'venue', url: '/user-management.html' },
   { name: 'create-user', login: 'venue', url: '/user-management.html', before: async (p) => { await clickText(p, 'Create New User'); } },

@@ -14,7 +14,7 @@ Pages appear in file-name order. Each starts with one `#` title; `##` headings b
 | `01-what-indietix-does.md` | What IndieTix is, a night at the box office start to finish, the menu |
 | `02-getting-started.md` | Signing up, logging in, the first settings to fill in |
 | `03-selling-tickets.md` | Connect Square, where tickets sell, pickup only, what the buyer gets |
-| `04-adding-movies-and-events.md` | Add a movie or event step by step, ticket types, and how a ticket item is built in Square |
+| `04-adding-movies-and-events.md` | Add a movie or event step by step, the Showtimes page (showtimes, seats, edit / delete / end a show, bring in Square items), ticket types, and how a ticket item is built in Square |
 | `05-at-the-door.md` | Scanning, manual check-in, Today's Dashboard, skeleton keys, printing |
 | `06-orders-refunds-and-resends.md` | Resend, edit, refund, cancel, transfer, print an order |
 | `07-reports-and-insights.md` | Event Report, Insights, nightly distributor reports |

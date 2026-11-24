@@ -18,6 +18,16 @@ Common problems at the box office and how to fix them.
 
 **Movie Info Lookup doesn't find anything.** It needs an OMDB API key in **Client Settings → API Configuration**. Try the title without "The", or add the year.
 
+**A showtime won't let me change its time.** A ticket has been sold for it, and that ticket shows the current time. Cancel the showtime and add a new one on the [Showtimes page](04-adding-movies-and-events.md#the-showtimes-page), then refund or transfer the affected tickets.
+
+**A show I made in Square isn't on the Showtimes page.** Choose **Bring in existing Square items** there. If it still isn't listed, its Show Time list is probably shared with another item ([Bring in shows already in Square](04-adding-movies-and-events.md#bring-in-shows-already-in-square)).
+
+**The Delete button says "End event".** Tickets have been sold for that show, so it can only be ended (taken off sale and archived), not deleted, to keep its sales history.
+
+**A showtime sold out but there are seats left.** Check its **Capacity** and **Held seats** on the Showtimes page, and the room's **Seats** in Client Settings → Event Locations. Raising the capacity puts it straight back on sale.
+
+**Support says a show was changed in Square.** Its showtimes, name, description or poster were changed directly in Square. Make the change on the Showtimes page instead, or undo it in Square.
+
 **Add Movie or Add Event says a Distributor choice is missing.** The name in **Client Settings → Square Ticket Items** isn't one of the Distributor attribute's choices in Square. Add the choice in Square and set it on the item.
 
 **A refund in Square didn't stop the ticket.** Refunds made in Square's own dashboard or app don't cancel IndieTix tickets. Use **Mark as Invalid** on the ticket, and refund through IndieTix next time.

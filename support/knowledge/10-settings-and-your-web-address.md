@@ -14,7 +14,7 @@
 | Theater Settings | Names, logo and the box-office report details |
 | Square Ticket Items | Ticket types, prices and distributors for new movies and events |
 | Social Media Integration | Facebook, Instagram and TikTok accounts for marketing posts |
-| Event Locations | Your rooms or stages |
+| Event Locations | Your rooms or stages, each with its **Seats** (the starting capacity of a new showtime there), and **Stop selling a showtime when it's full** ([Seats and selling out](04-adding-movies-and-events.md#seats-and-selling-out)) |
 | Event Descriptors | Labels for showtimes, such as "Closed Caption" or "21+" |
 | User Names | The names in the refund form's "Processed By" list |
 | Ticket Settings | Ticket layout (portrait or landscape) |

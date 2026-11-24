@@ -330,6 +330,11 @@ export function generateDemo({ seed = 20260401, now = new Date(), clientId, site
   const today = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth(), nowLocal.getUTCDate()));
   const shows = buildShowtimes(rand, today, options);
   planSales(rand, shows, now, options);
+  // IndieTix's own copy of each show (native events): ids for the showtime
+  // modifiers and showings, from a separate stream so the rest of the venue
+  // is the same as before these tables existed.
+  const nativeRand = makeRandom(seed + 1);
+  shows.forEach((show, i) => { show.showingId = i + 1; show.modifierId = nativeRand.squareId(); });
 
   // Orders and customers: from customers x orders per customer when given,
   // otherwise from the usual 1.75 tickets an order.
@@ -413,7 +418,7 @@ export function generateDemo({ seed = 20260401, now = new Date(), clientId, site
         const details = showtimeLabel(show.local, show.item.room);
         const lineItem = {
           uid: lineUid, name: show.item.name, quantity: '1', item_type: 'ITEM',
-          modifiers: [{ uid: rand.uuid(), name: details, quantity: '1', base_price_money: money(0), total_price_money: money(0) }],
+          modifiers: [{ uid: rand.uuid(), name: details, quantity: '1', base_price_money: money(0), total_price_money: money(0), catalog_object_id: show.modifierId }],
           location_id: DEMO_VENUE.locationId, variation_name: v.name, catalog_object_id: v.id,
           base_price_money: money(cents), gross_sales_money: money(cents), total_money: money(cents),
           total_tax_money: money(0), total_discount_money: money(0), variation_total_price_money: money(cents)
@@ -433,7 +438,7 @@ export function generateDemo({ seed = 20260401, now = new Date(), clientId, site
           ProductPrice: v.price, ProductID: show.item.productId, EmailAddress: orderRow.EmailAddress,
           FirstName: orderRow.FirstName, LastName: orderRow.LastName, PhoneNumber: orderRow.PhoneNumber,
           Distributor: show.item.distributor, ProductVenue: show.item.room, ProductSeatCode: v.name,
-          Status: 'valid', CustomerID: orderRow.CustomerID
+          Status: 'valid', CustomerID: orderRow.CustomerID, ShowingID: show.showingId
         };
         tickets.push(ticket);
         orderTickets.push(ticket);
@@ -579,14 +584,18 @@ export function generateDemo({ seed = 20260401, now = new Date(), clientId, site
     EVENT_TICKET_TYPES: JSON.stringify([{ name: 'General Admission', price: '15.00' }, { name: 'VIP', price: '35.00' }]),
     USERS_NAMES: STAFF.filter(u => u.permissions.view).map(u => `${u.first} ${u.last}`),
     EVENT_DESCRIPTORS: ['Closed Caption', '21+', 'All Ages', 'Q&A After'],
+    ROOM_CAPACITY: { [DEMO_VENUE.rooms.main]: 220, [DEMO_VENUE.rooms.studio]: 60, [DEMO_VENUE.rooms.lounge]: 150 }, ENFORCE_CAPACITY: 'true',
     LEGAL_NAME: DEMO_VENUE.legalName, LEGAL_SHORT_NAME: DEMO_VENUE.name, LEGAL_ADDRESS: `100 Example Street, ${DEMO_VENUE.city} 00000`,
     LEGAL_PHONE: '(785) 555-0100', LEGAL_EMAIL: 'hello@example.com', LEGAL_STATE: 'Kansas', LEGAL_COURT_COUNTY: 'Example County'
   };
+
+  const native = buildNativeEvents(nativeRand, shows, tickets, now);
 
   return {
     venue: DEMO_VENUE, settings,
     tables: {
       Customer: customers, Order: orders, QRCodeProduct: tickets, QRCodeProductToOrder: links,
+      Event: native.events, TicketType: native.ticketTypes, Showing: native.showings, ExternalCatalogLink: native.catalogLinks,
       SmsConsent: consents, SmsOutboundLog: smsLog, MarketingPost: posts, MarketingEmailContact: emailContacts,
       SkeletonKey: skeletonKeys, SkeletonKeyUsage: skeletonUsage, Users: users
     },
@@ -598,6 +607,61 @@ export function generateDemo({ seed = 20260401, now = new Date(), clientId, site
       showtimes: { movie: shows.filter(x => x.item.type === 'Movie').length, live: shows.filter(x => x.item.type === 'Live').length }
     }
   };
+}
+
+// ---- native events: the Showtimes page's Event / TicketType / Showing rows ----
+// One Event per show title, its ticket types, one Showing per showtime and
+// the (made-up) Square ids each is linked to, as Add Movie / Add Event and
+// the import would leave them. Past showings are expired; a title with
+// nothing upcoming is archived, as the nightly job leaves it.
+function buildNativeEvents(rand, shows, tickets, now) {
+  const sold = new Map();
+  for (const t of tickets) if (t.Status === 'valid') sold.set(t.ShowingID, (sold.get(t.ShowingID) || 0) + 1);
+  const events = [], ticketTypes = [], showings = [], catalogLinks = [];
+  const link = (EntityType, EntityID, ExternalType, ExternalID, deleted = null) => catalogLinks.push({
+    ID: catalogLinks.length + 1, EntityType, EntityID, Provider: 'square', ExternalType, ExternalID,
+    CreatedAt: deleted?.created || sqlTime(now), DeletedAt: deleted?.at || null, DeletedReason: deleted?.reason || null
+  });
+  const byItem = new Map();
+  for (const show of shows) {
+    if (!byItem.has(show.item)) byItem.set(show.item, []);
+    byItem.get(show.item).push(show);
+  }
+  for (const [item, itemShows] of byItem) {
+    const first = itemShows[0];
+    const createdAt = sqlTime(toUtc(new Date(first.local.getTime() - 14 * DAY)));
+    const upcoming = itemShows.some(sh => toUtc(sh.local) > now);
+    const event = {
+      ID: events.length + 1, Kind: item.type === 'Movie' ? 'movie' : 'event', Title: item.name, EventType: item.type,
+      Distributor: item.distributor, ImdbID: null,
+      Description: item.type === 'Movie' ? `${item.name.replace(/ \(\d{4}\)$/, '')} in the ${item.room} at ${DEMO_VENUE.name}.` : `Live in ${item.room} at ${DEMO_VENUE.name}.`,
+      PosterUrl: null, Status: upcoming ? 'active' : 'archived', CreatedBy: 'demo', CreatedAt: createdAt, UpdatedAt: createdAt
+    };
+    events.push(event);
+    link('event', event.ID, 'ITEM', item.productId);
+    link('event', event.ID, 'MODIFIER_LIST', rand.squareId());
+    item.variations.forEach((v, i) => {
+      const id = ticketTypes.length + 1;
+      ticketTypes.push({ ID: id, EventID: event.ID, Name: v.name, PriceCents: Math.round(v.price * 100), SortOrder: i });
+      link('ticket_type', id, 'ITEM_VARIATION', v.id);
+    });
+    for (const show of itemShows) {
+      const past = toUtc(show.local) < now;
+      const n = sold.get(show.showingId) || 0;
+      // A couple of seats held for passes on main-room shows.
+      const held = show.item.room === DEMO_VENUE.rooms.main && !past ? 4 : 0;
+      const full = !past && n >= show.capacity - held;
+      showings.push({
+        ID: show.showingId, EventID: event.ID, StartsAt: sqlTime(show.local), Venue: show.item.room, Descriptors: '',
+        Label: showtimeLabel(show.local, show.item.room), Capacity: show.capacity, HeldSeats: held,
+        Status: past ? 'expired' : full ? 'sold_out' : 'on_sale', SoldOutAt: full ? sqlTime(now) : null, CreatedAt: createdAt
+      });
+      // Square no longer has it: removed a few hours after it started, or when it sold out.
+      const closedAt = past ? new Date(Math.min(toUtc(show.local).getTime() + 5 * 3600000, now.getTime())) : now;
+      link('showing', show.showingId, 'MODIFIER', show.modifierId, past || full ? { at: sqlTime(closedAt), reason: full ? 'sold_out' : 'expired' } : null);
+    }
+  }
+  return { events, ticketTypes, showings, catalogLinks };
 }
 
 // ---- SQL ----
@@ -616,7 +680,8 @@ function literal(column, value) {
 }
 
 // Every venue table the demo fills (Client keeps its row, with settings merged in).
-export const RESET_TABLES = ['QRCodeProductToOrder', 'QRCodeProduct', 'Order', 'Customer', 'SmsConsent', 'SmsOutboundLog',
+export const RESET_TABLES = ['ExternalCatalogLink', 'Showing', 'TicketType', 'Event', 'NoTicketOrder',
+  'QRCodeProductToOrder', 'QRCodeProduct', 'Order', 'Customer', 'SmsConsent', 'SmsOutboundLog',
   'MarketingSchedule', 'MarketingPost', 'MarketingEmailContact', 'SkeletonKeyUsage', 'SkeletonKey', 'Users',
   'ApiIdempotency', 'ApiKey', 'PrivacyRequest'];
 const ID_COLUMN = { SkeletonKey: 'id', SkeletonKeyUsage: 'id' };
