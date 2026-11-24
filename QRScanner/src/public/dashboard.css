@@ -229,6 +229,11 @@ body {
     color: #28a745;
 }
 
+/* Seats left: only on IndieTix's own showings with a capacity */
+.dash-stat--seats {
+    background: rgba(13, 110, 253, 0.14);
+}
+
 .dash-stat__label {
     margin-top: 4px;
     font-size: 0.72rem;
@@ -343,3 +348,10 @@ body {
    this page's old override (margin: 20px 0) fought that rule's
    position:fixed centering, nudging the spinner off-center. Removed
    2026-10-26, standardizing on the one shared style everywhere. */
+
+/* After .dash-badge so its colors win */
+.dash-badge--soldout {
+    background: rgba(220, 53, 69, 0.25);
+    color: #ff8a95;
+    font-weight: 700;
+}

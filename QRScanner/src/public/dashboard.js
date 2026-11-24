@@ -127,6 +127,14 @@ document.addEventListener('DOMContentLoaded', function () {
             .join('');
 
         const runtimeText = ev.runtime ? escapeHtml(ev.runtime + ' min') : '';
+        // IndieTix's own showings carry capacity (absent for a filtered login or a Square-only showtime).
+        const hasSeats = ev.capacity !== undefined && ev.capacity !== null && ev.available !== undefined && ev.available !== null;
+        const seatsStat = hasSeats ? `
+                    <div class="dash-stat dash-stat--seats" title="${escapeHtml(`${ev.capacity} ${ev.capacity === 1 ? 'seat' : 'seats'}${ev.heldSeats ? `, ${ev.heldSeats} held` : ''}`)}">
+                        <span class="dash-stat__num">${Number(ev.available) || 0}</span>
+                        <span class="dash-stat__label">Seats Left</span>
+                    </div>` : '';
+        const soldOutBadge = ev.status === 'sold_out' ? '<span class="dash-badge dash-badge--soldout">Sold out</span>' : '';
 
         return `
             <article class="dash-card${complete ? ' is-complete' : ''}" data-key="${escapeHtml(cardKey(ev))}">
@@ -143,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="dash-stat dash-stat--checked">
                         <span class="dash-stat__num">${checked}</span>
                         <span class="dash-stat__label">Checked In</span>
-                    </div>
+                    </div>${seatsStat}
                 </div>
                 <div class="dash-progress" role="progressbar"
                      aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
@@ -151,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <footer class="dash-card__foot">
                     <span class="dash-card__pct">${pct}% checked in</span>
-                    <span class="dash-card__meta">${runtimeText}${badges}</span>
+                    <span class="dash-card__meta">${runtimeText}${soldOutBadge}${badges}</span>
                 </footer>
             </article>`;
     }
