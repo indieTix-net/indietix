@@ -9,8 +9,6 @@ import {
 } from "@aws-sdk/client-s3";
 import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import nodemailer from 'nodemailer';
-import { defaultProvider } from '@aws-sdk/credential-provider-node';
 import mailcomposer from 'mailcomposer';
 import pg from 'pg';
 import crypto from 'crypto';
@@ -148,11 +146,6 @@ async function getClientConfiguration(pool, clientId) {
     throw error;
   }
 }
-
-// Create a Nodemailer transporter using AWS SES
-const transporter = nodemailer.createTransport({
-  SES: { ses: sesClient, aws: { defaultProvider } }
-});
 
 // A walk-up/cash sale with no captured buyer email falls back to
 // clientConfig.OWNER_BCC_EMAIL if the client has one set (see
