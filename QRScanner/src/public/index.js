@@ -51,6 +51,72 @@ document.addEventListener('DOMContentLoaded', function() {
     const now = new Date();
     return now.toLocaleTimeString('en-US', { hour12: false });
   };
+
+  // ---- CHECK-IN DETAILS AND SHOWTIME WARNING ----
+  // A single lower tone: "look at the screen", not "no".
+  const playWarningSound = () => {
+    playSound(520, 0.12, 'warning');
+    setTimeout(() => playSound(520, 0.12, 'warning'), 180);
+  };
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // "The Long Night · Fri, Nov 28, 7:30 PM"
+  const ticketLine = (data) => [data.productName, data.showtime].filter(Boolean).join(' \u00b7 ');
+  // "by guest at 7:42 PM" for an already-checked-in ticket, when known.
+  const checkedInByText = (data) => {
+    if (!data.checkedInBy && !data.checkedInAt) return '';
+    const at = data.checkedInAt ? new Date(data.checkedInAt) : null;
+    const when = at ? at.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+    return [data.checkedInBy ? `by ${data.checkedInBy}` : '', when ? `at ${when}` : ''].filter(Boolean).join(' ');
+  };
+  const showtimeWarningText = (data) => {
+    const what = data.reason === 'other_day' ? 'This ticket is for another day'
+      : data.reason === 'later_show' ? 'This ticket is for a later show'
+      : 'This ticket is for an earlier show';
+    return `${what}: ${ticketLine(data)}`;
+  };
+  // The ticket is for another day or show: ask the door person. "Admit
+  // anyway" checks it in (logged as an override); "Don't admit" leaves it.
+  // Scanning waits until they choose, so the next ticket isn't missed.
+  const askShowtimeOverride = (qrCode, data, { auto }) => {
+    playWarningSound();
+    scanningPaused = true;
+    const readerElement = document.getElementById('reader');
+    if (readerElement) readerElement.style.border = '4px solid #f0ad4e';
+    const message = showtimeWarningText(data);
+    if (auto) {
+      resultContainer.innerHTML = `<span style="color: #f0ad4e; font-weight: bold;">[${getTimestamp()}] ! ${esc(message)}</span>`;
+    } else {
+      displayMessage(message, 'warning');
+    }
+    actionContainer.innerHTML = '';
+    const group = document.createElement('div');
+    group.className = 'status-button-group';
+    const admit = document.createElement('button');
+    admit.textContent = 'Admit anyway';
+    admit.className = 'action-button check-in-button';
+    admit.onclick = async () => {
+      actionContainer.innerHTML = '';
+      await sendCheckIn(qrCode, { auto, override: true });
+      if (auto) { scanningPaused = false; if (readerElement) readerElement.style.border = '2px solid #ddd'; }
+    };
+    const skip = document.createElement('button');
+    skip.textContent = "Don't admit";
+    skip.className = 'action-button restart-button';
+    skip.onclick = () => {
+      actionContainer.innerHTML = '';
+      if (auto) {
+        resultContainer.innerHTML = `<span style="color: #dc3545; font-weight: bold;">[${getTimestamp()}] \u2717 Not admitted: ${esc(ticketLine(data))}</span>`;
+        scanningPaused = false;
+        if (readerElement) readerElement.style.border = '2px solid #ddd';
+      } else {
+        startScanner();
+      }
+    };
+    group.appendChild(admit);
+    group.appendChild(skip);
+    actionContainer.appendChild(group);
+  };
+  // ---- END CHECK-IN DETAILS AND SHOWTIME WARNING ----
   
   // Improved QR scanning configuration - optimized for detection speed
   const getOptimalConfig = () => {
@@ -395,7 +461,10 @@ document.addEventListener('DOMContentLoaded', function() {
       displayMessage("No QR code scanned yet", "error");
       return;
     }
-    
+    return sendCheckIn(lastScannedCode, { auto: false, override: false });
+  };
+
+  const performManualCheckIn = async (qrCode, override) => {
     // Show loading state
     const statusElement = document.getElementById("check-in-status") || createStatusElement();
     statusElement.textContent = "Processing check-in...";
@@ -407,7 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ qrCode: lastScannedCode })
+        body: JSON.stringify({ qrCode, override, source: 'scanner' })
       });
       
       // Handle cancelled request
@@ -415,8 +484,11 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Handle different response statuses
       switch(data.returnStatus) {
+        case 'needs_confirm_showtime':
+          askShowtimeOverride(qrCode, data, { auto: false });
+          break;
         case 'successful_checkin':
-          displayMessage("Successfully checked in!", "success");
+          displayMessage(`Checked in${data.overridden ? ' (admitted anyway)' : ''}: ${ticketLine(data) || 'ticket'}`, "success");
           // Unpause scanner and prepare for next scan
           setTimeout(() => {
             startScanner(); // This will unpause and reset border
@@ -433,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function() {
           displayMessage("QR code not found in the system", "error");
           break;
         case 'failed_already_checked_in':
-          displayMessage("Already checked in", "warning");
+          displayMessage(`Already checked in ${checkedInByText(data)}`.trim(), "warning");
           break;
         case 'failed_expired_qrcode':
           displayMessage("QR code has expired", "error");
@@ -456,7 +528,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
   
-  const performAutoCheckIn = async (qrCode) => {
+  const performAutoCheckIn = async (qrCode) => sendCheckIn(qrCode, { auto: true, override: false });
+
+  // Every scanner check-in goes through here: manual (Check In button) or
+  // auto (scan = check in), first try or "Admit anyway".
+  const sendCheckIn = async (qrCode, { auto, override }) => {
+    if (!auto) return performManualCheckIn(qrCode, override);
+    return performAutoCheckInRequest(qrCode, override);
+  };
+
+  const performAutoCheckInRequest = async (qrCode, override) => {
     console.log('performAutoCheckIn called for:', qrCode);
     
     // Clear any action buttons (shouldn't show buttons in auto-checkin mode)
@@ -468,7 +549,7 @@ document.addEventListener('DOMContentLoaded', function() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ qrCode: qrCode })
+        body: JSON.stringify({ qrCode, override, source: 'scanner' })
       });
       
       // Handle cancelled request
@@ -483,8 +564,11 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Handle different response statuses
       switch(data.returnStatus) {
+        case 'needs_confirm_showtime':
+          askShowtimeOverride(qrCode, data, { auto: true });
+          break;
         case 'successful_checkin':
-          resultContainer.innerHTML = `<span style="color: #28a745; font-weight: bold;">[${timestamp}] ✓ Checked in successfully</span>`;
+          resultContainer.innerHTML = `<span style="color: #28a745; font-weight: bold;">[${timestamp}] ✓ Checked in${data.overridden ? ' (admitted anyway)' : ''}${ticketLine(data) ? ': ' + esc(ticketLine(data)) : ''}</span>`;
           playSuccessSound();
           break;
         case 'successful_skeleton_key_checkin':
@@ -496,7 +580,7 @@ document.addEventListener('DOMContentLoaded', function() {
           playErrorSound();
           break;
         case 'failed_already_checked_in':
-          resultContainer.innerHTML = `<span style="color: #dc3545; font-weight: bold;">[${timestamp}] ✗ Already checked in</span>`;
+          resultContainer.innerHTML = `<span style="color: #dc3545; font-weight: bold;">[${timestamp}] ✗ Already checked in ${esc(checkedInByText(data))}</span>`;
           playErrorSound();
           break;
         case 'failed_expired_qrcode':

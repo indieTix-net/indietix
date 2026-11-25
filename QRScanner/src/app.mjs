@@ -2027,8 +2027,99 @@ app.get('/api/product_by_qrcode', requireAuth, requirePermission(...PERMS_DOOR),
 
 
 // QR code check-in (authenticated)
+// ---- CHECK-IN SAFEGUARDS ----
+// A ticket checks in without a question only near its own showtime: from
+// CHECKIN_EARLY_HOURS before it starts to CHECKIN_LATE_HOURS after. Outside
+// that (another day, or an earlier/later show today) the scanner asks the
+// door person first, and they can admit anyway (logged as an override).
+// ProductDate is venue wall-clock with no timezone, so both sides are
+// compared as venue wall-clock. A ticket with no date isn't checked.
+const CHECKIN_EARLY_HOURS = 4;
+const CHECKIN_LATE_HOURS = 4;
+
+function venueWallClockNow(now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: venueTz(), year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(now).map(p => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+// productDateText: 'YYYY-MM-DDTHH:MM:SS' venue wall-clock, or null.
+// Returns null when the ticket is fine to check in now, else
+// { reason: 'other_day' | 'earlier_show' | 'later_show', showDate, showtime }.
+function showtimeMismatch(productDateText, nowText) {
+  if (!productDateText) return null;
+  const show = Date.parse(`${productDateText}Z`);
+  const now = Date.parse(`${nowText}Z`);
+  if (Number.isNaN(show) || Number.isNaN(now)) return null;
+  const hours = (show - now) / 3600000;
+  if (hours <= CHECKIN_EARLY_HOURS && hours >= -CHECKIN_LATE_HOURS) return null;
+  const showtime = showtimeMismatchLabel(productDateText);
+  const reason = productDateText.slice(0, 10) !== nowText.slice(0, 10) ? 'other_day' : (hours > 0 ? 'later_show' : 'earlier_show');
+  return { reason, showDate: productDateText.slice(0, 10), showtime };
+}
+
+function showtimeMismatchLabel(productDateText) {
+  const d = new Date(`${productDateText}Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+const CHECKIN_SOURCES = new Set(['scanner', 'manual', 'api']);
+
+// One row per check-in, check-out or refused check-in of a real ticket:
+// who (login), from where (scanner, manual list, API key), and whether the
+// showtime warning was overridden. Best effort: a venue database without
+// the table yet (42P01) or any logging error never blocks the door.
+async function logCheckIn(pool, req, { ticketId, action, result, override = false, overrideReason = null, source }) {
+  if (!ticketId) return;
+  try {
+    const isClient = req.user?.userType === 'client';
+    await pool.query(
+      `INSERT INTO "CheckInLog" ("QRCodeProductID", "Action", "Result", "Override", "OverrideReason", "UserType", "UserID", "ApiKeyID", "Source", "IPAddress")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [ticketId, action, result, override, overrideReason,
+       req.apiKey ? 'api' : (isClient ? 'client' : 'user'),
+       isClient ? null : (req.user?.userId ?? null),
+       req.apiKey?.id ?? null,
+       CHECKIN_SOURCES.has(source) ? source : 'scanner',
+       String(req.ip || '').slice(0, 64) || null]
+    );
+  } catch (error) {
+    if (error.code !== '42P01') console.error('CheckInLog write failed:', error.message);
+  }
+}
+
+// Who checked this ticket in last, and when: { checkedInBy, checkedInAt }
+// ("Main login", a staff username, "API key: <name>"), or {} if unknown.
+async function lastCheckIn(pool, ticketId) {
+  try {
+    const r = await pool.query(
+      `SELECT l."CreatedAt", l."UserType", u."Username", k."Name" AS "KeyName"
+         FROM "CheckInLog" l
+         LEFT JOIN "Users" u ON u."ID" = l."UserID"
+         LEFT JOIN "ApiKey" k ON k."ID" = l."ApiKeyID"
+        WHERE l."QRCodeProductID" = $1 AND l."Action" = 'check_in' AND l."Result" = 'successful_checkin'
+        ORDER BY l."ID" DESC LIMIT 1`, [ticketId]);
+    if (r.rows.length === 0) return {};
+    const row = r.rows[0];
+    const who = row.UserType === 'client' ? 'Main login'
+      : row.UserType === 'api' ? `API key${row.KeyName ? `: ${row.KeyName}` : ''}`
+      : (row.Username || 'Staff login');
+    return { checkedInBy: who, checkedInAt: new Date(row.CreatedAt).toISOString() };
+  } catch {
+    return {};
+  }
+}
+// ---- END CHECK-IN SAFEGUARDS ----
+
 app.post('/api/checkin', requireAuth, requirePermission(...PERMS_DOOR), async (req, res) => {
   const { qrCode, eventName, notes } = req.body;
+  // override: the door person saw the showtime warning and chose to admit
+  // anyway. source: which screen asked ('scanner' or 'manual').
+  const override = req.body.override === true;
+  const source = req.body.source === 'manual' ? 'manual' : 'scanner';
   console.log('QR Code:', qrCode);
   if (!qrCode) {
     return res.status(400).json({ 
@@ -2044,7 +2135,9 @@ app.post('/api/checkin', requireAuth, requirePermission(...PERMS_DOOR), async (r
     
     // Check if QR code exists and its status
     const checkResult = await userPool.query(
-      'SELECT "ID", "CheckedIn", "ExpirationDate", "ProductVenue", "ProductName", "Status" FROM "QRCodeProduct" WHERE "QRCode" = $1',
+      `SELECT "ID", "CheckedIn", "ExpirationDate", "ProductVenue", "ProductName", "Status",
+              to_char("ProductDate", 'YYYY-MM-DD"T"HH24:MI:SS') AS "ProductDateText"
+         FROM "QRCodeProduct" WHERE "QRCode" = $1`,
       [qrCode]
     );
     
@@ -2063,19 +2156,25 @@ app.post('/api/checkin', requireAuth, requirePermission(...PERMS_DOOR), async (r
       // Refunded, cancelled, deleted and transferred tickets used to scan in
       // as if nothing had happened -- this route never looked at Status.
       const ticketStatus = qrCodeRecord.Status || 'valid';
-      if (ticketStatus !== 'valid') {
+      const refuse = async (body) => {
+        await logCheckIn(userPool, req, { ticketId: qrCodeRecord.ID, action: 'refused', result: body.returnStatus, source });
         await userPool.end();
-        return res.json({
-          returnStatus: 'failed_ticket_not_valid',
-          ticketStatus,
-          productName: qrCodeRecord.ProductName
-        });
+        return res.json(body);
+      };
+      const ticketInfo = {
+        productName: qrCodeRecord.ProductName,
+        location: qrCodeRecord.ProductVenue,
+        showDate: qrCodeRecord.ProductDateText ? qrCodeRecord.ProductDateText.slice(0, 10) : null
+      };
+      if (ticketStatus !== 'valid') {
+        return refuse({ returnStatus: 'failed_ticket_not_valid', ticketStatus, ...ticketInfo });
       }
       
-      // Check if already checked in
+      // Already checked in: say who and when, so the door can tell a
+      // second scan of the same phone from a copied ticket.
       if (qrCodeRecord.CheckedIn) {
-        await userPool.end();
-        return res.json({ returnStatus: 'failed_already_checked_in' });
+        const last = await lastCheckIn(userPool, qrCodeRecord.ID);
+        return refuse({ returnStatus: 'failed_already_checked_in', ...ticketInfo, ...last });
       }
       
       // Check if expired
@@ -2083,24 +2182,39 @@ app.post('/api/checkin', requireAuth, requirePermission(...PERMS_DOOR), async (r
       const expirationDate = new Date(qrCodeRecord.ExpirationDate);
       
       if (currentDate > expirationDate) {
-        await userPool.end();
-        return res.json({ 
-          returnStatus: 'failed_expired_qrcode', 
-          expirationDate: expirationDate.toISOString() 
-        });
+        return refuse({ returnStatus: 'failed_expired_qrcode', expirationDate: expirationDate.toISOString(), ...ticketInfo });
       }
       
-      // Update the QR code to checked in
-      await userPool.query(
-       'UPDATE "QRCodeProduct" SET "CheckedIn" = true, "LastEditedDate" = $1 WHERE "ID" = $2',
-       [currentDate.toISOString(), qrCodeRecord.ID]
+      // Another day, or a show well before/after now: ask first.
+      const mismatch = showtimeMismatch(qrCodeRecord.ProductDateText, venueWallClockNow(currentDate));
+      if (mismatch && !override) {
+        await userPool.end();
+        return res.json({ returnStatus: 'needs_confirm_showtime', ...ticketInfo, ...mismatch });
+      }
+      
+      // Conditional update: two scanners racing on one ticket can't both
+      // win -- the loser gets "already checked in" with who beat it.
+      const updated = await userPool.query(
+        `UPDATE "QRCodeProduct" SET "CheckedIn" = true, "LastEditedDate" = $1
+          WHERE "ID" = $2 AND "CheckedIn" = false AND COALESCE("Status", 'valid') = 'valid'
+          RETURNING "ID"`,
+        [currentDate.toISOString(), qrCodeRecord.ID]
       );
+      if (updated.rows.length === 0) {
+        const last = await lastCheckIn(userPool, qrCodeRecord.ID);
+        return refuse({ returnStatus: 'failed_already_checked_in', ...ticketInfo, ...last });
+      }
+      await logCheckIn(userPool, req, {
+        ticketId: qrCodeRecord.ID, action: 'check_in', result: 'successful_checkin',
+        override: Boolean(mismatch), overrideReason: mismatch ? mismatch.reason : null, source
+      });
 
       await userPool.end();
       return res.json({ 
         returnStatus: 'successful_checkin',
-        location: qrCodeRecord.ProductVenue,
-        productName: qrCodeRecord.ProductName
+        ...ticketInfo,
+        showtime: qrCodeRecord.ProductDateText ? showtimeMismatchLabel(qrCodeRecord.ProductDateText) : null,
+        overridden: Boolean(mismatch)
       });
 
     }
@@ -3766,11 +3880,20 @@ app.post('/api/checkout', requireAuth, requirePermission(...PERMS_DOOR), async (
       });
     }
     
-    // Update the QR code to checked out (CheckedIn = false)
-    await userPool.query(
-      'UPDATE "QRCodeProduct" SET "CheckedIn" = false, "LastEditedDate" = $1 WHERE "ID" = $2',
+    // Update the QR code to checked out (CheckedIn = false). Conditional, so
+    // two undos racing don't both report success.
+    const updated = await userPool.query(
+      'UPDATE "QRCodeProduct" SET "CheckedIn" = false, "LastEditedDate" = $1 WHERE "ID" = $2 AND "CheckedIn" = true RETURNING "ID"',
       [currentDate.toISOString(), qrCodeRecord.ID]
     );
+    if (updated.rows.length === 0) {
+      await userPool.end();
+      return res.json({ returnStatus: 'failed_already_checked_out' });
+    }
+    await logCheckIn(userPool, req, {
+      ticketId: qrCodeRecord.ID, action: 'check_out', result: 'successful_checkout',
+      source: req.body.source === 'manual' ? 'manual' : 'scanner'
+    });
     
     await userPool.end();
     return res.json({ returnStatus: 'successful_checkout' });
@@ -8557,6 +8680,7 @@ app.post('/v1/checkins', requireApiKey, requireScope('checkin:write'), async (re
       if (updated.rows.length === 0) {
         return { status: 409, body: errorBody('ticket_already_checked_in', 'Ticket is already checked in') };
       }
+      await logCheckIn(req.v1Pool, req, { ticketId: ticket.ID, action: 'check_in', result: 'successful_checkin', source: 'api' });
       const fresh = await v1FindTicket(req, qrCode);
       return { status: 201, body: { data: serializeTicket(fresh, req) } };
     });
@@ -8579,6 +8703,7 @@ app.post('/v1/checkins/:qrCode/undo', requireApiKey, requireScope('checkin:write
       if (updated.rows.length === 0) {
         return { status: 409, body: errorBody('ticket_not_checked_in', 'Ticket is not checked in') };
       }
+      await logCheckIn(req.v1Pool, req, { ticketId: ticket.ID, action: 'check_out', result: 'successful_checkout', source: 'api' });
       const fresh = await v1FindTicket(req, req.params.qrCode);
       return { status: 200, body: { data: serializeTicket(fresh, req) } };
     });

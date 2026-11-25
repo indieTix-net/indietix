@@ -1386,3 +1386,34 @@ ALTER TABLE public."QRCodeProduct" ADD COLUMN IF NOT EXISTS "ShowingID" INTEGER;
 CREATE INDEX IF NOT EXISTS "QRCodeProduct_ShowingID_idx" ON public."QRCodeProduct" ("ShowingID");
 
 COMMIT;
+
+
+-- ============================================================
+-- 2026-11-24: CheckInLog -- who checked each ticket in or out
+-- ============================================================
+-- One row per check-in, check-out or refused check-in of a real ticket
+-- (QRScanner's scanner and ticket list, and the /v1 API): which login or
+-- API key, from which screen, and whether the door overrode the showtime
+-- warning. Must match createDatabaseObjects in src/index.js. QRScanner
+-- works without it (logging is skipped), so this can run before or after
+-- that deploy.
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public."CheckInLog" (
+  "ID" SERIAL PRIMARY KEY,
+  "QRCodeProductID" INTEGER NOT NULL,
+  "Action" VARCHAR(20) NOT NULL CHECK ("Action" IN ('check_in', 'check_out', 'refused')),
+  "Result" VARCHAR(40) NOT NULL,
+  "Override" BOOLEAN NOT NULL DEFAULT false,
+  "OverrideReason" VARCHAR(20),
+  "UserType" VARCHAR(10) NOT NULL,
+  "UserID" INTEGER,
+  "ApiKeyID" INTEGER,
+  "Source" VARCHAR(20) NOT NULL,
+  "IPAddress" VARCHAR(64),
+  "CreatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "CheckInLog_QRCodeProductID_idx" ON public."CheckInLog" ("QRCodeProductID");
+CREATE INDEX IF NOT EXISTS "CheckInLog_CreatedAt_idx" ON public."CheckInLog" ("CreatedAt");
+
+COMMIT;

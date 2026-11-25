@@ -13,10 +13,12 @@ beforeEach(async () => {
   await ctx.pgClient.query(`DELETE FROM "QRCodeProduct"`);
 });
 
-async function insertTicket(qrCode, { expirationDate = '2099-01-01', checkedIn = false, status = 'valid' } = {}) {
+// showNow: the show starts right now (venue time), so check-in doesn't ask
+// "different show?"; otherwise the show was 2026-01-01 7 PM.
+async function insertTicket(qrCode, { expirationDate = '2099-01-01', checkedIn = false, status = 'valid', showNow = false } = {}) {
   const result = await ctx.pgClient.query(
     `INSERT INTO "QRCodeProduct" ("QRCode", "ExpirationDate", "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductID", "CheckedIn", "Status")
-     VALUES ($1, $2, '2026-01-01 19:00:00', 'Movie', 'Main', 'Movie', 'details', 'ITEM', $3, $4)
+     VALUES ($1, $2, ${showNow ? `(NOW() AT TIME ZONE 'America/Chicago')` : `'2026-01-01 19:00:00'`}, 'Movie', 'Main', 'Movie', 'details', 'ITEM', $3, $4)
      RETURNING "ID"`,
     [qrCode, expirationDate, checkedIn, status]
   );
@@ -42,7 +44,7 @@ test('POST /api/checkin: refunded, cancelled, deleted and transferred tickets ar
 });
 
 test('POST /api/checkin: a ticket with a legacy NULL status still checks in', async () => {
-  await insertTicket('QR-NULL-STATUS', { status: null });
+  await insertTicket('QR-NULL-STATUS', { status: null, showNow: true });
   const { json } = await ctx.request('POST', '/api/checkin', { token: ctx.clientToken, body: { qrCode: 'QR-NULL-STATUS' } });
   assert.equal(json.returnStatus, 'successful_checkin');
 });
@@ -62,7 +64,7 @@ test('POST /api/checkin: expired ticket is rejected', async () => {
 });
 
 test('POST /api/checkin: checks in a valid ticket by QR code', async () => {
-  await insertTicket('QR-CKIN-4');
+  await insertTicket('QR-CKIN-4', { showNow: true });
   const { status, json } = await ctx.request('POST', '/api/checkin', { token: ctx.clientToken, body: { qrCode: 'QR-CKIN-4' } });
   assert.equal(status, 200);
   assert.equal(json.returnStatus, 'successful_checkin');

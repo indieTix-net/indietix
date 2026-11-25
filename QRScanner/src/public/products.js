@@ -936,12 +936,15 @@ document.addEventListener('DOMContentLoaded', function() {
     confirmCheckinButton.addEventListener('click', () => confirmCheckin(false));
     confirmCheckinPrintButton.addEventListener('click', () => confirmCheckin(true));
 
-    function confirmCheckin(alsoPrint) {
-        if (!currentQrCode) {
+    // override: staff saw the "different day/show" question and chose to
+    // check in anyway. qrCodeArg carries the ticket into that second try,
+    // after the modal (and currentQrCode) may have moved on.
+    function confirmCheckin(alsoPrint, override = false, qrCodeArg = null) {
+        const qrCode = qrCodeArg || currentQrCode;
+        if (!qrCode) {
             UIDialogs.showMessage({ type: 'error', title: 'Couldn\'t check in', message: "This ticket has no QR code." });
             return;
         }
-        const qrCode = currentQrCode;
         
         console.log("Checking in event with QR Code:", qrCode, alsoPrint ? '(and printing)' : '');
         confirmCheckinButton.disabled = true;
@@ -950,12 +953,23 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`${API_URL}/api/checkin`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ qrCode })
+            body: JSON.stringify({ qrCode, override, source: 'manual' })
         })
         .then(response => UIDialogs.readJson(response))  // 401/403 handling is automatic via auth-helper
         .then(async data => {
             console.log("Check-in response:", data);
             
+            if (data.returnStatus === 'needs_confirm_showtime') {
+                checkinModal.hide();
+                const what = data.reason === 'other_day' ? 'another day' : data.reason === 'later_show' ? 'a later show' : 'an earlier show';
+                const yes = await UIDialogs.showConfirm({
+                    title: 'Different show',
+                    message: `This ticket is for ${what}: ${[data.productName, data.showtime].filter(Boolean).join(', ')}. Check it in anyway?`,
+                    confirmText: 'Check In Anyway'
+                });
+                if (yes) confirmCheckin(alsoPrint, true, qrCode);
+                return;
+            }
             if (data.returnStatus === 'successful_checkin' && alsoPrint) {
                 try {
                     await sendTicketToPrinter(qrCode);
@@ -972,7 +986,9 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 checkinModal.hide();
                 if (data.returnStatus === 'failed_already_checked_in') {
-                    UIDialogs.showMessage({ type: 'warning', title: 'Already checked in', message: 'This ticket was already checked in.' });
+                    const at = data.checkedInAt ? new Date(data.checkedInAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+                    const who = [data.checkedInBy ? `by ${data.checkedInBy}` : '', at ? `at ${at}` : ''].filter(Boolean).join(' ');
+                    UIDialogs.showMessage({ type: 'warning', title: 'Already checked in', message: `This ticket was already checked in${who ? ' ' + who : ''}.` });
                 } else if (data.returnStatus === 'failed_expired_qrcode') {
                     UIDialogs.showMessage({ type: 'error', title: "Couldn't check in", message: 'This ticket has expired.' });
                 } else if (data.returnStatus === 'failed_no_QRCode') {
@@ -1009,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`${API_URL}/api/checkout`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ qrCode: currentQrCode })
+            body: JSON.stringify({ qrCode: currentQrCode, source: 'manual' })
         })
         .then(response => UIDialogs.readJson(response))  // 401/403 handling is automatic via auth-helper
         .then(data => {
