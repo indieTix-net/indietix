@@ -44,25 +44,39 @@
     };
     
     /**
-     * Master menu definition. The header builder filters this list based on
-     * the current user's access. Order here is the display order.
+     * Master menu definition: five groups, then Help on its own. The header
+     * builder filters each group by the current user's access and drops a
+     * group with nothing left in it. Order here is the display order.
      */
-    const MENU_ITEMS = [
-        { href: '/dashboard.html',        label: 'Today\u2019s Dashboard',         perms: ['view', 'edit', 'checkIn'] },
-        { href: '/',                      label: 'Ticket Scanner',                perms: ['view', 'edit', 'checkIn'] },
-        { href: '/products.html',         label: 'Manual Checkin / List Tickets', perms: ['view', 'edit', 'checkIn'] },
-        { href: '/order.html',            label: 'List Orders',                   perms: ['view', 'edit'] },
-        { href: '/reports.html',          label: 'Event Report',                  perms: ['view', 'edit'] },
-        { href: '/box-office-reports.html', label: 'Box Office Reports',          perms: ['edit'] },
-        { href: '/insights.html',         label: 'Insights',                      perms: ['admin'] },
-        { href: '/getMovieInfo.html',     label: 'Movie Info Lookup',             perms: ['edit'] },
-        { href: '/getEventInfo.html',     label: 'Event Info Entry',              perms: ['edit'] },
-        { href: '/showtimes.html',        label: 'Showtimes',                     perms: ['edit'] },
-        { href: '/marketing.html',        label: 'Marketing Schedule',            perms: ['marketing'] },
-        { href: '/marketing-posts.html',  label: 'Marketing Posts',               perms: ['marketing'] },
-        { href: '/email-list.html',       label: 'Email List',                    perms: ['marketing'] },
-        { href: '/user-management.html',  label: 'User Management',               clientOnly: true },
-        { href: '/client.html',           label: 'Client Settings',               clientOnly: true },
+    const MENU_GROUPS = [
+        { id: 'ticketing', label: 'Ticketing', items: [
+            { href: '/dashboard.html',        label: 'Today\u2019s Dashboard',         perms: ['view', 'edit', 'checkIn'] },
+            { href: '/',                      label: 'Ticket Scanner',                perms: ['view', 'edit', 'checkIn'] },
+            { href: '/products.html',         label: 'Manual Checkin / List Tickets', perms: ['view', 'edit', 'checkIn'] },
+            { href: '/order.html',            label: 'List Orders',                   perms: ['view', 'edit'] }
+        ] },
+        { id: 'reporting', label: 'Reporting', items: [
+            { href: '/reports.html',          label: 'Event Report',                  perms: ['view', 'edit'] },
+            { href: '/box-office-reports.html', label: 'Box Office Reports',          perms: ['edit'] },
+            { href: '/insights.html',         label: 'Insights',                      perms: ['admin'] }
+        ] },
+        { id: 'events', label: 'Events', items: [
+            { href: '/showtimes.html',        label: 'Showtimes',                     perms: ['edit'] },
+            { href: '/getMovieInfo.html',     label: 'Movie Info Lookup',             perms: ['edit'] },
+            { href: '/getEventInfo.html',     label: 'Event Info Entry',              perms: ['edit'] }
+        ] },
+        { id: 'marketing', label: 'Marketing', items: [
+            { href: '/marketing.html',        label: 'Marketing Schedule',            perms: ['marketing'] },
+            { href: '/marketing-posts.html',  label: 'Marketing Posts',               perms: ['marketing'] },
+            { href: '/email-list.html',       label: 'Email List',                    perms: ['marketing'] }
+        ] },
+        { id: 'admin', label: 'Admin', items: [
+            { href: '/user-management.html',  label: 'User Management',               clientOnly: true },
+            { href: '/client.html',           label: 'Client Settings',               clientOnly: true },
+            { href: '/privacy-requests.html', label: 'Privacy Requests',              clientOnly: true }
+        ] }
+    ];
+    const MENU_LINKS = [
         { href: '/help/index.html',       label: 'Help' }                         // public guide, for everyone
     ];
     
@@ -326,29 +340,244 @@
     }
     
     /**
-     * Build the nav menu HTML, filtered by the current user's access.
+     * Can the current user open this menu item?
      */
+    function canSeeItem(item, isClient, perms) {
+        if (item.clientOnly) {
+            if (isClient) return true;
+            // clientOnly items can still list perms as an additional
+            // allowed path for sub-users (e.g. clientOnly + perms: ['admin']).
+            if (!item.perms || item.perms.length === 0) return false;
+        } else if (isClient) {
+            return true;                                         // clients see all non-clientOnly
+        }
+        if (!item.perms || item.perms.length === 0) return true;
+        return item.perms.some(p => perms[p] === true);
+    }
+    
+    // ---- GROUPED MENU ----
+    // Each group is a header button with a dropdown of its pages (on a
+    // phone, the hamburger lists every group's pages under its name). The
+    // group holding the current page is marked, and so is the page.
+    function isCurrentPage(href) {
+        const path = window.location.pathname;
+        if (href === '/') return path === '/' || path === '/index.html';
+        return path === href;
+    }
+    
     function buildMenuHtml() {
         const isClient = isClientUser();
         const perms = getPermissions();
+        const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const link = (item, extra) => {
+            const current = isCurrentPage(item.href);
+            return `<a href="${item.href}" class="nav-link${extra ? ' ' + extra : ''}${current ? ' is-current' : ''}"${current ? ' aria-current="page"' : ''}>${esc(item.label)}</a>`;
+        };
         
-        const visible = MENU_ITEMS.filter(item => {
-            if (item.clientOnly) {
-                if (isClient) return true;
-                // clientOnly items can still list perms as an additional
-                // allowed path for sub-users (e.g. clientOnly + perms: ['admin']).
-                if (!item.perms || item.perms.length === 0) return false;
-            } else if (isClient) {
-                return true;                                     // clients see all non-clientOnly
-            }
-            if (!item.perms || item.perms.length === 0) return true;
-            return item.perms.some(p => perms[p] === true);
+        const groups = MENU_GROUPS.map(group => {
+            const items = group.items.filter(item => canSeeItem(item, isClient, perms));
+            if (items.length === 0) return '';
+            const current = items.some(item => isCurrentPage(item.href));
+            return `
+                <div class="nav-group${current ? ' is-current' : ''}" data-group="${group.id}">
+                    <button type="button" class="nav-link nav-group-toggle" aria-expanded="false" aria-controls="nav-menu-${group.id}">${esc(group.label)}<span class="nav-caret" aria-hidden="true">&#9662;</span></button>
+                    <div class="nav-group-menu" id="nav-menu-${group.id}">
+                        ${items.map(item => link(item, 'nav-sublink')).join('\n')}
+                    </div>
+                </div>`;
+        }).join('\n');
+        
+        const links = MENU_LINKS
+            .filter(item => canSeeItem(item, isClient, perms))
+            .map(item => link(item))
+            .join('\n');
+        return groups + '\n' + links;
+    }
+    
+    /**
+     * Open and close the group dropdowns: hover (with a mouse) or click,
+     * one open at a time, Escape or a click elsewhere closes them. On a
+     * phone the groups are always expanded inside the hamburger, so none
+     * of this applies there.
+     */
+    function initializeMenuGroups() {
+        const nav = document.getElementById('main-nav');
+        if (!nav) return;
+        const groups = [...nav.querySelectorAll('.nav-group')];
+        const isPhone = () => window.matchMedia('(max-width: 768px)').matches;
+        const canHover = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        
+        function setOpen(group, open) {
+            group.classList.toggle('is-open', open);
+            const btn = group.querySelector('.nav-group-toggle');
+            if (btn) btn.setAttribute('aria-expanded', String(open));
+        }
+        function closeAll(except) {
+            groups.forEach(g => { if (g !== except) setOpen(g, false); });
+        }
+        
+        groups.forEach(group => {
+            const btn = group.querySelector('.nav-group-toggle');
+            let closeTimer = null;
+            btn.addEventListener('click', (e) => {
+                if (isPhone()) return;
+                e.stopPropagation();
+                // Hovering just opened it: the click that follows keeps it
+                // open rather than closing it again.
+                const justHovered = Date.now() - (group.__hoverOpenedAt || 0) < 700;
+                const open = justHovered || !group.classList.contains('is-open');
+                closeAll(group);
+                setOpen(group, open);
+                if (open) {
+                    const first = group.querySelector('.nav-sublink');
+                    if (first && e.detail === 0) first.focus();  // keyboard (Enter/Space) opens into the list
+                }
+            });
+            group.addEventListener('mouseenter', () => {
+                if (isPhone() || !canHover()) return;
+                clearTimeout(closeTimer);
+                closeAll(group);
+                if (!group.classList.contains('is-open')) group.__hoverOpenedAt = Date.now();
+                setOpen(group, true);
+            });
+            group.addEventListener('mouseleave', () => {
+                if (isPhone() || !canHover()) return;
+                closeTimer = setTimeout(() => setOpen(group, false), 180);
+            });
+            group.addEventListener('focusout', (e) => {
+                if (!group.contains(e.relatedTarget)) setOpen(group, false);
+            });
+            group.addEventListener('keydown', (e) => {
+                if (e.key !== 'Escape' || !group.classList.contains('is-open')) return;
+                setOpen(group, false);
+                btn.focus();
+            });
         });
         
-        return visible
-            .map(item => `<a href="${item.href}" class="nav-link">${item.label}</a>`)
-            .join('\n');
+        if (!document.__navGroupsOutsideClick) {
+            document.__navGroupsOutsideClick = true;
+            document.addEventListener('click', (e) => {
+                document.querySelectorAll('#main-nav .nav-group.is-open').forEach(g => {
+                    if (!g.contains(e.target)) {
+                        g.classList.remove('is-open');
+                        const b = g.querySelector('.nav-group-toggle');
+                        if (b) b.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            });
+        }
     }
+    
+    /**
+     * Styles for the grouped menu. Injected like the collapse styles so
+     * every page gets them without its own stylesheet changing. Colors come
+     * from the theme's --lh-* tokens.
+     */
+    function injectMenuStyles() {
+        if (document.getElementById('header-menu-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'header-menu-styles';
+        style.textContent = `
+            #main-nav { align-items: center; row-gap: 6px; }
+            #main-nav .nav-group { position: relative; display: inline-block; }
+            
+            /* The group header looks like the other menu links (style.css
+               gives every .nav-link its color and underline), minus the
+               browser's button chrome. */
+            #main-nav .nav-group-toggle {
+                background: none;
+                border: 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+                font: inherit;
+                cursor: pointer;
+                padding: 8px 16px;
+                display: inline-flex !important;
+                align-items: center;
+                gap: 6px;
+            }
+            #main-nav .nav-caret {
+                font-size: 0.75em;
+                display: inline-block;
+                transition: transform 0.15s ease;
+                text-decoration: none;
+            }
+            #main-nav .nav-group.is-open .nav-caret { transform: rotate(180deg); }
+            #main-nav .nav-group.is-current > .nav-group-toggle { font-weight: 600; }
+            
+            #main-nav .nav-group-menu {
+                display: none;
+                position: absolute;
+                top: calc(100% + 6px);
+                left: 50%;
+                transform: translateX(-50%);
+                min-width: 230px;
+                padding: 6px;
+                background: var(--lh-panel-grad, #fff);
+                border: 1px solid var(--lh-border, #dee2e6);
+                border-radius: var(--lh-radius, 12px);
+                box-shadow: var(--lh-shadow, 0 10px 28px rgba(0, 0, 0, 0.2));
+                z-index: 1000;
+                text-align: left;
+            }
+            /* A bridge across the gap, so moving the mouse down to the list
+               doesn't close it. */
+            #main-nav .nav-group-menu::before {
+                content: '';
+                position: absolute;
+                left: 0; right: 0; top: -8px; height: 8px;
+            }
+            #main-nav .nav-group.is-open .nav-group-menu { display: block; }
+            #main-nav .nav-sublink {
+                display: block !important;
+                padding: 9px 12px;
+                border-radius: 8px;
+                white-space: nowrap;
+            }
+            #main-nav .nav-sublink:hover,
+            #main-nav .nav-sublink:focus-visible { background: rgba(255, 255, 255, 0.06); }
+            #main-nav .nav-sublink.is-current {
+                background: rgba(255, 255, 255, 0.08);
+                font-weight: 600;
+            }
+            
+            /* Phone: the hamburger lists every group, its name as a small
+               heading over its pages. */
+            @media (max-width: 768px) {
+                #main-nav .nav-group { display: block; width: 100%; }
+                #main-nav .nav-group-toggle {
+                    width: 100%;
+                    justify-content: center;
+                    cursor: default;
+                    pointer-events: none;
+                    text-decoration: none !important;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: var(--lh-muted, #6c757d) !important;
+                    padding: 14px 16px 6px !important;
+                    border-bottom: 0 !important;
+                }
+                #main-nav .nav-caret { display: none; }
+                #main-nav .nav-group-toggle::after { display: none; }
+                #main-nav .nav-group-menu {
+                    display: block;
+                    position: static;
+                    transform: none;
+                    min-width: 0;
+                    padding: 0;
+                    background: none;
+                    border: 0;
+                    box-shadow: none;
+                    text-align: center;
+                }
+                #main-nav .nav-group-menu::before { display: none; }
+                #main-nav .nav-sublink { border-radius: 0; white-space: normal; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    // ---- END GROUPED MENU ----
     
     /**
      * Get inline header template with role-based menu items
@@ -616,7 +845,7 @@
         });
         
         // Close menu when clicking a nav link (mobile only)
-        const navLinks = mainNav.querySelectorAll('.nav-link');
+        const navLinks = mainNav.querySelectorAll('a.nav-link');
         navLinks.forEach(link => {
             link.addEventListener('click', function() {
                 if (window.innerWidth <= 768) {
@@ -644,6 +873,7 @@
         // Make sure the collapse styles are present in <head> before any
         // header markup is injected. Function is idempotent.
         injectCollapseStyles();
+        injectMenuStyles();
         
         try {
             // Get branding config (from cache or API)
@@ -666,8 +896,9 @@
                 headerElement.style.display = 'block';
             }
             
-            // Initialize mobile menu toggle
+            // Initialize mobile menu toggle and the group dropdowns
             initializeMobileMenuToggle();
+            initializeMenuGroups();
             
             // Wire up collapse/expand toggle and apply saved preference.
             initializeCollapseToggle();
@@ -716,8 +947,9 @@
                 </div>
             `;
             
-            // Initialize mobile menu toggle
+            // Initialize mobile menu toggle and the group dropdowns
             initializeMobileMenuToggle();
+            initializeMenuGroups();
             
             // Wire up collapse/expand toggle and apply saved preference.
             initializeCollapseToggle();
