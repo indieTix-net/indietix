@@ -20,7 +20,6 @@
     "@aws-sdk/credential-provider-node": "^3.0.0",
     "@aws-sdk/s3-request-presigner": "^3.1090.0",
     "mailcomposer": "^4.0.2",
-    "nodemailer": "^6.9.16",
     "pg": "^8.13.3",
     "sms-utils": "file:../sms-utils",
     "square": "^42.0.0",
