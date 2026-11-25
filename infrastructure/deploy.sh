@@ -73,8 +73,11 @@ read-only.
                                 a new layer version for <repo>. Does NOT
                                 attach it -- see attach-layer.
   attach-layer <repo>          Attach the latest published layer version to
-                                <repo>'s function, preserving any other
-                                attached layers (e.g. LambdaInsightsExtension).
+                                <repo>'s function in the same slot, keeping
+                                every other layer where it is (layer order
+                                decides which copy of a shared file wins).
+                                If the new layer drops a package the live
+                                code still imports, deploy the code first.
 
   static-diff                  Show which QRScanner/src/public files differ
                                 from what's actually live in S3.
@@ -379,10 +382,26 @@ cmd_deploy_layer() {
   echo
   confirm "Publish new version of layer '$LAYER_NAME'?" "" || { echo "Aborted (nothing published)."; return 1; }
 
+  # A big zip sent straight to Lambda keeps dropping ("Connection was closed
+  # before we received a valid response", 2026-11-24, 18 MB+), so anything
+  # over 10 MB goes up through the account's SAM bucket instead.
+  local content=(--zip-file "fileb://$layer_zip") size bucket key
+  size=$(wc -c < "$layer_zip" | tr -d ' ')
+  if [ "$size" -gt 10485760 ]; then
+    bucket=$(aws s3api list-buckets \
+      --query "Buckets[?starts_with(Name, 'aws-sam-cli-managed-default')].Name | [0]" --output text)
+    if [ -n "$bucket" ] && [ "$bucket" != "None" ]; then
+      key="layers/${LAYER_NAME}-$(date +%Y%m%d-%H%M%S).zip"
+      echo "Uploading $((size / 1048576)) MB layer zip to s3://$bucket/$key"
+      aws s3 cp "$layer_zip" "s3://$bucket/$key" --only-show-errors || return 1
+      content=(--content "S3Bucket=$bucket,S3Key=$key")
+    fi
+  fi
+
   local new_arn
   new_arn=$(aws lambda publish-layer-version \
     --layer-name "$LAYER_NAME" \
-    --zip-file "fileb://$layer_zip" \
+    "${content[@]}" \
     --compatible-runtimes nodejs22.x \
     --compatible-architectures x86_64 \
     --query 'LayerVersionArn' --output text)
@@ -404,18 +423,31 @@ cmd_attach_layer() {
     --query 'LayerVersions[0].Version' --output text)
   local layer_arn="arn:aws:lambda:$REGION:$ACCOUNT_ID:layer:$LAYER_NAME:$latest_version"
 
-  # Preserve any other layers already attached (e.g. LambdaInsightsExtension)
-  # that don't match this layer name.
-  local other_layers
-  other_layers=$(aws lambda get-function-configuration --function-name "$AWS_FN" \
-    --query "Layers[?!contains(Arn, ':layer:${LAYER_NAME}:')].Arn" --output text)
+  # Swap this layer in place and keep every other attached layer (e.g.
+  # LambdaInsightsExtension) in its slot. ORDER MATTERS: Lambda unpacks
+  # layers into /opt in list order, and a later layer overwrites a file an
+  # earlier one also has. Moving the function's own layer to the front once
+  # let square-api-lib/sms-utils/ticket-pdf-lib overwrite its newer AWS SDK
+  # internals with older copies, and QRScanner crashed at startup
+  # (2026-11-24). A function with no copy of the layer yet gets it last.
+  local current layers=() a found=""
+  current=$(aws lambda get-function-configuration --function-name "$AWS_FN" \
+    --query 'Layers[].Arn' --output text)
+  for a in $current; do
+    if [[ "$a" == *":layer:${LAYER_NAME}:"* ]]; then
+      layers+=("$layer_arn"); found=1
+    else
+      layers+=("$a")
+    fi
+  done
+  [ -z "$found" ] && layers+=("$layer_arn")
 
   echo "Attaching $layer_arn to $AWS_FN"
-  [ -n "$other_layers" ] && echo "Preserving other layer(s): $other_layers"
+  echo "Layer order: ${layers[*]}"
 
   aws lambda update-function-configuration \
     --function-name "$AWS_FN" \
-    --layers $layer_arn $other_layers \
+    --layers "${layers[@]}" \
     --query '{Layers:Layers[].Arn,LastUpdateStatus:LastUpdateStatus}' \
     --output json
 
