@@ -32,10 +32,10 @@ let userSeq = 0;
 const userWith = (permissions, dataFilter) =>
   ctx.insertUser({ username: `perm-user-${++userSeq}`, permissions, dataFilter });
 
-async function insertTicket(qrCode, productName, { checkedIn = false } = {}) {
+async function insertTicket(qrCode, productName, { checkedIn = false, showNow = false } = {}) {
   const result = await ctx.pgClient.query(
     `INSERT INTO "QRCodeProduct" ("QRCode", "ExpirationDate", "ProductDate", "ProductName", "ProductLocation", "ProductType", "ProductDetails", "ProductID", "CheckedIn", "Status")
-     VALUES ($1, '2099-01-01', '2026-01-01 19:00:00', $2, 'Main', 'Movie', 'details', 'ITEM', $3, 'valid')
+     VALUES ($1, '2099-01-01', ${showNow ? `(NOW() AT TIME ZONE 'America/Chicago')` : `'2026-01-01 19:00:00'`}, $2, 'Main', 'Movie', 'details', 'ITEM', $3, 'valid')
      RETURNING "ID"`,
     [qrCode, productName, checkedIn]
   );
@@ -181,7 +181,7 @@ test('scanner lookup: a filtered user sees their own event\'s ticket but not ano
 
 test('check-in: a filtered user cannot check in another event\'s ticket, and it stays unchecked', async () => {
   const otherId = await insertTicket('QR-B', 'Movie B');
-  await insertTicket('QR-A', 'Movie A');
+  await insertTicket('QR-A', 'Movie A', { showNow: true });
   const { token } = await userWith(only('checkIn'), FILTER_A);
 
   const other = await ctx.request('POST', '/api/checkin', { token, body: { qrCode: 'QR-B' } });

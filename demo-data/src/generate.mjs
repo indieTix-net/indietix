@@ -683,7 +683,7 @@ function literal(column, value) {
 export const RESET_TABLES = ['ExternalCatalogLink', 'Showing', 'TicketType', 'Event', 'NoTicketOrder',
   'QRCodeProductToOrder', 'QRCodeProduct', 'Order', 'Customer', 'SmsConsent', 'SmsOutboundLog',
   'MarketingSchedule', 'MarketingPost', 'MarketingEmailContact', 'SkeletonKeyUsage', 'SkeletonKey', 'Users',
-  'ApiIdempotency', 'ApiKey', 'PrivacyRequest'];
+  'ApiIdempotency', 'ApiKey', 'PrivacyRequest', 'CheckInLog'];
 const ID_COLUMN = { SkeletonKey: 'id', SkeletonKeyUsage: 'id' };
 
 /** Yields SQL statements (strings) that reset the venue and load the demo, in order; each stays under maxBytes. */
