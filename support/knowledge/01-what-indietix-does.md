@@ -26,19 +26,23 @@ IndieTix is ticketing for independent cinemas, venues and promoters, built on Sq
 
 ## What's in the menu
 
-| Menu item | What it's for | Who sees it |
-|---|---|---|
-| Today's Dashboard | Today's shows with sold and checked-in counts | Door, view or edit permission |
-| Ticket Scanner | Scan tickets with the camera | Door, view or edit permission |
-| Manual Checkin / List Tickets | Find any ticket, check in by hand, transfer, print | Door, view or edit permission |
-| List Orders | Find orders, resend, refund, edit contact details | View or edit permission |
-| Event Report | Sales and check-ins, grouped and exported | View or edit permission |
-| Box Office Reports | Download the nightly box-office files for any dates | Edit permission |
-| Insights | Questions about your sales in plain English | Admin permission |
-| Movie Info Lookup | Add a movie and its showtimes | Edit permission |
-| Event Info Entry | Add a live event and its showtimes | Edit permission |
-| Showtimes | Add, change, re-seat or cancel showtimes; edit or end a show | Edit permission |
-| Marketing Schedule | Plan and approve social and email posts | Marketing permission |
-| Email List | Marketing email subscribers | Marketing permission |
-| User Management | Staff accounts and permissions | Main login only |
-| Client Settings | Everything about the venue's setup | Main login only |
+The menu has five groups (Ticketing, Reporting, Events, Marketing and Admin), plus Help. Point at a group, or tap it, to see its pages. On a phone, the menu button lists every group with its pages underneath. Each login sees only the pages it can use, and a group with none of them doesn't show.
+
+| Group | Page | What it's for | Who sees it |
+|---|---|---|---|
+| Ticketing | Today's Dashboard | Today's shows with sold and checked-in counts | Door, view or edit permission |
+| Ticketing | Ticket Scanner | Scan tickets with the camera | Door, view or edit permission |
+| Ticketing | Manual Checkin / List Tickets | Find any ticket, check in by hand, transfer, print | Door, view or edit permission |
+| Ticketing | List Orders | Find orders, resend, refund, edit contact details | View or edit permission |
+| Reporting | Event Report | Sales and check-ins, grouped and exported | View or edit permission |
+| Reporting | Box Office Reports | Download the nightly box-office files for any dates | Edit permission |
+| Reporting | Insights | Questions about your sales in plain English | Admin permission |
+| Events | Showtimes | Add, change, re-seat or cancel showtimes; edit or end a show | Edit permission |
+| Events | Movie Info Lookup | Add a movie and its showtimes | Edit permission |
+| Events | Event Info Entry | Add a live event and its showtimes | Edit permission |
+| Marketing | Marketing Schedule | Plan and approve social and email posts | Marketing permission |
+| Marketing | Marketing Posts | Read and edit the drafted posts | Marketing permission |
+| Marketing | Email List | Marketing email subscribers | Marketing permission |
+| Admin | User Management | Staff accounts and permissions | Main login only |
+| Admin | Client Settings | Everything about the venue's setup | Main login only |
+| Admin | Privacy Requests | Customers' requests to see or erase their data | Main login only |
