@@ -3,7 +3,7 @@
     "@aws-sdk/client-s3": "^3.873.0",
     "@aws-sdk/client-secrets-manager": "^3.873.0",
     "@aws-sdk/client-ses": "^3.873.0",
-    "basic-ftp": "^5.3.1",
+    "basic-ftp": "^6.2.4",
     "ftp": "^0.3.10",
     "pg": "^8.16.3",
     "ssh2-sftp-client": "^10.0.3"
