@@ -242,102 +242,159 @@
     // Skip on the login page itself so we don't fight with login flow.
     enforcePageAccess();
     
+    // ---- BRANDING CACHE + FALLBACKS ----
+    // The header's logo and venue name come from /api/client/branding,
+    // kept in localStorage for CACHE_DURATION. The saved copy is tied to
+    // the logged-in venue (the token's dbName), so another venue's login
+    // never sees it. A failed request (expired login, the database waking,
+    // spotty signal) never saves anything: the header keeps the venue's
+    // last good branding, even if older than CACHE_DURATION, and tries the
+    // API again on the next page. With nothing saved, it uses the logo
+    // published for this address (venue-sites/<name>/site.json, as the
+    // login page does), and the IndieTix default only as a last resort.
+    // Saved copies from before this change have no venue and are ignored.
+
+    /** The logged-in venue's ID from the token, or null. */
+    function getTokenVenue() {
+        const token = localStorage.getItem('authToken');
+        if (!token) return null;
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return payload.dbName || payload.username || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
     /**
-     * Get cached branding data from localStorage
+     * This venue's saved branding as { data, fresh }, or null when there's
+     * none (or it belongs to a different venue).
      */
     function getCachedBranding() {
         try {
             const cached = localStorage.getItem(CACHE_KEY);
             if (!cached) return null;
-            
-            const { data, timestamp } = JSON.parse(cached);
-            const now = Date.now();
-            
-            // Check if cache is still valid (within 30 minutes)
-            if (now - timestamp < CACHE_DURATION) {
-                console.log('Using cached branding data');
-                return data;
-            } else {
-                console.log('Cached branding data expired, will fetch fresh data');
-                localStorage.removeItem(CACHE_KEY);
-                return null;
-            }
+            const { data, timestamp, venue } = JSON.parse(cached);
+            const currentVenue = getTokenVenue();
+            if (!data || !data.logoFile || !venue || !currentVenue || venue !== currentVenue) return null;
+            return { data, fresh: Date.now() - timestamp < CACHE_DURATION };
         } catch (error) {
             console.warn('Error reading branding cache:', error);
-            localStorage.removeItem(CACHE_KEY);
             return null;
         }
     }
-    
-    /**
-     * Cache branding data to localStorage
-     */
+
+    /** Save branding the API returned for the logged-in venue. */
     function cacheBranding(data) {
+        const venue = getTokenVenue();
+        if (!venue) return;
         try {
-            const cacheData = {
-                data: data,
-                timestamp: Date.now()
-            };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-            console.log('Branding data cached successfully');
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now(), venue }));
         } catch (error) {
             console.warn('Error caching branding data:', error);
         }
     }
-    
+
+    const DEFAULT_BRANDING = {
+        webHeaderCompany: 'IndieTix',
+        logoFile: 'indieTixLogo.png',
+        theaterName: '',
+        clientID: 'default'
+    };
+
     /**
-     * Fetch branding configuration from API
+     * The branding published for this venue address (<name>.<domain>), or
+     * null on any other address or failure. Same checks as login.html.
      */
-    async function fetchBrandingConfig() {
-        // Check cache first
-        const cached = getCachedBranding();
-        if (cached) {
-            return cached;
-        }
-        
+    async function fetchVenueSiteBranding() {
         try {
-            console.log('Fetching fresh branding data from API');
+            const domain = String(window.INDIETIX_VENUE_SITE_DOMAIN || '').toLowerCase();
+            const host = window.location.hostname.toLowerCase();
+            if (!domain || !host.endsWith(`.${domain}`)) return null;
+            const name = host.slice(0, -(domain.length + 1));
+            if (!/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(name)) return null;
+            const response = await fetch(`venue-sites/${name}/site.json`, { cache: 'no-cache' });
+            if (!response.ok) return null;
+            const site = await response.json();
+            const logoFile = site && site.logoFile;
+            if (!logoFile || !/^[A-Za-z0-9._\/-]+$/.test(logoFile) || logoFile.includes('..')) return null;
+            return {
+                webHeaderCompany: site.venueName || DEFAULT_BRANDING.webHeaderCompany,
+                logoFile,
+                theaterName: '',
+                clientID: site.clientId || 'default'
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Branding for the header. options.fresh skips a still-fresh saved copy
+     * (used when the logo file itself failed to load).
+     */
+    async function fetchBrandingConfig(options = {}) {
+        const cached = getCachedBranding();
+        if (cached && cached.fresh && !options.fresh) {
+            return cached.data;
+        }
+
+        try {
             const response = await fetch(`${API_URL}/api/client/branding`, {
                 headers: getAuthHeaders()
             });
-            
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
             const data = await response.json();
-            
             if (data.success && data.branding) {
-                // Cache the successful response
                 cacheBranding(data.branding);
                 return data.branding;
-            } else {
-                throw new Error(data.message || 'Failed to load branding configuration');
             }
+            throw new Error(data.message || 'Failed to load branding configuration');
         } catch (error) {
             console.error('Error fetching branding config:', error);
-            // Return default fallback values
-            const defaultBranding = {
-                webHeaderCompany: 'IndieTix',
-                logoFile: 'indieTixLogo.png',
-                theaterName: '',
-                clientID: 'default'
-            };
-            
-            // Cache the fallback for a shorter time (5 minutes) to retry sooner
-            try {
-                const shortCacheData = {
-                    data: defaultBranding,
-                    timestamp: Date.now() - (CACHE_DURATION - 5 * 60 * 1000) // Expires in 5 minutes
-                };
-                localStorage.setItem(CACHE_KEY, JSON.stringify(shortCacheData));
-            } catch (cacheError) {
-                // Ignore cache errors for fallback data
+            if (cached) {
+                console.log('Using the last saved branding until the next page load');
+                return cached.data;
             }
-            
-            return defaultBranding;
+            return (await fetchVenueSiteBranding()) || DEFAULT_BRANDING;
         }
     }
+
+    /**
+     * If the header logo can't load (e.g. it was replaced and the old file
+     * deleted while this device still had the old name saved), fetch fresh
+     * branding once and swap it in; then the venue address's logo; then
+     * the IndieTix default. Each step runs at most once per page.
+     */
+    function watchHeaderLogo(container) {
+        const logoImg = container.querySelector('#header-logo');
+        if (!logoImg) return;
+        const tried = new Set([logoImg.getAttribute('src')]);
+        let refetched = false;
+        let siteTried = false;
+        const use = (logoFile) => {
+            if (!logoFile || tried.has(logoFile)) return false;
+            tried.add(logoFile);
+            logoImg.src = logoFile;
+            return true;
+        };
+        logoImg.addEventListener('error', async () => {
+            if (!refetched) {
+                refetched = true;
+                const branding = await fetchBrandingConfig({ fresh: true });
+                if (use(branding && branding.logoFile)) return;
+            }
+            if (!siteTried) {
+                siteTried = true;
+                const site = await fetchVenueSiteBranding();
+                if (use(site && site.logoFile)) return;
+            }
+            use(DEFAULT_BRANDING.logoFile);
+        });
+    }
+    // ---- END BRANDING CACHE + FALLBACKS ----
     
     /**
      * Can the current user open this menu item?
@@ -889,6 +946,7 @@
             
             // Inject into container
             container.innerHTML = populatedHeader;
+            watchHeaderLogo(container);
             
             // Show the header (in case it was hidden)
             const headerElement = container.querySelector('#app-header');
@@ -1045,6 +1103,7 @@
         injectHeader,
         initializeHeader,
         fetchBrandingConfig,
+        watchHeaderLogo,
         clearCache,
         getUserType,
         isClientUser,
